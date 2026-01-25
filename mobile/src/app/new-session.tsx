@@ -51,11 +51,11 @@ export default function NewSessionScreen() {
 		if (!selectedRepo) return
 		setLoading(true)
 		try {
-			await api.createSession({
+			const session = await api.createSession({
 				repoId: selectedRepo.id,
 				worktree: worktreeBranch,
 			})
-			router.replace('/')
+			router.replace(`/sessions/${session.id}`)
 		} catch (_e) {
 			Alert.alert('Error', 'Failed to create session')
 			setLoading(false)
@@ -76,6 +76,28 @@ export default function NewSessionScreen() {
 			Alert.alert('Error', 'Failed to create worktree')
 			setLoading(false)
 		}
+	}
+
+	const deleteWorktree = (worktree: Worktree) => {
+		if (!selectedRepo || worktree.isMain) return
+		Alert.alert('Delete Worktree', `Delete "${worktree.branch}"?`, [
+			{ text: 'Cancel', style: 'cancel' },
+			{
+				text: 'Delete',
+				style: 'destructive',
+				onPress: async () => {
+					try {
+						await api.deleteWorktree({
+							repoId: selectedRepo.id,
+							branch: worktree.branch,
+						})
+						setWorktrees(prev => prev.filter(w => w.path !== worktree.path))
+					} catch (_e) {
+						Alert.alert('Error', 'Failed to delete worktree')
+					}
+				},
+			},
+		])
 	}
 
 	if (step === 'repo') {
@@ -136,14 +158,23 @@ export default function NewSessionScreen() {
 						</View>
 					}
 					renderItem={({ item }) => (
-						<Pressable
-							style={styles.item}
-							onPress={() => selectWorktree(item)}
-							disabled={loading}
-						>
-							<Text style={styles.itemText}>{item.branch}</Text>
-							{item.isMain && <Text style={styles.mainBadge}>[main]</Text>}
-						</Pressable>
+						<View style={styles.itemRow}>
+							<Pressable
+								style={styles.item}
+								onPress={() => selectWorktree(item)}
+								disabled={loading}
+							>
+								<Text style={styles.itemText}>{item.branch}</Text>
+								{item.isMain && <Text style={styles.mainBadge}>[main]</Text>}
+							</Pressable>
+							{!item.isMain && (
+								<Pressable onPress={() => deleteWorktree(item)}>
+									<View style={styles.deleteButton}>
+										<Text style={styles.deleteText}>×</Text>
+									</View>
+								</Pressable>
+							)}
+						</View>
 					)}
 				/>
 			</View>
@@ -181,13 +212,32 @@ const styles = StyleSheet.create(theme => ({
 		textAlign: 'center',
 		marginTop: theme.spacing(10),
 	},
+	itemRow: {
+		flexDirection: 'row',
+		alignItems: 'stretch',
+		marginBottom: theme.spacing(2),
+	},
 	item: {
+		flex: 1,
 		borderWidth: 1,
 		borderColor: theme.colors.border,
 		padding: theme.spacing(4),
-		marginBottom: theme.spacing(2),
 		flexDirection: 'row',
 		alignItems: 'center',
+	},
+	deleteButton: {
+		borderWidth: 1,
+		borderColor: '#FF4444',
+		borderLeftWidth: 0,
+		paddingHorizontal: theme.spacing(4),
+		justifyContent: 'center',
+		alignItems: 'center',
+		flex: 1,
+	},
+	deleteText: {
+		color: '#FF4444',
+		fontFamily: theme.fonts.mono,
+		fontSize: 20,
 	},
 	itemText: {
 		color: theme.colors.text,

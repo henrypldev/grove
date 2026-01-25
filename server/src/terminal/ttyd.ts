@@ -1,9 +1,10 @@
 import { type Subprocess, spawn } from 'bun'
-import { loadSessions, type SessionData, saveSessions } from '../config'
+import { loadSessions, log, type SessionData, saveSessions } from '../config'
 
 const processes = new Map<string, Subprocess>()
 
 export async function startSession(session: SessionData): Promise<boolean> {
+	log('ttyd', 'starting ttyd', { id: session.id, port: session.port })
 	const proc = spawn({
 		cmd: [
 			'ttyd',
@@ -26,9 +27,11 @@ export async function startSession(session: SessionData): Promise<boolean> {
 	})
 
 	if (!proc.pid) {
+		log('ttyd', 'failed to start ttyd', { id: session.id })
 		return false
 	}
 
+	log('ttyd', 'ttyd started', { id: session.id, pid: proc.pid })
 	processes.set(session.id, proc)
 
 	const state = await loadSessions()
@@ -40,13 +43,16 @@ export async function startSession(session: SessionData): Promise<boolean> {
 }
 
 export async function stopSession(sessionId: string): Promise<boolean> {
+	log('ttyd', 'stopping session', { id: sessionId })
 	const proc = processes.get(sessionId)
 	if (proc) {
 		proc.kill()
 		processes.delete(sessionId)
+		log('ttyd', 'killed ttyd process', { id: sessionId })
 	}
 
 	await Bun.$`tmux kill-session -t klaude-${sessionId}`.quiet().nothrow()
+	log('ttyd', 'killed tmux session', { id: sessionId })
 
 	const state = await loadSessions()
 	state.sessions = state.sessions.filter(s => s.id !== sessionId)
@@ -56,6 +62,7 @@ export async function stopSession(sessionId: string): Promise<boolean> {
 }
 
 export async function cleanupStaleSessions() {
+	log('ttyd', 'cleaning up stale sessions')
 	const state = await loadSessions()
 	const validSessions: SessionData[] = []
 
@@ -64,10 +71,18 @@ export async function cleanupStaleSessions() {
 		if (result.exitCode === 0) {
 			validSessions.push(session)
 		} else {
+			log('ttyd', 'removing stale session', {
+				id: session.id,
+				pid: session.pid,
+			})
 			await Bun.$`tmux kill-session -t klaude-${session.id}`.quiet().nothrow()
 		}
 	}
 
+	log('ttyd', 'cleanup complete', {
+		before: state.sessions.length,
+		after: validSessions.length,
+	})
 	state.sessions = validSessions
 	await saveSessions(state)
 }

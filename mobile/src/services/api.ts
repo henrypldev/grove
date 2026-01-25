@@ -103,4 +103,10 @@ export const api = {
 			method: 'POST',
 			body: JSON.stringify(data),
 		}),
+
+	deleteWorktree: (data: { repoId: string; branch: string }) =>
+		fetchApi<void>('/worktrees', {
+			method: 'DELETE',
+			body: JSON.stringify(data),
+		}),
 }

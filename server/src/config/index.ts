@@ -6,6 +6,13 @@ const CONFIG_DIR = Bun.env.XDG_CONFIG_HOME
 
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const SESSIONS_FILE = join(CONFIG_DIR, 'sessions.json')
+export const WORKTREES_DIR = join(Bun.env.HOME ?? '', '.claude-worktrees')
+
+export function log(context: string, message: string, data?: unknown) {
+	const timestamp = new Date().toISOString().slice(11, 23)
+	const dataStr = data !== undefined ? ` ${JSON.stringify(data)}` : ''
+	console.log(`[${timestamp}] [${context}] ${message}${dataStr}`)
+}
 
 export interface Repo {
 	id: string

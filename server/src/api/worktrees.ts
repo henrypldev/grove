@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { loadConfig } from '../config'
+import { loadConfig, log, WORKTREES_DIR } from '../config'
 
 export interface Worktree {
 	path: string
@@ -8,9 +8,11 @@ export interface Worktree {
 }
 
 export async function getWorktrees(repoId: string): Promise<Worktree[]> {
+	log('worktrees', 'getting worktrees', { repoId })
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
+		log('worktrees', 'repo not found', { repoId })
 		return []
 	}
 
@@ -50,7 +52,12 @@ export async function getWorktrees(repoId: string): Promise<Worktree[]> {
 		})
 	}
 
+	log('worktrees', 'found worktrees', { count: worktrees.length })
 	return worktrees
+}
+
+function sanitizeBranchName(branch: string): string {
+	return branch.replace(/\//g, '-')
 }
 
 export async function createWorktree(
@@ -58,13 +65,19 @@ export async function createWorktree(
 	branch: string,
 	baseBranch: string,
 ): Promise<Worktree | null> {
+	log('worktrees', 'creating worktree', { repoId, branch, baseBranch })
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
+		log('worktrees', 'repo not found', { repoId })
 		return null
 	}
 
-	const worktreePath = join(repo.path, '..', `${repo.name}-${branch}`)
+	const sanitizedBranch = sanitizeBranchName(branch)
+	const worktreePath = join(WORKTREES_DIR, repo.name, sanitizedBranch)
+
+	log('worktrees', 'creating directory', { worktreePath })
+	await Bun.$`mkdir -p ${WORKTREES_DIR}/${repo.name}`.quiet()
 
 	const result =
 		await Bun.$`git -C ${repo.path} worktree add -b ${branch} ${worktreePath} ${baseBranch}`
@@ -72,12 +85,58 @@ export async function createWorktree(
 			.nothrow()
 
 	if (result.exitCode !== 0) {
+		log('worktrees', 'failed to create worktree', {
+			exitCode: result.exitCode,
+			stderr: result.stderr.toString(),
+		})
 		return null
 	}
 
+	log('worktrees', 'worktree created', { worktreePath, branch })
 	return {
 		path: worktreePath,
 		branch,
 		isMain: false,
 	}
+}
+
+export async function deleteWorktree(
+	repoId: string,
+	branch: string,
+): Promise<boolean> {
+	log('worktrees', 'deleting worktree', { repoId, branch })
+	const config = await loadConfig()
+	const repo = config.repos.find(r => r.id === repoId)
+	if (!repo) {
+		log('worktrees', 'repo not found', { repoId })
+		return false
+	}
+
+	const worktrees = await getWorktrees(repoId)
+	const worktree = worktrees.find(w => w.branch === branch)
+	if (!worktree) {
+		log('worktrees', 'worktree not found', { branch })
+		return false
+	}
+
+	if (worktree.isMain) {
+		log('worktrees', 'cannot delete main worktree', { branch })
+		return false
+	}
+
+	const result =
+		await Bun.$`git -C ${repo.path} worktree remove ${worktree.path}`
+			.quiet()
+			.nothrow()
+
+	if (result.exitCode !== 0) {
+		log('worktrees', 'failed to delete worktree', {
+			exitCode: result.exitCode,
+			stderr: result.stderr.toString(),
+		})
+		return false
+	}
+
+	log('worktrees', 'worktree deleted', { branch })
+	return true
 }

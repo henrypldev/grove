@@ -1,30 +1,31 @@
 import { basename, join } from 'node:path'
-import { generateId, loadConfig, type Repo, saveConfig } from '../config'
+import { generateId, loadConfig, log, type Repo, saveConfig } from '../config'
 
 export async function getRepos(): Promise<Repo[]> {
+	log('repos', 'getting repos')
 	const config = await loadConfig()
+	log('repos', 'found repos', { count: config.repos.length })
 	return config.repos
 }
 
 export async function addRepo(path: string): Promise<Repo | null> {
-	console.log('Checking path exists:', path)
+	log('repos', 'adding repo', { path })
 	const pathFile = Bun.file(path)
 	if (!(await pathFile.exists())) {
-		console.log('Path does not exist')
+		log('repos', 'path does not exist', { path })
 		return null
 	}
 
 	const result = await Bun.$`test -d ${path}`.quiet().nothrow()
 	if (result.exitCode !== 0) {
-		console.log('Path is not a directory')
+		log('repos', 'path is not a directory', { path })
 		return null
 	}
 
 	const gitDir = join(path, '.git')
-	console.log('Checking for .git:', gitDir)
 	const gitFile = Bun.file(gitDir)
 	if (!(await gitFile.exists())) {
-		console.log('.git not found')
+		log('repos', '.git not found', { gitDir })
 		return null
 	}
 
@@ -32,6 +33,7 @@ export async function addRepo(path: string): Promise<Repo | null> {
 
 	const existing = config.repos.find(r => r.path === path)
 	if (existing) {
+		log('repos', 'repo already exists', { id: existing.id })
 		return existing
 	}
 
@@ -44,16 +46,20 @@ export async function addRepo(path: string): Promise<Repo | null> {
 	config.repos.push(repo)
 	await saveConfig(config)
 
+	log('repos', 'repo added', { id: repo.id, name: repo.name })
 	return repo
 }
 
 export async function deleteRepo(id: string): Promise<boolean> {
+	log('repos', 'deleting repo', { id })
 	const config = await loadConfig()
 	const index = config.repos.findIndex(r => r.id === id)
 	if (index === -1) {
+		log('repos', 'repo not found', { id })
 		return false
 	}
 	config.repos.splice(index, 1)
 	await saveConfig(config)
+	log('repos', 'repo deleted', { id })
 	return true
 }

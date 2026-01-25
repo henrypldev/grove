@@ -1,10 +1,12 @@
 import { addRepo, deleteRepo, getRepos } from './api/repos'
 import { createSession, deleteSession, getSessions } from './api/sessions'
-import { createWorktree, getWorktrees } from './api/worktrees'
+import { createWorktree, deleteWorktree, getWorktrees } from './api/worktrees'
+import { log } from './config'
 import { cleanupStaleSessions } from './terminal/ttyd'
 
 const PORT = Bun.env.PORT || 3000
 
+log('server', 'starting up')
 await cleanupStaleSessions()
 
 Bun.serve({
@@ -25,7 +27,7 @@ Bun.serve({
 			return new Response(null, { headers })
 		}
 
-		console.log(`${method} ${path}`)
+		log('http', `${method} ${path}`)
 
 		try {
 			if (path === '/repos' && method === 'GET') {
@@ -34,16 +36,13 @@ Bun.serve({
 
 			if (path === '/repos' && method === 'POST') {
 				const body = await req.json()
-				console.log('Adding repo:', body.path)
 				const repo = await addRepo(body.path)
 				if (!repo) {
-					console.log('Failed to add repo - invalid path')
 					return Response.json(
 						{ error: 'Invalid repo path' },
 						{ status: 400, headers },
 					)
 				}
-				console.log('Repo added:', repo)
 				return Response.json(repo, { headers })
 			}
 
@@ -109,9 +108,21 @@ Bun.serve({
 				return Response.json(worktree, { headers })
 			}
 
+			if (path === '/worktrees' && method === 'DELETE') {
+				const body = await req.json()
+				const deleted = await deleteWorktree(body.repoId, body.branch)
+				if (!deleted) {
+					return Response.json(
+						{ error: 'Failed to delete worktree' },
+						{ status: 400, headers },
+					)
+				}
+				return Response.json({ success: true }, { headers })
+			}
+
 			return Response.json({ error: 'Not found' }, { status: 404, headers })
 		} catch (e) {
-			console.error(e)
+			log('http', 'error', e)
 			return Response.json(
 				{ error: 'Internal server error' },
 				{ status: 500, headers },
@@ -120,4 +131,4 @@ Bun.serve({
 	},
 })
 
-console.log(`Klaude server running on http://localhost:${PORT}`)
+log('server', `listening on http://localhost:${PORT}`)

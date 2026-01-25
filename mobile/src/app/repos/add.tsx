@@ -14,7 +14,7 @@ export default function AddRepoScreen() {
 		try {
 			await api.addRepo(path.trim())
 			router.back()
-		} catch (e) {
+		} catch (_e) {
 			Alert.alert('Error', 'Failed to add repo. Make sure the path is valid.')
 		} finally {
 			setLoading(false)

@@ -1,5 +1,5 @@
 import { Link } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Alert, FlatList, Pressable, Text, View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { api, type Repo } from '@/services/api'
@@ -8,11 +8,7 @@ export default function ReposScreen() {
 	const [repos, setRepos] = useState<Repo[]>([])
 	const [loading, setLoading] = useState(true)
 
-	useEffect(() => {
-		loadRepos()
-	}, [])
-
-	const loadRepos = async () => {
+	const loadRepos = useCallback(async () => {
 		try {
 			const data = await api.getRepos()
 			setRepos(data)
@@ -21,7 +17,11 @@ export default function ReposScreen() {
 		} finally {
 			setLoading(false)
 		}
-	}
+	}, [])
+
+	useEffect(() => {
+		loadRepos()
+	}, [loadRepos])
 
 	const handleDelete = (repo: Repo) => {
 		Alert.alert('Remove Repo', `Remove ${repo.name} from Klaude?`, [

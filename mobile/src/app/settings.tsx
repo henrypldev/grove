@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
 	Alert,
 	Pressable,
@@ -21,11 +21,7 @@ export default function SettingsScreen() {
 	const [host, setHost] = useState('')
 	const [loading, setLoading] = useState(true)
 
-	useEffect(() => {
-		loadSettings()
-	}, [])
-
-	const loadSettings = async () => {
+	const loadSettings = useCallback(async () => {
 		const [currentUrl, currentHost] = await Promise.all([
 			getServerUrl(),
 			getTerminalHost(),
@@ -33,9 +29,13 @@ export default function SettingsScreen() {
 		if (currentUrl) setUrl(currentUrl)
 		if (currentHost) setHost(currentHost)
 		setLoading(false)
-	}
+	}, [])
 
-	const handleSave = async () => {
+	useEffect(() => {
+		loadSettings()
+	}, [loadSettings])
+
+	const handleSave = useCallback(async () => {
 		if (!url.trim()) {
 			Alert.alert('Error', 'Please enter a server URL')
 			return
@@ -57,7 +57,7 @@ export default function SettingsScreen() {
 			setTerminalHost(host.trim()),
 		])
 		router.back()
-	}
+	}, [url, host])
 
 	if (loading) {
 		return (

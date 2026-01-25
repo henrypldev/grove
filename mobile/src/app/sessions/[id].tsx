@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { StyleSheet } from 'react-native-unistyles'
@@ -13,11 +13,7 @@ export default function SessionScreen() {
 	const [input, setInput] = useState('')
 	const webViewRef = useRef<WebView>(null)
 
-	useEffect(() => {
-		loadSession()
-	}, [id])
-
-	const loadSession = async () => {
+	const loadSession = useCallback(async () => {
 		try {
 			const host = await getTerminalHost()
 			setTerminalHostState(host)
@@ -27,7 +23,11 @@ export default function SessionScreen() {
 		} catch (e) {
 			console.error('Failed to load session:', e)
 		}
-	}
+	}, [id])
+
+	useEffect(() => {
+		loadSession()
+	}, [loadSession])
 
 	const sendInput = (text: string) => {
 		if (!webViewRef.current) return

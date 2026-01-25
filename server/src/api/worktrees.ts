@@ -1,5 +1,5 @@
+import { join } from 'node:path'
 import { spawn } from 'bun'
-import { join } from 'path'
 import { loadConfig } from '../config'
 
 export interface Worktree {

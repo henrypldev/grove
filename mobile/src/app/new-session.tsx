@@ -1,5 +1,5 @@
 import { router } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { api, type Repo, type Worktree } from '@/services/api'
@@ -11,25 +11,23 @@ export default function NewSessionScreen() {
 	const [repos, setRepos] = useState<Repo[]>([])
 	const [worktrees, setWorktrees] = useState<Worktree[]>([])
 	const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null)
-	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
-		null,
-	)
+	const [, setSelectedWorktree] = useState<Worktree | null>(null)
 	const [newBranch, setNewBranch] = useState('')
 	const [baseBranch, setBaseBranch] = useState('main')
 	const [loading, setLoading] = useState(false)
 
-	useEffect(() => {
-		loadRepos()
-	}, [])
-
-	const loadRepos = async () => {
+	const loadRepos = useCallback(async () => {
 		try {
 			const data = await api.getRepos()
 			setRepos(data)
 		} catch (e) {
 			console.error('Failed to load repos:', e)
 		}
-	}
+	}, [])
+
+	useEffect(() => {
+		loadRepos()
+	}, [loadRepos])
 
 	const selectRepo = async (repo: Repo) => {
 		setSelectedRepo(repo)
@@ -58,7 +56,7 @@ export default function NewSessionScreen() {
 				worktree: worktreeBranch,
 			})
 			router.replace('/')
-		} catch (e) {
+		} catch (_e) {
 			Alert.alert('Error', 'Failed to create session')
 			setLoading(false)
 		}
@@ -74,7 +72,7 @@ export default function NewSessionScreen() {
 				baseBranch,
 			})
 			await createSession(newBranch.trim())
-		} catch (e) {
+		} catch (_e) {
 			Alert.alert('Error', 'Failed to create worktree')
 			setLoading(false)
 		}

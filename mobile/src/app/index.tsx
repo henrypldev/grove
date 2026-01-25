@@ -9,13 +9,7 @@ export default function HomeScreen() {
 	const [loading, setLoading] = useState(true)
 	const [configured, setConfigured] = useState(true)
 
-	useFocusEffect(
-		useCallback(() => {
-			loadSessions()
-		}, []),
-	)
-
-	const loadSessions = async () => {
+	const loadSessions = useCallback(async () => {
 		setLoading(true)
 		const url = await getServerUrl()
 		if (!url) {
@@ -32,7 +26,13 @@ export default function HomeScreen() {
 		} finally {
 			setLoading(false)
 		}
-	}
+	}, [])
+
+	useFocusEffect(
+		useCallback(() => {
+			loadSessions()
+		}, [loadSessions]),
+	)
 
 	if (!configured && !loading) {
 		return (

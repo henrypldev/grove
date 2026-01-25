@@ -122,14 +122,32 @@ export default function NewSessionScreen() {
 	}
 
 	if (step === 'worktree') {
+		const mainWorktree = worktrees.find(w => w.isMain)
+		const otherWorktrees = worktrees.filter(w => !w.isMain)
+
 		return (
 			<View style={styles.container}>
 				<Pressable onPress={() => setStep('repo')}>
 					<Text style={styles.backText}>{'< Back'}</Text>
 				</Pressable>
-				<Text style={styles.stepTitle}>Select or Create Worktree</Text>
+				<Text style={styles.stepTitle}>Start Session</Text>
+
+				{mainWorktree && (
+					<View style={styles.currentBranchSection}>
+						<Text style={styles.sectionLabel}>Current Branch</Text>
+						<Pressable
+							onPress={() => selectWorktree(mainWorktree)}
+							disabled={loading}
+						>
+							<View style={styles.currentBranchItem}>
+								<Text style={styles.itemText}>{mainWorktree.branch}</Text>
+							</View>
+						</Pressable>
+					</View>
+				)}
+
 				<FlatList
-					data={worktrees}
+					data={otherWorktrees}
 					keyExtractor={item => item.path}
 					contentContainerStyle={styles.list}
 					ListHeaderComponent={
@@ -154,7 +172,9 @@ export default function NewSessionScreen() {
 									{loading ? '[ CREATING... ]' : '[ CREATE & START ]'}
 								</Text>
 							</Pressable>
-							<Text style={styles.sectionLabel}>Or Select Existing</Text>
+							{otherWorktrees.length > 0 && (
+								<Text style={styles.sectionLabel}>Or Select Worktree</Text>
+							)}
 						</View>
 					}
 					renderItem={({ item }) => (
@@ -165,15 +185,12 @@ export default function NewSessionScreen() {
 								disabled={loading}
 							>
 								<Text style={styles.itemText}>{item.branch}</Text>
-								{item.isMain && <Text style={styles.mainBadge}>[main]</Text>}
 							</Pressable>
-							{!item.isMain && (
-								<Pressable onPress={() => deleteWorktree(item)}>
-									<View style={styles.deleteButton}>
-										<Text style={styles.deleteText}>×</Text>
-									</View>
-								</Pressable>
-							)}
+							<Pressable onPress={() => deleteWorktree(item)}>
+								<View style={styles.deleteButton}>
+									<Text style={styles.deleteText}>×</Text>
+								</View>
+							</Pressable>
 						</View>
 					)}
 				/>
@@ -216,6 +233,7 @@ const styles = StyleSheet.create(theme => ({
 		flexDirection: 'row',
 		alignItems: 'stretch',
 		marginBottom: theme.spacing(2),
+		gap: theme.spacing(1),
 	},
 	item: {
 		flex: 1,
@@ -227,15 +245,14 @@ const styles = StyleSheet.create(theme => ({
 	},
 	deleteButton: {
 		borderWidth: 1,
-		borderColor: '#FF4444',
-		borderLeftWidth: 0,
+		borderColor: '#FF4444F9',
 		paddingHorizontal: theme.spacing(4),
 		justifyContent: 'center',
 		alignItems: 'center',
 		flex: 1,
 	},
 	deleteText: {
-		color: '#FF4444',
+		color: '#FF4444F9',
 		fontFamily: theme.fonts.mono,
 		fontSize: 20,
 	},
@@ -243,12 +260,19 @@ const styles = StyleSheet.create(theme => ({
 		color: theme.colors.text,
 		fontFamily: theme.fonts.mono,
 		fontSize: 14,
-		flex: 1,
 	},
 	mainBadge: {
 		color: theme.colors.textDim,
 		fontFamily: theme.fonts.mono,
 		fontSize: 10,
+	},
+	currentBranchSection: {
+		marginBottom: theme.spacing(4),
+	},
+	currentBranchItem: {
+		borderWidth: 1,
+		borderColor: theme.colors.accent,
+		padding: theme.spacing(4),
 	},
 	createSection: {
 		marginBottom: theme.spacing(4),

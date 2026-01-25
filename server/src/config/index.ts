@@ -29,6 +29,7 @@ export interface SessionData {
 	port: number
 	pid: number
 	createdAt: string
+	skipPermissions?: boolean
 }
 
 interface Config {

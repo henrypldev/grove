@@ -1,6 +1,14 @@
 import { router } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native'
+import {
+	Alert,
+	FlatList,
+	Pressable,
+	Switch,
+	Text,
+	TextInput,
+	View,
+} from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { api, type Repo, type Worktree } from '@/services/api'
 
@@ -15,6 +23,7 @@ export default function NewSessionScreen() {
 	const [newBranch, setNewBranch] = useState('')
 	const [baseBranch, setBaseBranch] = useState('main')
 	const [loading, setLoading] = useState(false)
+	const [skipPermissions, setSkipPermissions] = useState(false)
 
 	const loadRepos = useCallback(async () => {
 		try {
@@ -54,6 +63,7 @@ export default function NewSessionScreen() {
 			const session = await api.createSession({
 				repoId: selectedRepo.id,
 				worktree: worktreeBranch,
+				skipPermissions,
 			})
 			router.replace(`/sessions/${session.id}`)
 		} catch (_e) {
@@ -131,6 +141,16 @@ export default function NewSessionScreen() {
 					<Text style={styles.backText}>{'< Back'}</Text>
 				</Pressable>
 				<Text style={styles.stepTitle}>Start Session</Text>
+
+				<View style={styles.toggleRow}>
+					<Text style={styles.toggleLabel}>Skip Permissions</Text>
+					<Switch
+						value={skipPermissions}
+						onValueChange={setSkipPermissions}
+						trackColor={{ false: '#333', true: '#00FF00' }}
+						thumbColor="#FFFFFF"
+					/>
+				</View>
 
 				{mainWorktree && (
 					<View style={styles.currentBranchSection}>
@@ -218,6 +238,18 @@ const styles = StyleSheet.create(theme => ({
 		fontFamily: theme.fonts.mono,
 		fontSize: 16,
 		marginBottom: theme.spacing(4),
+	},
+	toggleRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		marginBottom: theme.spacing(4),
+		paddingVertical: theme.spacing(2),
+	},
+	toggleLabel: {
+		color: theme.colors.textDim,
+		fontFamily: theme.fonts.mono,
+		fontSize: 12,
 	},
 	list: {
 		flexGrow: 1,

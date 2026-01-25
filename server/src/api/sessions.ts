@@ -18,6 +18,7 @@ export async function getSessions(): Promise<SessionData[]> {
 export async function createSession(
 	repoId: string,
 	worktreeBranch: string,
+	skipPermissions?: boolean,
 ): Promise<SessionData | null> {
 	log('sessions', 'creating session', { repoId, worktreeBranch })
 	const config = await loadConfig()
@@ -43,6 +44,7 @@ export async function createSession(
 		port: await getNextPort(),
 		pid: 0,
 		createdAt: new Date().toISOString(),
+		skipPermissions,
 	}
 
 	log('sessions', 'starting session', { id: session.id, port: session.port })

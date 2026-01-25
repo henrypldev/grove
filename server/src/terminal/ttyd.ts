@@ -5,6 +5,9 @@ const processes = new Map<string, Subprocess>()
 
 export async function startSession(session: SessionData): Promise<boolean> {
 	log('ttyd', 'starting ttyd', { id: session.id, port: session.port })
+	const claudeCmd = session.skipPermissions
+		? 'claude --dangerously-skip-permissions'
+		: 'claude'
 	const proc = spawn({
 		cmd: [
 			'ttyd',
@@ -20,7 +23,7 @@ export async function startSession(session: SessionData): Promise<boolean> {
 			`klaude-${session.id}`,
 			'-c',
 			session.worktree,
-			'claude',
+			claudeCmd,
 		],
 		stdout: 'ignore',
 		stderr: 'ignore',

@@ -64,7 +64,11 @@ Bun.serve({
 
 			if (path === '/sessions' && method === 'POST') {
 				const body = await req.json()
-				const session = await createSession(body.repoId, body.worktree)
+				const session = await createSession(
+					body.repoId,
+					body.worktree,
+					body.skipPermissions,
+				)
 				if (!session) {
 					return Response.json(
 						{ error: 'Failed to create session' },

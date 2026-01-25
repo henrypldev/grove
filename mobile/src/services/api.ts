@@ -71,7 +71,11 @@ export interface Worktree {
 export const api = {
 	getSessions: () => fetchApi<Session[]>('/sessions'),
 
-	createSession: (data: { repoId: string; worktree: string }) =>
+	createSession: (data: {
+		repoId: string
+		worktree: string
+		skipPermissions?: boolean
+	}) =>
 		fetchApi<Session>('/sessions', {
 			method: 'POST',
 			body: JSON.stringify(data),

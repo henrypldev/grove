@@ -1,10 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
-import { homedir } from 'os'
-import { join } from 'path'
+import { join } from 'node:path'
 
-const CONFIG_DIR = process.env.XDG_CONFIG_HOME
-	? join(process.env.XDG_CONFIG_HOME, 'klaude')
-	: join(homedir(), '.config', 'klaude')
+const CONFIG_DIR = Bun.env.XDG_CONFIG_HOME
+	? join(Bun.env.XDG_CONFIG_HOME, 'klaude')
+	: join(Bun.env.HOME ?? '', '.config', 'klaude')
 
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const SESSIONS_FILE = join(CONFIG_DIR, 'sessions.json')
@@ -35,44 +33,47 @@ interface SessionsState {
 	nextPort: number
 }
 
-function ensureConfigDir() {
-	if (!existsSync(CONFIG_DIR)) {
-		mkdirSync(CONFIG_DIR, { recursive: true })
+async function ensureConfigDir() {
+	const dir = Bun.file(CONFIG_DIR)
+	if (!(await dir.exists())) {
+		await Bun.$`mkdir -p ${CONFIG_DIR}`.quiet()
 	}
 }
 
-export function loadConfig(): Config {
-	ensureConfigDir()
-	if (!existsSync(CONFIG_FILE)) {
+export async function loadConfig(): Promise<Config> {
+	await ensureConfigDir()
+	const file = Bun.file(CONFIG_FILE)
+	if (!(await file.exists())) {
 		return { repos: [] }
 	}
 	try {
-		return JSON.parse(readFileSync(CONFIG_FILE, 'utf-8'))
+		return await file.json()
 	} catch {
 		return { repos: [] }
 	}
 }
 
-export function saveConfig(config: Config) {
-	ensureConfigDir()
-	writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
+export async function saveConfig(config: Config) {
+	await ensureConfigDir()
+	await Bun.write(CONFIG_FILE, JSON.stringify(config, null, 2))
 }
 
-export function loadSessions(): SessionsState {
-	ensureConfigDir()
-	if (!existsSync(SESSIONS_FILE)) {
+export async function loadSessions(): Promise<SessionsState> {
+	await ensureConfigDir()
+	const file = Bun.file(SESSIONS_FILE)
+	if (!(await file.exists())) {
 		return { sessions: [], nextPort: 7681 }
 	}
 	try {
-		return JSON.parse(readFileSync(SESSIONS_FILE, 'utf-8'))
+		return await file.json()
 	} catch {
 		return { sessions: [], nextPort: 7681 }
 	}
 }
 
-export function saveSessions(state: SessionsState) {
-	ensureConfigDir()
-	writeFileSync(SESSIONS_FILE, JSON.stringify(state, null, 2))
+export async function saveSessions(state: SessionsState) {
+	await ensureConfigDir()
+	await Bun.write(SESSIONS_FILE, JSON.stringify(state, null, 2))
 }
 
 export function generateId(): string {

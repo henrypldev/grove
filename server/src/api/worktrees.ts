@@ -1,5 +1,4 @@
 import { join } from 'node:path'
-import { spawn } from 'bun'
 import { loadConfig } from '../config'
 
 export interface Worktree {
@@ -9,20 +8,16 @@ export interface Worktree {
 }
 
 export async function getWorktrees(repoId: string): Promise<Worktree[]> {
-	const config = loadConfig()
+	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
 		return []
 	}
 
-	const proc = spawn({
-		cmd: ['git', 'worktree', 'list', '--porcelain'],
-		cwd: repo.path,
-		stdout: 'pipe',
-		stderr: 'ignore',
-	})
-
-	const output = await new Response(proc.stdout).text()
+	const result = await Bun.$`git -C ${repo.path} worktree list --porcelain`
+		.quiet()
+		.nothrow()
+	const output = result.stdout.toString()
 	const lines = output.trim().split('\n')
 
 	const worktrees: Worktree[] = []
@@ -63,7 +58,7 @@ export async function createWorktree(
 	branch: string,
 	baseBranch: string,
 ): Promise<Worktree | null> {
-	const config = loadConfig()
+	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
 		return null
@@ -71,16 +66,12 @@ export async function createWorktree(
 
 	const worktreePath = join(repo.path, '..', `${repo.name}-${branch}`)
 
-	const proc = spawn({
-		cmd: ['git', 'worktree', 'add', '-b', branch, worktreePath, baseBranch],
-		cwd: repo.path,
-		stdout: 'ignore',
-		stderr: 'pipe',
-	})
+	const result =
+		await Bun.$`git -C ${repo.path} worktree add -b ${branch} ${worktreePath} ${baseBranch}`
+			.quiet()
+			.nothrow()
 
-	await proc.exited
-
-	if (proc.exitCode !== 0) {
+	if (result.exitCode !== 0) {
 		return null
 	}
 

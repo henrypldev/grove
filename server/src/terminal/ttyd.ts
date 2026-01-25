@@ -3,7 +3,7 @@ import { loadSessions, type SessionData, saveSessions } from '../config'
 
 const processes = new Map<string, Subprocess>()
 
-export function startSession(session: SessionData): boolean {
+export async function startSession(session: SessionData): Promise<boolean> {
 	const proc = spawn({
 		cmd: [
 			'ttyd',
@@ -31,56 +31,48 @@ export function startSession(session: SessionData): boolean {
 
 	processes.set(session.id, proc)
 
-	const state = loadSessions()
+	const state = await loadSessions()
 	state.sessions.push({ ...session, pid: proc.pid })
 	state.nextPort = session.port + 1
-	saveSessions(state)
+	await saveSessions(state)
 
 	return true
 }
 
-export function stopSession(sessionId: string): boolean {
+export async function stopSession(sessionId: string): Promise<boolean> {
 	const proc = processes.get(sessionId)
 	if (proc) {
 		proc.kill()
 		processes.delete(sessionId)
 	}
 
-	spawn({
-		cmd: ['tmux', 'kill-session', '-t', `klaude-${sessionId}`],
-		stdout: 'ignore',
-		stderr: 'ignore',
-	})
+	await Bun.$`tmux kill-session -t klaude-${sessionId}`.quiet().nothrow()
 
-	const state = loadSessions()
+	const state = await loadSessions()
 	state.sessions = state.sessions.filter(s => s.id !== sessionId)
-	saveSessions(state)
+	await saveSessions(state)
 
 	return true
 }
 
-export function cleanupStaleSessions() {
-	const state = loadSessions()
+export async function cleanupStaleSessions() {
+	const state = await loadSessions()
 	const validSessions: SessionData[] = []
 
 	for (const session of state.sessions) {
-		try {
-			process.kill(session.pid, 0)
+		const result = await Bun.$`kill -0 ${session.pid}`.quiet().nothrow()
+		if (result.exitCode === 0) {
 			validSessions.push(session)
-		} catch {
-			spawn({
-				cmd: ['tmux', 'kill-session', '-t', `klaude-${session.id}`],
-				stdout: 'ignore',
-				stderr: 'ignore',
-			})
+		} else {
+			await Bun.$`tmux kill-session -t klaude-${session.id}`.quiet().nothrow()
 		}
 	}
 
 	state.sessions = validSessions
-	saveSessions(state)
+	await saveSessions(state)
 }
 
-export function getNextPort(): number {
-	const state = loadSessions()
+export async function getNextPort(): Promise<number> {
+	const state = await loadSessions()
 	return state.nextPort || 7681
 }

@@ -3,9 +3,9 @@ import { createSession, deleteSession, getSessions } from './api/sessions'
 import { createWorktree, getWorktrees } from './api/worktrees'
 import { cleanupStaleSessions } from './terminal/ttyd'
 
-const PORT = process.env.PORT || 3000
+const PORT = Bun.env.PORT || 3000
 
-cleanupStaleSessions()
+await cleanupStaleSessions()
 
 Bun.serve({
 	port: PORT,
@@ -29,13 +29,13 @@ Bun.serve({
 
 		try {
 			if (path === '/repos' && method === 'GET') {
-				return Response.json(getRepos(), { headers })
+				return Response.json(await getRepos(), { headers })
 			}
 
 			if (path === '/repos' && method === 'POST') {
 				const body = await req.json()
 				console.log('Adding repo:', body.path)
-				const repo = addRepo(body.path)
+				const repo = await addRepo(body.path)
 				if (!repo) {
 					console.log('Failed to add repo - invalid path')
 					return Response.json(
@@ -49,7 +49,7 @@ Bun.serve({
 
 			if (path.startsWith('/repos/') && method === 'DELETE') {
 				const id = path.split('/')[2]
-				const deleted = deleteRepo(id)
+				const deleted = await deleteRepo(id)
 				if (!deleted) {
 					return Response.json(
 						{ error: 'Repo not found' },
@@ -60,7 +60,7 @@ Bun.serve({
 			}
 
 			if (path === '/sessions' && method === 'GET') {
-				return Response.json(getSessions(), { headers })
+				return Response.json(await getSessions(), { headers })
 			}
 
 			if (path === '/sessions' && method === 'POST') {
@@ -77,7 +77,7 @@ Bun.serve({
 
 			if (path.startsWith('/sessions/') && method === 'DELETE') {
 				const id = path.split('/')[2]
-				const deleted = deleteSession(id)
+				const deleted = await deleteSession(id)
 				if (!deleted) {
 					return Response.json(
 						{ error: 'Session not found' },

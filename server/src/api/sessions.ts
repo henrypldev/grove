@@ -7,8 +7,8 @@ import {
 import { getNextPort, startSession, stopSession } from '../terminal/ttyd'
 import { getWorktrees } from './worktrees'
 
-export function getSessions(): SessionData[] {
-	const state = loadSessions()
+export async function getSessions(): Promise<SessionData[]> {
+	const state = await loadSessions()
 	return state.sessions.map(({ pid, ...rest }) => rest) as SessionData[]
 }
 
@@ -16,7 +16,7 @@ export async function createSession(
 	repoId: string,
 	worktreeBranch: string,
 ): Promise<SessionData | null> {
-	const config = loadConfig()
+	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
 		return null
@@ -34,12 +34,12 @@ export async function createSession(
 		repoName: repo.name,
 		worktree: worktree.path,
 		branch: worktree.branch,
-		port: getNextPort(),
+		port: await getNextPort(),
 		pid: 0,
 		createdAt: new Date().toISOString(),
 	}
 
-	const started = startSession(session)
+	const started = await startSession(session)
 	if (!started) {
 		return null
 	}
@@ -47,6 +47,6 @@ export async function createSession(
 	return session
 }
 
-export function deleteSession(id: string): boolean {
+export async function deleteSession(id: string): Promise<boolean> {
 	return stopSession(id)
 }

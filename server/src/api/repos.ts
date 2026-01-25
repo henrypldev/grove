@@ -1,33 +1,34 @@
-import { existsSync, statSync } from 'fs'
-import { basename, join } from 'path'
+import { basename, join } from 'node:path'
 import { generateId, loadConfig, type Repo, saveConfig } from '../config'
 
-export function getRepos(): Repo[] {
-	const config = loadConfig()
+export async function getRepos(): Promise<Repo[]> {
+	const config = await loadConfig()
 	return config.repos
 }
 
-export function addRepo(path: string): Repo | null {
+export async function addRepo(path: string): Promise<Repo | null> {
 	console.log('Checking path exists:', path)
-	if (!existsSync(path)) {
+	const pathFile = Bun.file(path)
+	if (!(await pathFile.exists())) {
 		console.log('Path does not exist')
 		return null
 	}
 
-	const stat = statSync(path)
-	if (!stat.isDirectory()) {
+	const result = await Bun.$`test -d ${path}`.quiet().nothrow()
+	if (result.exitCode !== 0) {
 		console.log('Path is not a directory')
 		return null
 	}
 
 	const gitDir = join(path, '.git')
 	console.log('Checking for .git:', gitDir)
-	if (!existsSync(gitDir)) {
+	const gitFile = Bun.file(gitDir)
+	if (!(await gitFile.exists())) {
 		console.log('.git not found')
 		return null
 	}
 
-	const config = loadConfig()
+	const config = await loadConfig()
 
 	const existing = config.repos.find(r => r.path === path)
 	if (existing) {
@@ -41,18 +42,18 @@ export function addRepo(path: string): Repo | null {
 	}
 
 	config.repos.push(repo)
-	saveConfig(config)
+	await saveConfig(config)
 
 	return repo
 }
 
-export function deleteRepo(id: string): boolean {
-	const config = loadConfig()
+export async function deleteRepo(id: string): Promise<boolean> {
+	const config = await loadConfig()
 	const index = config.repos.findIndex(r => r.id === id)
 	if (index === -1) {
 		return false
 	}
 	config.repos.splice(index, 1)
-	saveConfig(config)
+	await saveConfig(config)
 	return true
 }

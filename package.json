@@ -1,0 +1,16 @@
+{
+	"name": "klaude",
+	"private": true,
+	"workspaces": [
+		"mobile",
+		"server"
+	],
+	"scripts": {
+		"mobile": "bun run --cwd mobile start",
+		"server": "bun run --cwd server start",
+		"dev": "bun run --cwd server dev"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.3.12"
+	}
+}

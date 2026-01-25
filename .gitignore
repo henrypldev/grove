@@ -1,0 +1,22 @@
+node_modules/
+bun.lockb
+.DS_Store
+
+# Expo
+mobile/.expo/
+mobile/dist/
+mobile/ios/
+mobile/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Server
+server/dist/
+
+# Environment
+.env
+.env.local

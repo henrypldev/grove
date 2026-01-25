@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Pressable, Text, TextInput, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { StyleSheet } from 'react-native-unistyles'
 import { WebView } from 'react-native-webview'
@@ -76,15 +76,17 @@ export default function SessionScreen() {
 			<Stack.Screen
 				options={{
 					headerTitle: session.branch,
+					// @ts-expect-error
+					unstable_headerRightItems: () => [
+						{
+							type: 'button',
+							icon: { type: 'sfSymbol', name: 'xmark' },
+							onPress: () => handleKill(),
+						},
+					],
 				}}
 			/>
 			<View style={styles.container}>
-				<View style={styles.header}>
-					<Text style={styles.headerText}>{session.branch}</Text>
-					<Pressable onPress={handleKill} style={styles.killButton}>
-						<Text style={styles.killText}>[ KILL ]</Text>
-					</Pressable>
-				</View>
 				<WebView
 					ref={webViewRef}
 					source={{ uri: terminalUrl }}
@@ -120,16 +122,6 @@ export default function SessionScreen() {
 								<Text style={styles.sendText}>SEND</Text>
 							</Pressable>
 						</View>
-						<TextInput
-							style={styles.input}
-							value={input}
-							onChangeText={setInput}
-							placeholder="> type here..."
-							placeholderTextColor="#888888"
-							onSubmitEditing={() => sendInput(input)}
-							autoCapitalize="none"
-							autoCorrect={false}
-						/>
 					</View>
 				</KeyboardStickyView>
 			</View>

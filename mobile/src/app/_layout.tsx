@@ -37,10 +37,11 @@ export default function RootLayout() {
 					headerTintColor: '#FFFFFF',
 					headerTitleStyle: { fontFamily: 'SpaceMono' },
 					contentStyle: { backgroundColor: '#000000' },
+					headerBackButtonDisplayMode: 'minimal',
 				}}
 			>
 				<Stack.Screen name="index" options={{ title: 'Klaude' }} />
-				<Stack.Screen name="sessions/[id]" options={{ title: 'Session' }} />
+				<Stack.Screen name="sessions/[id]" options={{ title: '' }} />
 				<Stack.Screen name="repos/index" options={{ title: 'Repos' }} />
 				<Stack.Screen
 					name="repos/add"

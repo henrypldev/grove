@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router'
+import { router, Stack, useLocalSearchParams } from 'expo-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Pressable, Text, TextInput, View } from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
@@ -61,8 +61,6 @@ export default function SessionScreen() {
 		}
 	}
 
-	console.log(session, terminalHost)
-
 	if (!session || !terminalHost) {
 		return (
 			<View style={styles.container}>
@@ -74,52 +72,68 @@ export default function SessionScreen() {
 	const terminalUrl = `http://${terminalHost}:${session.port}`
 
 	return (
-		<View style={styles.container}>
-			<View style={styles.header}>
-				<Text style={styles.headerText}>{session.branch}</Text>
-				<Pressable onPress={handleKill} style={styles.killButton}>
-					<Text style={styles.killText}>[ KILL ]</Text>
-				</Pressable>
-			</View>
-			<WebView
-				ref={webViewRef}
-				source={{ uri: terminalUrl }}
-				style={styles.webview}
-				javaScriptEnabled
-				domStorageEnabled
+		<>
+			<Stack.Screen
+				options={{
+					headerTitle: session.branch,
+				}}
 			/>
-			<KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
-				<View style={styles.inputBar}>
-					<View style={styles.shortcuts}>
-						<Pressable style={styles.shortcut} onPress={() => sendKey('\x03')}>
-							<Text style={styles.shortcutText}>^C</Text>
-						</Pressable>
-						<Pressable style={styles.shortcut} onPress={() => sendKey('\x04')}>
-							<Text style={styles.shortcutText}>^D</Text>
-						</Pressable>
-						<Pressable style={styles.shortcut} onPress={() => sendKey('\x1b')}>
-							<Text style={styles.shortcutText}>ESC</Text>
-						</Pressable>
-						<Pressable
-							style={styles.sendButton}
-							onPress={() => sendInput(input)}
-						>
-							<Text style={styles.sendText}>SEND</Text>
-						</Pressable>
-					</View>
-					<TextInput
-						style={styles.input}
-						value={input}
-						onChangeText={setInput}
-						placeholder="> type here..."
-						placeholderTextColor="#888888"
-						onSubmitEditing={() => sendInput(input)}
-						autoCapitalize="none"
-						autoCorrect={false}
-					/>
+			<View style={styles.container}>
+				<View style={styles.header}>
+					<Text style={styles.headerText}>{session.branch}</Text>
+					<Pressable onPress={handleKill} style={styles.killButton}>
+						<Text style={styles.killText}>[ KILL ]</Text>
+					</Pressable>
 				</View>
-			</KeyboardStickyView>
-		</View>
+				<WebView
+					ref={webViewRef}
+					source={{ uri: terminalUrl }}
+					style={styles.webview}
+					javaScriptEnabled
+					domStorageEnabled
+				/>
+				<KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+					<View style={styles.inputBar}>
+						<View style={styles.shortcuts}>
+							<Pressable
+								style={styles.shortcut}
+								onPress={() => sendKey('\x03')}
+							>
+								<Text style={styles.shortcutText}>^C</Text>
+							</Pressable>
+							<Pressable
+								style={styles.shortcut}
+								onPress={() => sendKey('\x04')}
+							>
+								<Text style={styles.shortcutText}>^D</Text>
+							</Pressable>
+							<Pressable
+								style={styles.shortcut}
+								onPress={() => sendKey('\x1b')}
+							>
+								<Text style={styles.shortcutText}>ESC</Text>
+							</Pressable>
+							<Pressable
+								style={styles.sendButton}
+								onPress={() => sendInput(input)}
+							>
+								<Text style={styles.sendText}>SEND</Text>
+							</Pressable>
+						</View>
+						<TextInput
+							style={styles.input}
+							value={input}
+							onChangeText={setInput}
+							placeholder="> type here..."
+							placeholderTextColor="#888888"
+							onSubmitEditing={() => sendInput(input)}
+							autoCapitalize="none"
+							autoCorrect={false}
+						/>
+					</View>
+				</KeyboardStickyView>
+			</View>
+		</>
 	)
 }
 

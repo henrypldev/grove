@@ -1,14 +1,17 @@
-module.exports = function (api) {
-  api.cache(true)
+module.exports = api => {
+	api.cache(true)
 
-  return {
-    presets: ['babel-preset-expo'],
+	return {
+		presets: ['babel-preset-expo'],
 
-    // other config
-    plugins: [
-        ['react-native-unistyles/plugin', {
-            root: 'src'
-        }]
-    ]
-  }
+		// other config
+		plugins: [
+			[
+				'react-native-unistyles/plugin',
+				{
+					root: 'src',
+				},
+			],
+		],
+	}
 }

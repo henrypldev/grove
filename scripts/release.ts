@@ -150,7 +150,7 @@ async function run() {
 	await $`git push origin main --tags`
 	console.log('Pushed to origin')
 
-	await $`gh release create ${tag} --generate-notes ${artifacts.join(' ')}`
+	await $`gh release create ${tag} --generate-notes ${artifacts}`
 	console.log(`Created GitHub release ${tag} with binaries`)
 
 	await $`rm -rf dist`

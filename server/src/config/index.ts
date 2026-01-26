@@ -8,7 +8,14 @@ const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const SESSIONS_FILE = join(CONFIG_DIR, 'sessions.json')
 export const WORKTREES_DIR = join(Bun.env.HOME ?? '', '.claude-worktrees')
 
+let logsEnabled = true
+
+export function setLogsEnabled(enabled: boolean) {
+	logsEnabled = enabled
+}
+
 export function log(context: string, message: string, data?: unknown) {
+	if (!logsEnabled) return
 	const timestamp = new Date().toISOString().slice(11, 23)
 	const dataStr = data !== undefined ? ` ${JSON.stringify(data)}` : ''
 	console.log(`[${timestamp}] [${context}] ${message}${dataStr}`)

@@ -1,22 +1,19 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { Box, render, Text } from 'ink'
 import Spinner from 'ink-spinner'
 import { useEffect, useState } from 'react'
+import { startServer, setLogsEnabled } from '../../server/src/index.ts'
 import { isRunning, stopAll } from './cleanup.js'
 import { DepsCheck } from './components/DepsCheck.js'
 import { Running } from './components/Running.js'
 import { loadConfig, loadPid, saveConfig, savePid } from './config.js'
 import { getTailscaleInfo, startFunnel, stopFunnel } from './tunnel.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const SERVER_PATH = join(__dirname, '../../server/src/index.ts')
-
 interface ParsedArgs {
 	port?: number
 	background: boolean
+	daemon: boolean
 	stop: boolean
 	help: boolean
 }
@@ -29,9 +26,10 @@ function parseArgs(): ParsedArgs {
 			? parseInt(args[portIndex + 1], 10)
 			: undefined
 	const background = args.includes('--background') || args.includes('-b')
+	const daemon = args.includes('--_daemon')
 	const stop = args.includes('--stop') || args.includes('stop')
 	const help = args.includes('--help') || args.includes('-h')
-	return { port, background, stop, help }
+	return { port, background, daemon, stop, help }
 }
 
 function printHelp() {
@@ -43,9 +41,49 @@ Usage: grove [options]
 Options:
   -b, --background    Start server in background and free terminal
   -h, --help          Show this help message
-  --port <number>     Set server port (default: 3000)
+  --port <number>     Set server port (default: 3001)
   --stop, stop        Stop background server and kill all sessions
 `)
+}
+
+async function runDaemon(port: number) {
+	const info = getTailscaleInfo()
+	if (!info) {
+		console.error('Could not get Tailscale info')
+		process.exit(1)
+	}
+
+	await startServer(port)
+	savePid(process.pid)
+
+	const success = startFunnel(port)
+	if (!success) {
+		console.error('Failed to start Tailscale Funnel')
+		process.exit(1)
+	}
+
+	process.on('SIGINT', () => {
+		stopFunnel()
+		process.exit(0)
+	})
+	process.on('SIGTERM', () => {
+		stopFunnel()
+		process.exit(0)
+	})
+}
+
+function spawnDaemon(port: number): number | null {
+	const args = ['--_daemon', '--port', String(port)]
+	const proc = spawn(process.execPath, [process.argv[1], ...args], {
+		stdio: 'ignore',
+		detached: true,
+	})
+
+	if (proc.pid) {
+		proc.unref()
+		return proc.pid
+	}
+	return null
 }
 
 type AppState = 'deps-check' | 'starting' | 'running' | 'error'
@@ -60,9 +98,7 @@ function App({ background, port }: AppProps) {
 	const [error, setError] = useState<string | null>(null)
 	const [serverUrl, setServerUrl] = useState<string>('')
 	const [terminalHost, setTerminalHost] = useState<string>('')
-	const [serverProcess, setServerProcess] = useState<ReturnType<
-		typeof spawn
-	> | null>(null)
+	const [daemonPid, setDaemonPid] = useState<number | null>(null)
 
 	const args = parseArgs()
 	const config = loadConfig()
@@ -73,12 +109,9 @@ function App({ background, port }: AppProps) {
 		}
 	}, [args.port, config])
 
-	const handleDepsComplete = () => {
+	const handleDepsComplete = async () => {
 		setState('starting')
-		startServer()
-	}
 
-	const startServer = () => {
 		const info = getTailscaleInfo()
 		if (!info) {
 			setError('Could not get Tailscale info. Is Tailscale running?')
@@ -86,37 +119,42 @@ function App({ background, port }: AppProps) {
 			return
 		}
 
-		const proc = spawn('bun', ['run', SERVER_PATH], {
-			env: { ...process.env, PORT: String(port) },
-			stdio: 'ignore',
-			detached: background,
-		})
-
-		proc.on('error', err => {
-			setError(`Failed to start server: ${err.message}`)
-			setState('error')
-		})
-
-		if (background && proc.pid) {
-			proc.unref()
-			savePid(proc.pid)
-		}
-
-		setServerProcess(proc)
-
-		setTimeout(() => {
-			const success = startFunnel(port)
-			if (!success) {
-				setError('Failed to start Tailscale Funnel')
-				proc.kill()
+		if (background) {
+			const pid = spawnDaemon(port)
+			if (!pid) {
+				setError('Failed to start background server')
 				setState('error')
 				return
 			}
+			savePid(pid)
+			setDaemonPid(pid)
+
+			await new Promise(resolve => setTimeout(resolve, 1500))
 
 			setServerUrl(`https://${info.hostname}/grove`)
 			setTerminalHost(info.ip)
 			setState('running')
-		}, 1000)
+		} else {
+			try {
+				setLogsEnabled(false)
+				await startServer(port)
+				savePid(process.pid)
+
+				const success = startFunnel(port)
+				if (!success) {
+					setError('Failed to start Tailscale Funnel')
+					setState('error')
+					return
+				}
+
+				setServerUrl(`https://${info.hostname}/grove`)
+				setTerminalHost(info.ip)
+				setState('running')
+			} catch (err) {
+				setError(`Failed to start server: ${err}`)
+				setState('error')
+			}
+		}
 	}
 
 	useEffect(() => {
@@ -124,9 +162,6 @@ function App({ background, port }: AppProps) {
 
 		const cleanup = () => {
 			stopFunnel()
-			if (serverProcess) {
-				serverProcess.kill()
-			}
 			process.exit(0)
 		}
 
@@ -137,7 +172,7 @@ function App({ background, port }: AppProps) {
 			process.off('SIGINT', cleanup)
 			process.off('SIGTERM', cleanup)
 		}
-	}, [serverProcess, background])
+	}, [background])
 
 	if (state === 'deps-check') {
 		return <DepsCheck onComplete={handleDepsComplete} />
@@ -167,7 +202,7 @@ function App({ background, port }: AppProps) {
 				serverUrl={serverUrl}
 				terminalHost={terminalHost}
 				background
-				pid={serverProcess?.pid}
+				pid={daemonPid ?? undefined}
 			/>
 		)
 	}
@@ -188,14 +223,20 @@ if (args.stop) {
 	process.exit(result.stopped ? 0 : 1)
 }
 
-if (isRunning()) {
-	const pid = loadPid()
-	console.log(`✗ grove is already running in background (PID: ${pid})`)
-	console.log('  Run "grove --stop" to stop it first')
-	process.exit(1)
+if (args.daemon) {
+	const config = loadConfig()
+	const port = args.port ?? config.port
+	runDaemon(port)
+} else {
+	if (isRunning()) {
+		const pid = loadPid()
+		console.log(`✗ grove is already running in background (PID: ${pid})`)
+		console.log('  Run "grove --stop" to stop it first')
+		process.exit(1)
+	}
+
+	const config = loadConfig()
+	const port = args.port ?? config.port
+
+	render(<App background={args.background} port={port} />)
 }
-
-const config = loadConfig()
-const port = args.port ?? config.port
-
-render(<App background={args.background} port={port} />)

@@ -6,7 +6,7 @@
 		"grove": "./dist/index.js"
 	},
 	"scripts": {
-		"dev": "tsx src/index.tsx",
+		"dev": "bun src/index.tsx",
 		"build": "bun build --target=node src/index.tsx --outdir=dist",
 		"compile": "bun build --compile --minify src/index.tsx --outfile=grove"
 	},

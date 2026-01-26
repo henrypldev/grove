@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 
-import { $ } from 'bun'
 import { createHash } from 'node:crypto'
+import { $ } from 'bun'
 
 const VALID_BUMPS = ['patch', 'minor', 'major'] as const
 type Bump = (typeof VALID_BUMPS)[number]
@@ -160,7 +160,9 @@ async function run() {
 	await updateHomebrewFormula(newVersion, checksums)
 
 	console.log('\n✓ Release complete!')
-	console.log(`\nUsers can install with: brew tap henrypl/grove && brew install grove`)
+	console.log(
+		`\nUsers can install with: brew tap henrypl/grove && brew install grove`,
+	)
 }
 
 run()

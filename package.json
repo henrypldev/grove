@@ -15,7 +15,8 @@
 		"format:fix": "biome format --write .",
 		"check": "biome check .",
 		"check:fix": "biome check --write .",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"release": "bun scripts/release.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.12",

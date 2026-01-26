@@ -6,18 +6,51 @@ import {
 	log,
 	type SessionData,
 } from '../config'
-import { getNextPort, startSession, stopSession } from '../terminal/ttyd'
+import {
+	getNextPort,
+	isSessionActive,
+	startSession,
+	stopSession,
+} from '../terminal/ttyd'
 import { getWorktrees } from './worktrees'
 
-export async function getSessions(): Promise<SessionData[]> {
+export type SessionWithStatus = Omit<SessionData, 'pid'> & { isActive: boolean }
+
+const sseClients = new Set<ReadableStreamDefaultController>()
+
+export function addSSEClient(controller: ReadableStreamDefaultController) {
+	sseClients.add(controller)
+}
+
+export function removeSSEClient(controller: ReadableStreamDefaultController) {
+	sseClients.delete(controller)
+}
+
+export async function broadcastSessions() {
+	const sessions = await getSessions()
+	const data = `data: ${JSON.stringify({ type: 'sessions', sessions })}\n\n`
+	for (const controller of sseClients) {
+		try {
+			controller.enqueue(new TextEncoder().encode(data))
+		} catch {
+			sseClients.delete(controller)
+		}
+	}
+}
+
+export async function getSessions(): Promise<SessionWithStatus[]> {
 	log('sessions', 'getting sessions')
 	const state = await loadSessions()
 	const terminalHost = await getTerminalHost()
 	log('sessions', 'found sessions', { count: state.sessions.length })
-	return state.sessions.map(({ pid, ...rest }) => ({
-		...rest,
-		terminalUrl: rest.terminalUrl || `https://${terminalHost}:${rest.port}`,
-	})) as SessionData[]
+	const sessions = await Promise.all(
+		state.sessions.map(async ({ pid, ...rest }) => ({
+			...rest,
+			terminalUrl: rest.terminalUrl || `https://${terminalHost}:${rest.port}`,
+			isActive: await isSessionActive(pid),
+		})),
+	)
+	return sessions
 }
 
 export async function createSession(
@@ -63,10 +96,13 @@ export async function createSession(
 	}
 
 	log('sessions', 'session created', { id: session.id })
+	broadcastSessions()
 	return session
 }
 
 export async function deleteSession(id: string): Promise<boolean> {
 	log('sessions', 'deleting session', { id })
-	return stopSession(id)
+	const result = await stopSession(id)
+	if (result) broadcastSessions()
+	return result
 }

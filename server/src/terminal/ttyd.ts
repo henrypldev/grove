@@ -106,3 +106,8 @@ export async function getNextPort(): Promise<number> {
 	const state = await loadSessions()
 	return state.nextPort || 7681
 }
+
+export async function isSessionActive(pid: number): Promise<boolean> {
+	const result = await Bun.$`kill -0 ${pid}`.quiet().nothrow()
+	return result.exitCode === 0
+}

@@ -3,7 +3,12 @@ import { Link, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
-import { api, getServerUrl, type Session } from '@/services/api'
+import {
+	api,
+	getServerUrl,
+	type Session,
+	subscribeToEvents,
+} from '@/services/api'
 
 export default function SessionsScreen() {
 	const [sessions, setSessions] = useState<Session[]>([])
@@ -37,6 +42,8 @@ export default function SessionsScreen() {
 	useFocusEffect(
 		useCallback(() => {
 			loadSessions()
+			const unsubscribe = subscribeToEvents(setSessions)
+			return unsubscribe
 		}, [loadSessions]),
 	)
 
@@ -81,7 +88,10 @@ export default function SessionsScreen() {
 				renderItem={({ item }) => (
 					<Link href={`/sessions/${item.id}`} asChild>
 						<Pressable style={styles.card}>
-							<Text style={styles.cardTitle}>{item.branch}</Text>
+							<View style={styles.cardHeader}>
+								<Text style={styles.cardTitle}>{item.branch}</Text>
+								{item.isActive && <View style={styles.activeIndicator} />}
+							</View>
 							<Text style={styles.cardSubtitle}>{item.repoName}</Text>
 						</Pressable>
 					</Link>
@@ -153,11 +163,22 @@ const styles = StyleSheet.create((theme, rt) => ({
 		borderRadius: theme.radius.md,
 		marginBottom: theme.spacing(3),
 	},
+	cardHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: theme.spacing(2),
+	},
 	cardTitle: {
 		color: theme.colors.text,
 		fontSize: 17,
 		fontWeight: '500',
 		fontFamily: theme.fonts.mono,
+	},
+	activeIndicator: {
+		width: 8,
+		height: 8,
+		borderRadius: 4,
+		backgroundColor: '#00FF00',
 	},
 	cardSubtitle: {
 		color: theme.colors.textSecondary,

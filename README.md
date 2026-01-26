@@ -11,8 +11,17 @@ Server and CLI for managing Git repositories and terminal sessions from your pho
 
 ## Installation
 
+### Homebrew (recommended)
+
 ```bash
-git clone https://github.com/yourusername/grove.git
+brew tap henrypl/grove
+brew install grove
+```
+
+### From source
+
+```bash
+git clone https://github.com/henrypl/grove.git
 cd grove
 bun install
 ```

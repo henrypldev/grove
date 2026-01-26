@@ -21,6 +21,8 @@ export default function AddRepoScreen() {
 		}
 	}
 
+	const isValid = path.trim().length > 0
+
 	return (
 		<View style={styles.container}>
 			<Text style={styles.label}>Repository Path</Text>
@@ -29,21 +31,26 @@ export default function AddRepoScreen() {
 				value={path}
 				onChangeText={setPath}
 				placeholder="/Users/you/Projects/your-repo"
-				placeholderTextColor="#888888"
+				placeholderTextColor="#636366"
 				autoCapitalize="none"
 				autoCorrect={false}
 				autoFocus
 			/>
 			<Text style={styles.hint}>
-				Enter the full path to a git repository on your laptop.
+				Enter the full path to a git repository on your Mac.
 			</Text>
 			<Pressable
-				style={[styles.button, loading && styles.buttonDisabled]}
+				style={[styles.button, (!isValid || loading) && styles.buttonDisabled]}
 				onPress={handleAdd}
-				disabled={loading}
+				disabled={loading || !isValid}
 			>
-				<Text style={styles.buttonText}>
-					{loading ? '[ ADDING... ]' : '[ ADD ]'}
+				<Text
+					style={[
+						styles.buttonText,
+						(!isValid || loading) && styles.buttonTextDisabled,
+					]}
+				>
+					{loading ? 'Adding...' : 'Add Repository'}
 				</Text>
 			</Pressable>
 		</View>
@@ -57,38 +64,42 @@ const styles = StyleSheet.create(theme => ({
 		padding: theme.spacing(4),
 	},
 	label: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 12,
+		color: theme.colors.textSecondary,
+		fontSize: 13,
+		fontWeight: '500',
 		marginBottom: theme.spacing(2),
-	},
-	input: {
-		borderWidth: 1,
-		borderColor: theme.colors.border,
-		padding: theme.spacing(3),
-		color: theme.colors.text,
-		fontFamily: theme.fonts.mono,
-		fontSize: 14,
-	},
-	hint: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 11,
 		marginTop: theme.spacing(2),
 	},
-	button: {
-		borderWidth: 1,
-		borderColor: theme.colors.text,
+	input: {
+		backgroundColor: theme.colors.surface,
+		borderRadius: theme.radius.sm,
 		padding: theme.spacing(4),
+		color: theme.colors.text,
+		fontSize: 16,
+		fontFamily: theme.fonts.mono,
+	},
+	hint: {
+		color: theme.colors.textSecondary,
+		fontSize: 13,
+		marginTop: theme.spacing(2),
+		lineHeight: 18,
+	},
+	button: {
+		backgroundColor: theme.colors.accent,
+		padding: theme.spacing(4),
+		borderRadius: theme.radius.md,
 		alignItems: 'center',
 		marginTop: theme.spacing(6),
 	},
 	buttonDisabled: {
-		borderColor: theme.colors.border,
+		backgroundColor: theme.colors.surface,
 	},
 	buttonText: {
 		color: theme.colors.text,
-		fontFamily: theme.fonts.mono,
-		fontSize: 14,
+		fontSize: 17,
+		fontWeight: '600',
+	},
+	buttonTextDisabled: {
+		color: theme.colors.textTertiary,
 	},
 }))

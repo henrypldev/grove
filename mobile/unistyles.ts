@@ -1,25 +1,32 @@
 import { StyleSheet } from 'react-native-unistyles'
 
-const terminalTheme = {
+const darkTheme = {
 	colors: {
-		background: '#000000',
-		foreground: '#111111',
+		background: '#0A0A0A',
+		surface: '#1C1C1E',
+		surfaceElevated: '#2C2C2E',
 		text: '#FFFFFF',
-		textDim: '#888888',
-		border: '#333333',
-		accent: '#00FF00',
-		error: '#FF0000',
-		warning: '#FFFF00',
+		textSecondary: '#8E8E93',
+		textTertiary: '#636366',
+		border: '#38383A',
+		accent: '#0A84FF',
+		destructive: '#FF453A',
+		success: '#30D158',
 	},
 	fonts: {
 		mono: 'SpaceMono',
+	},
+	radius: {
+		sm: 8,
+		md: 12,
+		lg: 16,
 	},
 	spacing: (v: number) => v * 4,
 } as const
 
 const appThemes = {
-	dark: terminalTheme,
-	light: terminalTheme,
+	dark: darkTheme,
+	light: darkTheme,
 }
 
 const breakpoints = {

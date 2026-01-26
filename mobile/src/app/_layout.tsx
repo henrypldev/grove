@@ -33,27 +33,18 @@ export default function RootLayout() {
 			<StatusBar style="light" />
 			<Stack
 				screenOptions={{
-					headerStyle: { backgroundColor: '#000000' },
+					headerStyle: { backgroundColor: '#0A0A0A' },
 					headerTintColor: '#FFFFFF',
-					headerTitleStyle: { fontFamily: 'SpaceMono' },
-					contentStyle: { backgroundColor: '#000000' },
+					contentStyle: { backgroundColor: '#0A0A0A' },
 					headerBackButtonDisplayMode: 'minimal',
 				}}
 			>
-				<Stack.Screen name="index" options={{ title: 'Klaude' }} />
+				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				<Stack.Screen name="new-session" options={{ title: 'New Session' }} />
 				<Stack.Screen name="sessions/[id]" options={{ title: '' }} />
-				<Stack.Screen name="repos/index" options={{ title: 'Repos' }} />
 				<Stack.Screen
-					name="repos/add"
+					name="add-repo"
 					options={{ title: 'Add Repo', presentation: 'modal' }}
-				/>
-				<Stack.Screen
-					name="new-session"
-					options={{ title: 'New Session', presentation: 'modal' }}
-				/>
-				<Stack.Screen
-					name="settings"
-					options={{ title: 'Settings', presentation: 'modal' }}
 				/>
 				<Stack.Screen
 					name="setup"

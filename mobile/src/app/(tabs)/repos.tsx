@@ -1,14 +1,23 @@
-import { Link } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, FlatList, Pressable, Text, View } from 'react-native'
+import {
+	Alert,
+	FlatList,
+	Pressable,
+	RefreshControl,
+	Text,
+	View,
+} from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import { api, type Repo } from '@/services/api'
 
 export default function ReposScreen() {
 	const [repos, setRepos] = useState<Repo[]>([])
 	const [loading, setLoading] = useState(true)
+	const [refreshing, setRefreshing] = useState(false)
 
-	const loadRepos = useCallback(async () => {
+	const loadRepos = useCallback(async (isRefresh = false) => {
+		if (isRefresh) setRefreshing(true)
+		else setLoading(true)
 		try {
 			const data = await api.getRepos()
 			setRepos(data)
@@ -16,6 +25,7 @@ export default function ReposScreen() {
 			console.error('Failed to load repos:', e)
 		} finally {
 			setLoading(false)
+			setRefreshing(false)
 		}
 	}, [])
 
@@ -47,8 +57,15 @@ export default function ReposScreen() {
 				data={repos}
 				keyExtractor={item => item.id}
 				contentContainerStyle={styles.list}
+				refreshControl={
+					<RefreshControl
+						refreshing={refreshing}
+						onRefresh={() => loadRepos(true)}
+						tintColor="#8E8E93"
+					/>
+				}
 				ListEmptyComponent={
-					<View style={styles.empty}>
+					<View style={styles.emptyContainer}>
 						<Text style={styles.emptyText}>
 							{loading ? 'Loading...' : 'No repos added'}
 						</Text>
@@ -56,21 +73,24 @@ export default function ReposScreen() {
 				}
 				renderItem={({ item }) => (
 					<Pressable
-						style={styles.repoItem}
+						style={styles.card}
 						onLongPress={() => handleDelete(item)}
+						delayLongPress={500}
 					>
-						<Text style={styles.repoName}>{item.name}</Text>
-						<Text style={styles.repoPath}>{item.path}</Text>
+						<View style={styles.cardContent}>
+							<Text style={styles.cardTitle}>{item.name}</Text>
+							<Text style={styles.cardSubtitle}>{item.path}</Text>
+						</View>
+						<Pressable
+							style={styles.deleteButton}
+							onPress={() => handleDelete(item)}
+							hitSlop={8}
+						>
+							<Text style={styles.deleteText}>Remove</Text>
+						</Pressable>
 					</Pressable>
 				)}
 			/>
-			<View style={styles.footer}>
-				<Link href="/repos/add" asChild>
-					<Pressable style={styles.button}>
-						<Text style={styles.buttonText}>[ ADD REPO ]</Text>
-					</Pressable>
-				</Link>
-			</View>
 		</View>
 	)
 }
@@ -80,52 +100,48 @@ const styles = StyleSheet.create(theme => ({
 		flex: 1,
 		backgroundColor: theme.colors.background,
 	},
-	list: {
-		padding: theme.spacing(4),
-		flexGrow: 1,
-	},
-	empty: {
+	emptyContainer: {
 		flex: 1,
 		justifyContent: 'center',
 		alignItems: 'center',
 		paddingTop: theme.spacing(20),
 	},
 	emptyText: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 14,
-	},
-	repoItem: {
-		borderWidth: 1,
-		borderColor: theme.colors.border,
-		padding: theme.spacing(4),
-		marginBottom: theme.spacing(2),
-	},
-	repoName: {
-		color: theme.colors.text,
-		fontFamily: theme.fonts.mono,
+		color: theme.colors.textSecondary,
 		fontSize: 16,
 	},
-	repoPath: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 12,
-		marginTop: theme.spacing(1),
-	},
-	footer: {
+	list: {
 		padding: theme.spacing(4),
-		borderTopWidth: 1,
-		borderTopColor: theme.colors.border,
+		flexGrow: 1,
 	},
-	button: {
-		borderWidth: 1,
-		borderColor: theme.colors.text,
+	card: {
+		backgroundColor: theme.colors.surface,
 		padding: theme.spacing(4),
+		borderRadius: theme.radius.md,
+		marginBottom: theme.spacing(3),
+		flexDirection: 'row',
 		alignItems: 'center',
 	},
-	buttonText: {
+	cardContent: {
+		flex: 1,
+	},
+	cardTitle: {
 		color: theme.colors.text,
+		fontSize: 17,
+		fontWeight: '500',
+	},
+	cardSubtitle: {
+		color: theme.colors.textSecondary,
+		fontSize: 13,
 		fontFamily: theme.fonts.mono,
+		marginTop: theme.spacing(1),
+	},
+	deleteButton: {
+		paddingVertical: theme.spacing(2),
+		paddingHorizontal: theme.spacing(3),
+	},
+	deleteText: {
+		color: theme.colors.destructive,
 		fontSize: 14,
 	},
 }))

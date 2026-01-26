@@ -59,83 +59,38 @@ export interface Worktree {
 
 type ConnectionState = { connected: boolean; url: string | null }
 type ConnectionListener = (state: ConnectionState) => void
+type SessionsListener = (sessions: Session[]) => void
+
 const connectionListeners = new Set<ConnectionListener>()
+const sessionsListeners = new Set<SessionsListener>()
 let connectionState: ConnectionState = { connected: false, url: null }
 let sseController: AbortController | null = null
+let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
 
-export function subscribeToConnection(
-	listener: ConnectionListener,
-): () => void {
-	connectionListeners.add(listener)
-	listener(connectionState)
-	if (connectionListeners.size === 1) {
-		startSSEConnection()
-	}
-	return () => {
-		connectionListeners.delete(listener)
-		if (connectionListeners.size === 0) {
-			sseController?.abort()
-			sseController = null
-		}
-	}
-}
-
-function setConnectionState(state: ConnectionState) {
-	connectionState = state
-	for (const listener of connectionListeners) {
-		listener(state)
-	}
-}
-
-async function startSSEConnection() {
-	const baseUrl = await getServerUrl()
-	if (!baseUrl) {
-		setConnectionState({ connected: false, url: null })
-		return
-	}
-
-	sseController = new AbortController()
-
-	try {
-		const res = await fetch(`${baseUrl}/events`, {
-			signal: sseController.signal,
-		})
-		if (!res.body) {
-			setConnectionState({ connected: false, url: baseUrl })
-			return
-		}
-		setConnectionState({ connected: true, url: baseUrl })
-
-		const reader = res.body.getReader()
-		while (true) {
-			const { done } = await reader.read()
-			if (done) break
-		}
-	} catch {}
-	setConnectionState({ connected: false, url: baseUrl })
-
-	if (connectionListeners.size > 0) {
-		setTimeout(startSSEConnection, 3000)
-	}
-}
-
-export function subscribeToEvents(
-	onSessions: (sessions: Session[]) => void,
-): () => void {
-	let controller: AbortController | null = null
+function startSSEConnection() {
+	if (sseController) return
 
 	const connect = async () => {
 		const baseUrl = await getServerUrl()
-		if (!baseUrl) return
+		if (!baseUrl) {
+			setConnectionState({ connected: false, url: null })
+			return
+		}
 
-		controller = new AbortController()
+		sseController = new AbortController()
+
 		try {
 			const res = await fetch(`${baseUrl}/events`, {
-				signal: controller.signal,
+				signal: sseController.signal,
 			})
-			const reader = res.body?.getReader()
-			if (!reader) return
+			if (!res.body) {
+				setConnectionState({ connected: false, url: baseUrl })
+				scheduleReconnect()
+				return
+			}
 
+			setConnectionState({ connected: true, url: baseUrl })
+			const reader = res.body.getReader()
 			const decoder = new TextDecoder()
 			let buffer = ''
 
@@ -149,20 +104,76 @@ export function subscribeToEvents(
 
 				for (const line of lines) {
 					if (line.startsWith('data: ')) {
-						const data = JSON.parse(line.slice(6))
-						if (data.type === 'sessions') {
-							onSessions(data.sessions)
-						}
+						try {
+							const data = JSON.parse(line.slice(6))
+							if (data.type === 'sessions') {
+								for (const listener of sessionsListeners) {
+									listener(data.sessions)
+								}
+							}
+						} catch {}
 					}
 				}
 			}
 		} catch {}
+
+		sseController = null
+		setConnectionState({ connected: false, url: connectionState.url })
+		scheduleReconnect()
 	}
 
 	connect()
+}
 
+function stopSSEConnection() {
+	if (reconnectTimeout) {
+		clearTimeout(reconnectTimeout)
+		reconnectTimeout = null
+	}
+	sseController?.abort()
+	sseController = null
+}
+
+function scheduleReconnect() {
+	if (connectionListeners.size > 0 || sessionsListeners.size > 0) {
+		reconnectTimeout = setTimeout(() => {
+			reconnectTimeout = null
+			startSSEConnection()
+		}, 3000)
+	}
+}
+
+function setConnectionState(state: ConnectionState) {
+	connectionState = state
+	for (const listener of connectionListeners) {
+		listener(state)
+	}
+}
+
+export function subscribeToConnection(
+	listener: ConnectionListener,
+): () => void {
+	connectionListeners.add(listener)
+	listener(connectionState)
+	startSSEConnection()
 	return () => {
-		controller?.abort()
+		connectionListeners.delete(listener)
+		if (connectionListeners.size === 0 && sessionsListeners.size === 0) {
+			stopSSEConnection()
+		}
+	}
+}
+
+export function subscribeToEvents(
+	onSessions: SessionsListener,
+): () => void {
+	sessionsListeners.add(onSessions)
+	startSSEConnection()
+	return () => {
+		sessionsListeners.delete(onSessions)
+		if (connectionListeners.size === 0 && sessionsListeners.size === 0) {
+			stopSSEConnection()
+		}
 	}
 }
 

@@ -38,6 +38,9 @@ Bun.serve({
 		if (path === '/events' && method === 'GET') {
 			const stream = new ReadableStream({
 				start(controller) {
+					controller.enqueue(
+						new TextEncoder().encode('data: {"type":"connected"}\n\n'),
+					)
 					addSSEClient(controller)
 					const heartbeat = setInterval(() => {
 						try {

@@ -5,26 +5,57 @@ import { fileURLToPath } from 'node:url'
 import { Box, render, Text } from 'ink'
 import Spinner from 'ink-spinner'
 import { useEffect, useState } from 'react'
+import { isRunning, stopAll } from './cleanup.js'
 import { DepsCheck } from './components/DepsCheck.js'
 import { Running } from './components/Running.js'
-import { loadConfig, saveConfig } from './config.js'
+import { loadConfig, loadPid, saveConfig, savePid } from './config.js'
 import { getTailscaleInfo, startFunnel, stopFunnel } from './tunnel.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const SERVER_PATH = join(__dirname, '../../server/src/index.ts')
 
-function parseArgs(): { port?: number } {
+interface ParsedArgs {
+	port?: number
+	background: boolean
+	stop: boolean
+	help: boolean
+}
+
+function parseArgs(): ParsedArgs {
 	const args = process.argv.slice(2)
 	const portIndex = args.indexOf('--port')
-	if (portIndex !== -1 && args[portIndex + 1]) {
-		return { port: parseInt(args[portIndex + 1], 10) }
-	}
-	return {}
+	const port =
+		portIndex !== -1 && args[portIndex + 1]
+			? parseInt(args[portIndex + 1], 10)
+			: undefined
+	const background = args.includes('--background') || args.includes('-b')
+	const stop = args.includes('--stop') || args.includes('stop')
+	const help = args.includes('--help') || args.includes('-h')
+	return { port, background, stop, help }
+}
+
+function printHelp() {
+	console.log(`
+klaude - Mobile terminal server for Claude Code
+
+Usage: klaude [options]
+
+Options:
+  -b, --background    Start server in background and free terminal
+  -h, --help          Show this help message
+  --port <number>     Set server port (default: 3000)
+  --stop, stop        Stop background server and kill all sessions
+`)
 }
 
 type AppState = 'deps-check' | 'starting' | 'running' | 'error'
 
-function App() {
+interface AppProps {
+	background: boolean
+	port: number
+}
+
+function App({ background, port }: AppProps) {
 	const [state, setState] = useState<AppState>('deps-check')
 	const [error, setError] = useState<string | null>(null)
 	const [serverUrl, setServerUrl] = useState<string>('')
@@ -35,13 +66,12 @@ function App() {
 
 	const args = parseArgs()
 	const config = loadConfig()
-	const port = args.port ?? config.port
 
 	useEffect(() => {
 		if (args.port && args.port !== config.port) {
 			saveConfig({ ...config, port: args.port })
 		}
-	}, [args.port, config])
+	}, [args.port, config.port])
 
 	const handleDepsComplete = () => {
 		setState('starting')
@@ -59,12 +89,18 @@ function App() {
 		const proc = spawn('bun', ['run', SERVER_PATH], {
 			env: { ...process.env, PORT: String(port) },
 			stdio: 'ignore',
+			detached: background,
 		})
 
 		proc.on('error', err => {
 			setError(`Failed to start server: ${err.message}`)
 			setState('error')
 		})
+
+		if (background && proc.pid) {
+			proc.unref()
+			savePid(proc.pid)
+		}
 
 		setServerProcess(proc)
 
@@ -84,6 +120,8 @@ function App() {
 	}
 
 	useEffect(() => {
+		if (background) return
+
 		const cleanup = () => {
 			stopFunnel()
 			if (serverProcess) {
@@ -99,7 +137,7 @@ function App() {
 			process.off('SIGINT', cleanup)
 			process.off('SIGTERM', cleanup)
 		}
-	}, [serverProcess])
+	}, [serverProcess, background])
 
 	if (state === 'deps-check') {
 		return <DepsCheck onComplete={handleDepsComplete} />
@@ -123,7 +161,41 @@ function App() {
 		)
 	}
 
+	if (background) {
+		return (
+			<Running
+				serverUrl={serverUrl}
+				terminalHost={terminalHost}
+				background
+				pid={serverProcess?.pid}
+			/>
+		)
+	}
+
 	return <Running serverUrl={serverUrl} terminalHost={terminalHost} />
 }
 
-render(<App />)
+const args = parseArgs()
+
+if (args.help) {
+	printHelp()
+	process.exit(0)
+}
+
+if (args.stop) {
+	const result = stopAll()
+	console.log(result.stopped ? `✓ ${result.message}` : `✗ ${result.message}`)
+	process.exit(result.stopped ? 0 : 1)
+}
+
+if (isRunning()) {
+	const pid = loadPid()
+	console.log(`✗ Klaude is already running in background (PID: ${pid})`)
+	console.log('  Run "klaude --stop" to stop it first')
+	process.exit(1)
+}
+
+const config = loadConfig()
+const port = args.port ?? config.port
+
+render(<App background={args.background} port={port} />)

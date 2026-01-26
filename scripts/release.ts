@@ -76,13 +76,13 @@ async function updateHomebrewFormula(
 
 	const formula = `class Grove < Formula
   desc "Mobile terminal server for Claude Code - manage sessions from your phone"
-  homepage "https://github.com/henrypl/grove"
+  homepage "https://github.com/henrypldev/grove"
   version "${version}"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "https://github.com/henrypl/grove/releases/download/v#{version}/grove-#{version}-darwin-arm64.tar.gz"
+      url "https://github.com/henrypldev/grove/releases/download/v#{version}/grove-#{version}-darwin-arm64.tar.gz"
       sha256 "${checksums['darwin-arm64']}"
 
       def install
@@ -91,7 +91,7 @@ async function updateHomebrewFormula(
     end
 
     on_intel do
-      url "https://github.com/henrypl/grove/releases/download/v#{version}/grove-#{version}-darwin-x64.tar.gz"
+      url "https://github.com/henrypldev/grove/releases/download/v#{version}/grove-#{version}-darwin-x64.tar.gz"
       sha256 "${checksums['darwin-x64']}"
 
       def install
@@ -161,7 +161,7 @@ async function run() {
 
 	console.log('\n✓ Release complete!')
 	console.log(
-		`\nUsers can install with: brew tap henrypl/grove && brew install grove`,
+		`\nUsers can install with: brew tap henrypldev/grove && brew install grove`,
 	)
 }
 

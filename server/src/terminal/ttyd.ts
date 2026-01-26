@@ -1,10 +1,17 @@
 import { type Subprocess, spawn } from 'bun'
-import { loadSessions, log, type SessionData, saveSessions } from '../config'
+import {
+	ensureTailscaleCerts,
+	loadSessions,
+	log,
+	type SessionData,
+	saveSessions,
+} from '../config'
 
 const processes = new Map<string, Subprocess>()
 
 export async function startSession(session: SessionData): Promise<boolean> {
 	log('ttyd', 'starting ttyd', { id: session.id, port: session.port })
+	const { cert, key } = await ensureTailscaleCerts()
 	const claudeCmd = session.skipPermissions
 		? 'claude --dangerously-skip-permissions'
 		: 'claude'
@@ -13,6 +20,11 @@ export async function startSession(session: SessionData): Promise<boolean> {
 			'ttyd',
 			'-p',
 			String(session.port),
+			'-S',
+			'-C',
+			cert,
+			'-K',
+			key,
 			'-W',
 			'-t',
 			'fontSize=25',

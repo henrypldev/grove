@@ -55,6 +55,10 @@ export default function RootLayout() {
 					name="settings"
 					options={{ title: 'Settings', presentation: 'modal' }}
 				/>
+				<Stack.Screen
+					name="setup"
+					options={{ headerShown: false, presentation: 'modal' }}
+				/>
 			</Stack>
 		</KeyboardProvider>
 	)

@@ -3,12 +3,14 @@
 	"private": true,
 	"workspaces": [
 		"mobile",
-		"server"
+		"server",
+		"cli"
 	],
 	"scripts": {
 		"mobile": "bun run --cwd mobile start",
 		"server": "bun run --cwd server start",
 		"dev": "bun run --cwd server dev",
+		"cli": "bun run --cwd cli dev",
 		"lint": "biome lint .",
 		"lint:fix": "biome lint --write .",
 		"format": "biome format .",

@@ -3,15 +3,23 @@ import { execSync, spawnSync } from 'node:child_process'
 export interface TailscaleStatus {
 	Self: {
 		DNSName: string
+		TailscaleIPs: string[]
 	}
 }
 
-export function getTailscaleHostname(): string | null {
+export interface TailscaleInfo {
+	hostname: string
+	ip: string
+}
+
+export function getTailscaleInfo(): TailscaleInfo | null {
 	try {
 		const result = execSync('tailscale status --json', { encoding: 'utf-8' })
 		const status: TailscaleStatus = JSON.parse(result)
 		const dnsName = status.Self.DNSName
-		return dnsName.endsWith('.') ? dnsName.slice(0, -1) : dnsName
+		const hostname = dnsName.endsWith('.') ? dnsName.slice(0, -1) : dnsName
+		const ip = status.Self.TailscaleIPs[0]
+		return { hostname, ip }
 	} catch {
 		return null
 	}

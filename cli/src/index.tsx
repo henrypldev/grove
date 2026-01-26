@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { DepsCheck } from './components/DepsCheck.js'
 import { Running } from './components/Running.js'
 import { loadConfig, saveConfig } from './config.js'
-import { getTailscaleHostname, startFunnel, stopFunnel } from './tunnel.js'
+import { getTailscaleInfo, startFunnel, stopFunnel } from './tunnel.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const SERVER_PATH = join(__dirname, '../../server/src/index.ts')
@@ -27,7 +27,8 @@ type AppState = 'deps-check' | 'starting' | 'running' | 'error'
 function App() {
 	const [state, setState] = useState<AppState>('deps-check')
 	const [error, setError] = useState<string | null>(null)
-	const [url, setUrl] = useState<string>('')
+	const [serverUrl, setServerUrl] = useState<string>('')
+	const [terminalHost, setTerminalHost] = useState<string>('')
 	const [serverProcess, setServerProcess] = useState<ReturnType<
 		typeof spawn
 	> | null>(null)
@@ -48,9 +49,9 @@ function App() {
 	}
 
 	const startServer = () => {
-		const hostname = getTailscaleHostname()
-		if (!hostname) {
-			setError('Could not get Tailscale hostname. Is Tailscale running?')
+		const info = getTailscaleInfo()
+		if (!info) {
+			setError('Could not get Tailscale info. Is Tailscale running?')
 			setState('error')
 			return
 		}
@@ -76,7 +77,8 @@ function App() {
 				return
 			}
 
-			setUrl(`https://${hostname}/klaude`)
+			setServerUrl(`https://${info.hostname}/klaude`)
+			setTerminalHost(info.ip)
 			setState('running')
 		}, 1000)
 	}
@@ -121,7 +123,7 @@ function App() {
 		)
 	}
 
-	return <Running url={url} />
+	return <Running serverUrl={serverUrl} terminalHost={terminalHost} />
 }
 
 render(<App />)

@@ -4,6 +4,7 @@ import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
+import { TabsHeader } from '@/components/TabsHeader'
 
 export { ErrorBoundary } from 'expo-router'
 
@@ -39,7 +40,12 @@ export default function RootLayout() {
 					headerBackButtonDisplayMode: 'minimal',
 				}}
 			>
-				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+				<Stack.Screen
+					name="(tabs)"
+					options={{
+						header: () => <TabsHeader />,
+					}}
+				/>
 				<Stack.Screen
 					name="new-session"
 					options={{

@@ -1,10 +1,16 @@
 import { addRepo, deleteRepo, getRepos } from './api/repos'
-import { createSession, deleteSession, getSessions } from './api/sessions'
+import {
+	addSSEClient,
+	createSession,
+	deleteSession,
+	getSessions,
+	removeSSEClient,
+} from './api/sessions'
 import { createWorktree, deleteWorktree, getWorktrees } from './api/worktrees'
 import { log } from './config'
 import { cleanupStaleSessions } from './terminal/ttyd'
 
-const PORT = Bun.env.PORT || 3000
+const PORT = Bun.env.PORT || 3001
 
 log('server', 'starting up')
 await cleanupStaleSessions()
@@ -28,6 +34,38 @@ Bun.serve({
 		}
 
 		log('http', `${method} ${path}`)
+
+		if (path === '/events' && method === 'GET') {
+			const stream = new ReadableStream({
+				start(controller) {
+					controller.enqueue(
+						new TextEncoder().encode('data: {"type":"connected"}\n\n'),
+					)
+					addSSEClient(controller)
+					const heartbeat = setInterval(() => {
+						try {
+							controller.enqueue(
+								new TextEncoder().encode('data: {"type":"heartbeat"}\n\n'),
+							)
+						} catch {
+							clearInterval(heartbeat)
+						}
+					}, 30000)
+					req.signal.addEventListener('abort', () => {
+						clearInterval(heartbeat)
+						removeSSEClient(controller)
+					})
+				},
+			})
+			return new Response(stream, {
+				headers: {
+					'Content-Type': 'text/event-stream',
+					'Cache-Control': 'no-cache',
+					Connection: 'keep-alive',
+					'Access-Control-Allow-Origin': '*',
+				},
+			})
+		}
 
 		try {
 			if (path === '/repos' && method === 'GET') {

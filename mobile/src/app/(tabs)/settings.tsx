@@ -106,11 +106,10 @@ export default function SettingsScreen() {
 	)
 }
 
-const styles = StyleSheet.create((theme, rt) => ({
+const styles = StyleSheet.create(theme => ({
 	container: {
 		flex: 1,
 		backgroundColor: theme.colors.background,
-		paddingTop: rt.insets.top,
 	},
 	centered: {
 		flex: 1,

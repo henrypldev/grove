@@ -1,20 +1,36 @@
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { GlassView } from 'expo-glass-effect'
 import { Link, useFocusEffect } from 'expo-router'
-import { useCallback, useState } from 'react'
-import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native'
+import { useCallback, useMemo, useState } from 'react'
+import {
+	FlatList,
+	Pressable,
+	RefreshControl,
+	Text,
+	TextInput,
+	View,
+} from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
 import {
 	api,
 	getServerUrl,
 	type Session,
+	subscribeToConnection,
 	subscribeToEvents,
 } from '@/services/api'
+
+function extractDomain(url: string): string {
+	return url.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+}
 
 export default function SessionsScreen() {
 	const [sessions, setSessions] = useState<Session[]>([])
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
 	const [configured, setConfigured] = useState(true)
+	const [connected, setConnected] = useState(false)
+	const [serverUrl, setServerUrl] = useState<string | null>(null)
+	const [search, setSearch] = useState('')
 
 	const loadSessions = useCallback(async (isRefresh = false) => {
 		if (isRefresh) setRefreshing(true)
@@ -42,17 +58,39 @@ export default function SessionsScreen() {
 	useFocusEffect(
 		useCallback(() => {
 			loadSessions()
-			const unsubscribe = subscribeToEvents(setSessions)
-			return unsubscribe
+			const unsubscribeEvents = subscribeToEvents(setSessions)
+			const unsubscribeConnection = subscribeToConnection(state => {
+				setConnected(state.connected)
+				setServerUrl(state.url)
+			})
+			return () => {
+				unsubscribeEvents()
+				unsubscribeConnection()
+			}
 		}, [loadSessions]),
 	)
+
+	const activeCount = useMemo(
+		() => sessions.filter(s => s.isActive).length,
+		[sessions],
+	)
+
+	const filteredSessions = useMemo(() => {
+		if (!search.trim()) return sessions
+		const query = search.toLowerCase()
+		return sessions.filter(
+			s =>
+				s.repoName.toLowerCase().includes(query) ||
+				s.branch.toLowerCase().includes(query),
+		)
+	}, [sessions, search])
 
 	if (!configured && !loading) {
 		return (
 			<View style={styles.container}>
 				<View style={styles.centered}>
-					<Text style={styles.title}>Welcome to Klaude</Text>
-					<Text style={styles.subtitle}>
+					<Text style={styles.welcomeTitle}>Welcome to Klaude</Text>
+					<Text style={styles.welcomeSubtitle}>
 						Configure your server connection to get started.
 					</Text>
 					<Link href="/(tabs)/settings" asChild>
@@ -67,8 +105,40 @@ export default function SessionsScreen() {
 
 	return (
 		<View style={styles.container}>
+			<View style={styles.header}>
+				<Text style={styles.headerTitle}>
+					{serverUrl ? extractDomain(serverUrl) : 'Klaude'}
+				</Text>
+				<Text style={styles.headerSubtitle}>
+					<Text
+						style={
+							connected ? styles.statusConnected : styles.statusDisconnected
+						}
+					>
+						{connected ? 'Connected' : 'Disconnected'}
+					</Text>
+					{' · '}
+					{activeCount} active
+				</Text>
+			</View>
+
+			<View style={styles.searchContainer}>
+				<View style={styles.searchBar}>
+					<Ionicons name="search" size={18} color="#8E8E93" />
+					<TextInput
+						style={styles.searchInput}
+						placeholder="Search..."
+						placeholderTextColor="#8E8E93"
+						value={search}
+						onChangeText={setSearch}
+						autoCapitalize="none"
+						autoCorrect={false}
+					/>
+				</View>
+			</View>
+
 			<FlatList
-				data={sessions}
+				data={filteredSessions}
 				keyExtractor={item => item.id}
 				contentContainerStyle={styles.list}
 				refreshControl={
@@ -81,22 +151,35 @@ export default function SessionsScreen() {
 				ListEmptyComponent={
 					<View style={styles.emptyContainer}>
 						<Text style={styles.emptyText}>
-							{loading ? 'Loading...' : 'No active sessions'}
+							{loading ? 'Loading...' : 'No sessions'}
 						</Text>
 					</View>
 				}
+				ItemSeparatorComponent={() => <View style={styles.separator} />}
 				renderItem={({ item }) => (
 					<Link href={`/sessions/${item.id}`} asChild>
-						<Pressable style={styles.card}>
-							<View style={styles.cardHeader}>
-								<Text style={styles.cardTitle}>{item.branch}</Text>
-								{item.isActive && <View style={styles.activeIndicator} />}
+						<Pressable>
+							<View style={styles.itemContainer}>
+								<View style={styles.row}>
+									<View style={styles.rowLeft}>
+										<View
+											style={[
+												styles.statusDot,
+												!item.isActive && styles.statusDotInactive,
+											]}
+										/>
+										<Text style={styles.rowText}>
+											{item.repoName} · {item.branch}
+										</Text>
+									</View>
+									<Ionicons name="chevron-forward" size={20} color="#8E8E93" />
+								</View>
 							</View>
-							<Text style={styles.cardSubtitle}>{item.repoName}</Text>
 						</Pressable>
 					</Link>
 				)}
 			/>
+
 			<Link href="/new-session" asChild>
 				<Pressable style={styles.fab}>
 					<GlassView style={styles.fabGlass}>
@@ -112,7 +195,7 @@ const styles = StyleSheet.create((theme, rt) => ({
 	container: {
 		flex: 1,
 		backgroundColor: theme.colors.background,
-		paddingTop: rt.insets.top + 48,
+		paddingTop: rt.insets.top,
 	},
 	centered: {
 		flex: 1,
@@ -120,13 +203,13 @@ const styles = StyleSheet.create((theme, rt) => ({
 		alignItems: 'center',
 		padding: theme.spacing(8),
 	},
-	title: {
+	welcomeTitle: {
 		color: theme.colors.text,
 		fontSize: 24,
 		fontWeight: '600',
 		marginBottom: theme.spacing(2),
 	},
-	subtitle: {
+	welcomeSubtitle: {
 		color: theme.colors.textSecondary,
 		fontSize: 16,
 		textAlign: 'center',
@@ -143,9 +226,51 @@ const styles = StyleSheet.create((theme, rt) => ({
 		fontSize: 16,
 		fontWeight: '600',
 	},
+	header: {
+		paddingHorizontal: theme.spacing(4),
+		paddingTop: theme.spacing(4),
+		paddingBottom: theme.spacing(2),
+	},
+	headerTitle: {
+		color: theme.colors.text,
+		fontSize: 28,
+		fontWeight: '700',
+	},
+	headerSubtitle: {
+		color: theme.colors.textSecondary,
+		fontSize: 15,
+		marginTop: theme.spacing(1),
+	},
+	statusConnected: {
+		color: '#34C759',
+	},
+	statusDisconnected: {
+		color: '#FF3B30',
+	},
+	searchContainer: {
+		paddingHorizontal: theme.spacing(4),
+		paddingVertical: theme.spacing(3),
+	},
+	searchBar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: theme.colors.surface,
+		borderRadius: theme.radius.md,
+		paddingHorizontal: theme.spacing(3),
+		paddingVertical: theme.spacing(2),
+		gap: theme.spacing(2),
+	},
+	searchInput: {
+		flex: 1,
+		color: theme.colors.text,
+		fontSize: 16,
+	},
 	list: {
-		padding: theme.spacing(4),
+		paddingHorizontal: theme.spacing(4),
 		flexGrow: 1,
+	},
+	itemContainer: {
+		flex: 1,
 	},
 	emptyContainer: {
 		flex: 1,
@@ -157,49 +282,51 @@ const styles = StyleSheet.create((theme, rt) => ({
 		color: theme.colors.textSecondary,
 		fontSize: 16,
 	},
-	card: {
-		backgroundColor: theme.colors.surface,
-		padding: theme.spacing(4),
-		borderRadius: theme.radius.md,
-		marginBottom: theme.spacing(3),
-	},
-	cardHeader: {
+	row: {
 		flexDirection: 'row',
 		alignItems: 'center',
-		gap: theme.spacing(2),
+		justifyContent: 'space-between',
+		paddingVertical: theme.spacing(3),
 	},
-	cardTitle: {
+	rowLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: theme.spacing(3),
+		flex: 1,
+	},
+	statusDot: {
+		width: 10,
+		height: 10,
+		borderRadius: 5,
+		backgroundColor: '#34C759',
+	},
+	statusDotInactive: {
+		backgroundColor: 'transparent',
+	},
+	rowText: {
 		color: theme.colors.text,
 		fontSize: 17,
-		fontWeight: '500',
-		fontFamily: theme.fonts.mono,
+		flex: 1,
 	},
-	activeIndicator: {
-		width: 8,
-		height: 8,
-		borderRadius: 4,
-		backgroundColor: '#00FF00',
-	},
-	cardSubtitle: {
-		color: theme.colors.textSecondary,
-		fontSize: 14,
-		marginTop: theme.spacing(1),
+	separator: {
+		height: 1,
+		backgroundColor: theme.colors.surface,
 	},
 	fab: {
 		position: 'absolute',
 		right: theme.spacing(4),
-		top: rt.insets.top,
+		bottom: rt.insets.bottom + theme.spacing(4),
 	},
 	fabGlass: {
-		width: 44,
-		height: 44,
-		borderRadius: 22,
+		width: 56,
+		height: 56,
+		borderRadius: 28,
 		alignItems: 'center',
 		justifyContent: 'center',
 	},
 	fabText: {
 		color: theme.colors.text,
-		fontSize: 24,
+		fontSize: 28,
 		fontWeight: '300',
 	},
 }))

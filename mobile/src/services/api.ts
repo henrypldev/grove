@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import EventSource from 'react-native-sse'
 
 const SERVER_URL_KEY = 'klaude_server_url'
 
@@ -67,65 +68,42 @@ type SessionsListener = (sessions: Session[]) => void
 const connectionListeners = new Set<ConnectionListener>()
 const sessionsListeners = new Set<SessionsListener>()
 let connectionState: ConnectionState = { connected: false, url: null }
-let sseController: AbortController | null = null
+let eventSource: EventSource | null = null
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
 
-function startSSEConnection() {
-	if (sseController) return
+async function startSSEConnection() {
+	if (eventSource) return
 
-	const connect = async () => {
-		const baseUrl = await getServerUrl()
-		if (!baseUrl) {
-			setConnectionState({ connected: false, url: null })
-			return
-		}
+	const baseUrl = await getServerUrl()
+	if (!baseUrl) {
+		setConnectionState({ connected: false, url: null })
+		return
+	}
 
-		sseController = new AbortController()
+	eventSource = new EventSource(`${baseUrl}/events`)
 
+	eventSource.addEventListener('open', () => {
+		setConnectionState({ connected: true, url: baseUrl })
+	})
+
+	eventSource.addEventListener('message', event => {
+		if (!event.data) return
 		try {
-			const res = await fetch(`${baseUrl}/events`, {
-				signal: sseController.signal,
-			})
-			if (!res.body) {
-				setConnectionState({ connected: false, url: baseUrl })
-				scheduleReconnect()
-				return
-			}
-
-			setConnectionState({ connected: true, url: baseUrl })
-			const reader = res.body.getReader()
-			const decoder = new TextDecoder()
-			let buffer = ''
-
-			while (true) {
-				const { done, value } = await reader.read()
-				if (done) break
-
-				buffer += decoder.decode(value, { stream: true })
-				const lines = buffer.split('\n\n')
-				buffer = lines.pop() || ''
-
-				for (const line of lines) {
-					if (line.startsWith('data: ')) {
-						try {
-							const data = JSON.parse(line.slice(6))
-							if (data.type === 'sessions') {
-								for (const listener of sessionsListeners) {
-									listener(data.sessions)
-								}
-							}
-						} catch {}
-					}
+			const data = JSON.parse(event.data)
+			if (data.type === 'sessions') {
+				for (const listener of sessionsListeners) {
+					listener(data.sessions)
 				}
 			}
 		} catch {}
+	})
 
-		sseController = null
-		setConnectionState({ connected: false, url: connectionState.url })
+	eventSource.addEventListener('error', () => {
+		eventSource?.close()
+		eventSource = null
+		setConnectionState({ connected: false, url: baseUrl })
 		scheduleReconnect()
-	}
-
-	connect()
+	})
 }
 
 function stopSSEConnection() {
@@ -133,8 +111,8 @@ function stopSSEConnection() {
 		clearTimeout(reconnectTimeout)
 		reconnectTimeout = null
 	}
-	sseController?.abort()
-	sseController = null
+	eventSource?.close()
+	eventSource = null
 }
 
 function scheduleReconnect() {

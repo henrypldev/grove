@@ -1,5 +1,4 @@
 import Ionicons from '@expo/vector-icons/Ionicons'
-import { GlassView } from 'expo-glass-effect'
 import { Link, useFocusEffect } from 'expo-router'
 import { useCallback, useMemo, useState } from 'react'
 import {
@@ -16,13 +15,8 @@ import {
 	getServerUrl,
 	type Session,
 	type SessionState,
-	subscribeToConnection,
 	subscribeToEvents,
 } from '@/services/api'
-
-function extractDomain(url: string): string {
-	return url.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
-}
 
 function getStateLabel(state: SessionState): string {
 	switch (state) {
@@ -40,8 +34,6 @@ export default function SessionsScreen() {
 	const [loading, setLoading] = useState(true)
 	const [refreshing, setRefreshing] = useState(false)
 	const [configured, setConfigured] = useState(true)
-	const [connected, setConnected] = useState(false)
-	const [serverUrl, setServerUrl] = useState<string | null>(null)
 	const [search, setSearch] = useState('')
 
 	const loadSessions = useCallback(async (isRefresh = false) => {
@@ -71,20 +63,10 @@ export default function SessionsScreen() {
 		useCallback(() => {
 			loadSessions()
 			const unsubscribeEvents = subscribeToEvents(setSessions)
-			const unsubscribeConnection = subscribeToConnection(state => {
-				setConnected(state.connected)
-				setServerUrl(state.url)
-			})
 			return () => {
 				unsubscribeEvents()
-				unsubscribeConnection()
 			}
 		}, [loadSessions]),
-	)
-
-	const activeCount = useMemo(
-		() => sessions.filter(s => s.isActive).length,
-		[sessions],
 	)
 
 	const filteredSessions = useMemo(() => {
@@ -117,23 +99,6 @@ export default function SessionsScreen() {
 
 	return (
 		<View style={styles.container}>
-			<View style={styles.header}>
-				<Text style={styles.headerTitle}>
-					{serverUrl ? extractDomain(serverUrl) : 'Klaude'}
-				</Text>
-				<Text style={styles.headerSubtitle}>
-					<Text
-						style={
-							connected ? styles.statusConnected : styles.statusDisconnected
-						}
-					>
-						{connected ? 'Connected' : 'Disconnected'}
-					</Text>
-					{' · '}
-					{activeCount} active
-				</Text>
-			</View>
-
 			<View style={styles.searchContainer}>
 				<View style={styles.searchBar}>
 					<Ionicons name="search" size={18} color="#8E8E93" />
@@ -194,23 +159,14 @@ export default function SessionsScreen() {
 					</Link>
 				)}
 			/>
-
-			<Link href="/new-session" asChild>
-				<Pressable style={styles.fab}>
-					<GlassView style={styles.fabGlass}>
-						<Text style={styles.fabText}>+</Text>
-					</GlassView>
-				</Pressable>
-			</Link>
 		</View>
 	)
 }
 
-const styles = StyleSheet.create((theme, rt) => ({
+const styles = StyleSheet.create(theme => ({
 	container: {
 		flex: 1,
 		backgroundColor: theme.colors.background,
-		paddingTop: rt.insets.top,
 	},
 	centered: {
 		flex: 1,
@@ -240,27 +196,6 @@ const styles = StyleSheet.create((theme, rt) => ({
 		color: theme.colors.text,
 		fontSize: 16,
 		fontWeight: '600',
-	},
-	header: {
-		paddingHorizontal: theme.spacing(4),
-		paddingTop: theme.spacing(4),
-		paddingBottom: theme.spacing(2),
-	},
-	headerTitle: {
-		color: theme.colors.text,
-		fontSize: 28,
-		fontWeight: '700',
-	},
-	headerSubtitle: {
-		color: theme.colors.textSecondary,
-		fontSize: 15,
-		marginTop: theme.spacing(1),
-	},
-	statusConnected: {
-		color: '#34C759',
-	},
-	statusDisconnected: {
-		color: '#FF3B30',
 	},
 	searchContainer: {
 		paddingHorizontal: theme.spacing(4),
@@ -329,22 +264,5 @@ const styles = StyleSheet.create((theme, rt) => ({
 	separator: {
 		height: 1,
 		backgroundColor: theme.colors.surface,
-	},
-	fab: {
-		position: 'absolute',
-		right: theme.spacing(4),
-		bottom: rt.insets.bottom + theme.spacing(4),
-	},
-	fabGlass: {
-		width: 56,
-		height: 56,
-		borderRadius: 28,
-		alignItems: 'center',
-		justifyContent: 'center',
-	},
-	fabText: {
-		color: theme.colors.text,
-		fontSize: 28,
-		fontWeight: '300',
 	},
 }))

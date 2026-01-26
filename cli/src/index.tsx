@@ -71,7 +71,7 @@ function App({ background, port }: AppProps) {
 		if (args.port && args.port !== config.port) {
 			saveConfig({ ...config, port: args.port })
 		}
-	}, [args.port, config.port])
+	}, [args.port, config])
 
 	const handleDepsComplete = () => {
 		setState('starting')

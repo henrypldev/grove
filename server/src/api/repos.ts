@@ -10,21 +10,15 @@ export async function getRepos(): Promise<Repo[]> {
 
 export async function addRepo(path: string): Promise<Repo | null> {
 	log('repos', 'adding repo', { path })
-	const pathFile = Bun.file(path)
-	if (!(await pathFile.exists())) {
-		log('repos', 'path does not exist', { path })
-		return null
-	}
-
 	const result = await Bun.$`test -d ${path}`.quiet().nothrow()
 	if (result.exitCode !== 0) {
-		log('repos', 'path is not a directory', { path })
+		log('repos', 'path does not exist or is not a directory', { path })
 		return null
 	}
 
 	const gitDir = join(path, '.git')
-	const gitFile = Bun.file(gitDir)
-	if (!(await gitFile.exists())) {
+	const gitResult = await Bun.$`test -e ${gitDir}`.quiet().nothrow()
+	if (gitResult.exitCode !== 0) {
 		log('repos', '.git not found', { gitDir })
 		return null
 	}

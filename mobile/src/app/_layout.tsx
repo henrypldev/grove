@@ -1,32 +1,13 @@
 import { useFonts } from 'expo-font'
-import * as Linking from 'expo-linking'
 import { Stack } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import { useEffect } from 'react'
-import { Alert } from 'react-native'
 import { KeyboardProvider } from 'react-native-keyboard-controller'
-import { setServerUrl, setTerminalHost } from '@/services/api'
 
 export { ErrorBoundary } from 'expo-router'
 
 SplashScreen.preventAutoHideAsync()
-
-function handleDeepLink(url: string) {
-	const parsed = Linking.parse(url)
-	if (parsed.hostname === 'setup' && parsed.queryParams) {
-		const { serverUrl, terminalHost } = parsed.queryParams
-		if (typeof serverUrl === 'string' && typeof terminalHost === 'string') {
-			Promise.all([setServerUrl(serverUrl), setTerminalHost(terminalHost)])
-				.then(() => {
-					Alert.alert('Connected', `Server configured:\n${serverUrl}`)
-				})
-				.catch(() => {
-					Alert.alert('Error', 'Failed to save configuration')
-				})
-		}
-	}
-}
 
 export default function RootLayout() {
 	const [loaded, error] = useFonts({
@@ -42,18 +23,6 @@ export default function RootLayout() {
 			SplashScreen.hideAsync()
 		}
 	}, [loaded])
-
-	useEffect(() => {
-		Linking.getInitialURL().then(url => {
-			if (url) handleDeepLink(url)
-		})
-
-		const subscription = Linking.addEventListener('url', ({ url }) => {
-			handleDeepLink(url)
-		})
-
-		return () => subscription.remove()
-	}, [])
 
 	if (!loaded) {
 		return null
@@ -85,6 +54,10 @@ export default function RootLayout() {
 				<Stack.Screen
 					name="settings"
 					options={{ title: 'Settings', presentation: 'modal' }}
+				/>
+				<Stack.Screen
+					name="setup"
+					options={{ headerShown: false, presentation: 'modal' }}
 				/>
 			</Stack>
 		</KeyboardProvider>

@@ -27,7 +27,7 @@ export async function startSession(session: SessionData): Promise<boolean> {
 			key,
 			'-W',
 			'-t',
-			'fontSize=25',
+			'fontSize=30',
 			'tmux',
 			'new-session',
 			'-A',
@@ -110,4 +110,25 @@ export async function getNextPort(): Promise<number> {
 export async function isSessionActive(pid: number): Promise<boolean> {
 	const result = await Bun.$`kill -0 ${pid}`.quiet().nothrow()
 	return result.exitCode === 0
+}
+
+export type SessionState = 'waiting' | 'busy' | 'idle'
+
+export async function getSessionState(
+	sessionId: string,
+): Promise<SessionState> {
+	const result = await Bun.$`tmux capture-pane -t klaude-${sessionId} -p`
+		.quiet()
+		.nothrow()
+	if (result.exitCode !== 0) {
+		return 'idle'
+	}
+	const output = result.text()
+	if (output.includes('Esc to interrupt') || output.includes('✢')) {
+		return 'busy'
+	}
+	if (output.includes('? for shortcuts')) {
+		return 'waiting'
+	}
+	return 'busy'
 }

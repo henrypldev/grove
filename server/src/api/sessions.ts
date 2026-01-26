@@ -8,22 +8,48 @@ import {
 } from '../config'
 import {
 	getNextPort,
+	getSessionState,
 	isSessionActive,
+	type SessionState,
 	startSession,
 	stopSession,
 } from '../terminal/ttyd'
 import { getWorktrees } from './worktrees'
 
-export type SessionWithStatus = Omit<SessionData, 'pid'> & { isActive: boolean }
+export type SessionWithStatus = Omit<SessionData, 'pid'> & {
+	isActive: boolean
+	state: SessionState
+}
 
 const sseClients = new Set<ReadableStreamDefaultController>()
+let stateInterval: ReturnType<typeof setInterval> | null = null
+
+function startStatePolling() {
+	if (stateInterval) return
+	stateInterval = setInterval(() => {
+		if (sseClients.size > 0) {
+			broadcastSessions()
+		}
+	}, 2000)
+}
+
+function stopStatePolling() {
+	if (stateInterval) {
+		clearInterval(stateInterval)
+		stateInterval = null
+	}
+}
 
 export function addSSEClient(controller: ReadableStreamDefaultController) {
 	sseClients.add(controller)
+	startStatePolling()
 }
 
 export function removeSSEClient(controller: ReadableStreamDefaultController) {
 	sseClients.delete(controller)
+	if (sseClients.size === 0) {
+		stopStatePolling()
+	}
 }
 
 export async function broadcastSessions() {
@@ -40,15 +66,21 @@ export async function broadcastSessions() {
 
 export async function getSessions(): Promise<SessionWithStatus[]> {
 	log('sessions', 'getting sessions')
-	const state = await loadSessions()
+	const sessionsState = await loadSessions()
 	const terminalHost = await getTerminalHost()
-	log('sessions', 'found sessions', { count: state.sessions.length })
+	log('sessions', 'found sessions', { count: sessionsState.sessions.length })
 	const sessions = await Promise.all(
-		state.sessions.map(async ({ pid, ...rest }) => ({
-			...rest,
-			terminalUrl: rest.terminalUrl || `https://${terminalHost}:${rest.port}`,
-			isActive: await isSessionActive(pid),
-		})),
+		sessionsState.sessions.map(async ({ pid, ...rest }) => {
+			const isActive = await isSessionActive(pid)
+			return {
+				...rest,
+				terminalUrl: rest.terminalUrl || `https://${terminalHost}:${rest.port}`,
+				isActive,
+				state: isActive
+					? await getSessionState(rest.id)
+					: ('idle' as SessionState),
+			}
+		}),
 	)
 	return sessions
 }

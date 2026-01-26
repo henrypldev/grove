@@ -15,12 +15,24 @@ import {
 	api,
 	getServerUrl,
 	type Session,
+	type SessionState,
 	subscribeToConnection,
 	subscribeToEvents,
 } from '@/services/api'
 
 function extractDomain(url: string): string {
 	return url.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+}
+
+function getStateLabel(state: SessionState): string {
+	switch (state) {
+		case 'waiting':
+			return 'Waiting for input'
+		case 'busy':
+			return 'Working...'
+		case 'idle':
+			return 'Idle'
+	}
 }
 
 export default function SessionsScreen() {
@@ -174,6 +186,9 @@ export default function SessionsScreen() {
 									</View>
 									<Ionicons name="chevron-forward" size={20} color="#8E8E93" />
 								</View>
+								{item.isActive && (
+									<Text style={styles.state}>{getStateLabel(item.state)}</Text>
+								)}
 							</View>
 						</Pressable>
 					</Link>
@@ -307,6 +322,9 @@ const styles = StyleSheet.create((theme, rt) => ({
 		color: theme.colors.text,
 		fontSize: 17,
 		flex: 1,
+	},
+	state: {
+		color: theme.colors.textSecondary,
 	},
 	separator: {
 		height: 1,

@@ -33,6 +33,8 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
 	return res.json()
 }
 
+export type SessionState = 'waiting' | 'busy' | 'idle'
+
 export interface Session {
 	id: string
 	repoId: string
@@ -43,6 +45,7 @@ export interface Session {
 	terminalUrl: string
 	createdAt: string
 	isActive: boolean
+	state: SessionState
 }
 
 export interface Repo {
@@ -164,9 +167,7 @@ export function subscribeToConnection(
 	}
 }
 
-export function subscribeToEvents(
-	onSessions: SessionsListener,
-): () => void {
+export function subscribeToEvents(onSessions: SessionsListener): () => void {
 	sessionsListeners.add(onSessions)
 	startSSEConnection()
 	return () => {

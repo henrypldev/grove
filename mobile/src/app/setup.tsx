@@ -2,31 +2,28 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect } from 'react'
 import { Alert, Text, View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
-import { setServerUrl, setTerminalHost } from '@/services/api'
+import { setServerUrl } from '@/services/api'
 
 export default function SetupScreen() {
-	const params = useLocalSearchParams<{
-		serverUrl?: string
-		terminalHost?: string
-	}>()
+	const params = useLocalSearchParams<{ serverUrl?: string }>()
 
 	useEffect(() => {
-		const { serverUrl, terminalHost } = params
+		const { serverUrl } = params
 
-		if (serverUrl && terminalHost) {
-			Promise.all([setServerUrl(serverUrl), setTerminalHost(terminalHost)])
+		if (serverUrl) {
+			setServerUrl(serverUrl)
 				.then(() => {
 					Alert.alert('Connected', `Server configured:\n${serverUrl}`, [
-						{ text: 'OK', onPress: () => router.replace('/') },
+						{ text: 'OK', onPress: () => router.replace('/(tabs)') },
 					])
 				})
 				.catch(() => {
 					Alert.alert('Error', 'Failed to save configuration', [
-						{ text: 'OK', onPress: () => router.replace('/') },
+						{ text: 'OK', onPress: () => router.replace('/(tabs)') },
 					])
 				})
 		} else {
-			router.replace('/')
+			router.replace('/(tabs)')
 		}
 	}, [params])
 
@@ -45,8 +42,7 @@ const styles = StyleSheet.create(theme => ({
 		alignItems: 'center',
 	},
 	text: {
-		color: theme.colors.text,
-		fontFamily: theme.fonts.mono,
-		fontSize: 14,
+		color: theme.colors.textSecondary,
+		fontSize: 16,
 	},
 }))

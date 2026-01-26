@@ -1,5 +1,6 @@
 import {
 	generateId,
+	getTerminalHost,
 	loadConfig,
 	loadSessions,
 	log,
@@ -11,8 +12,12 @@ import { getWorktrees } from './worktrees'
 export async function getSessions(): Promise<SessionData[]> {
 	log('sessions', 'getting sessions')
 	const state = await loadSessions()
+	const terminalHost = await getTerminalHost()
 	log('sessions', 'found sessions', { count: state.sessions.length })
-	return state.sessions.map(({ pid, ...rest }) => rest) as SessionData[]
+	return state.sessions.map(({ pid, ...rest }) => ({
+		...rest,
+		terminalUrl: rest.terminalUrl || `https://${terminalHost}:${rest.port}`,
+	})) as SessionData[]
 }
 
 export async function createSession(
@@ -35,13 +40,16 @@ export async function createSession(
 		return null
 	}
 
+	const port = await getNextPort()
+	const terminalHost = await getTerminalHost()
 	const session: SessionData = {
 		id: generateId(),
 		repoId,
 		repoName: repo.name,
 		worktree: worktree.path,
 		branch: worktree.branch,
-		port: await getNextPort(),
+		port,
+		terminalUrl: `https://${terminalHost}:${port}`,
 		pid: 0,
 		createdAt: new Date().toISOString(),
 		skipPermissions,

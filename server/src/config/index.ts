@@ -27,9 +27,46 @@ export interface SessionData {
 	worktree: string
 	branch: string
 	port: number
+	terminalUrl: string
 	pid: number
 	createdAt: string
 	skipPermissions?: boolean
+}
+
+let cachedTerminalHost: string | null = null
+
+export async function getTerminalHost(): Promise<string> {
+	if (cachedTerminalHost) return cachedTerminalHost
+	if (Bun.env.TERMINAL_HOST) {
+		cachedTerminalHost = Bun.env.TERMINAL_HOST
+		return cachedTerminalHost
+	}
+	const result = await Bun.$`tailscale status --json`.quiet()
+	const status = JSON.parse(result.text())
+	cachedTerminalHost = status.Self.DNSName.replace(/\.$/, '')
+	return cachedTerminalHost
+}
+
+const CERT_DIR = join(CONFIG_DIR, 'certs')
+
+export async function ensureTailscaleCerts(): Promise<{
+	cert: string
+	key: string
+}> {
+	const host = await getTerminalHost()
+	const certPath = join(CERT_DIR, `${host}.crt`)
+	const keyPath = join(CERT_DIR, `${host}.key`)
+
+	if (
+		!(await Bun.file(certPath).exists()) ||
+		!(await Bun.file(keyPath).exists())
+	) {
+		await Bun.$`mkdir -p ${CERT_DIR}`.quiet()
+		await Bun.$`tailscale cert --cert-file ${certPath} --key-file ${keyPath} ${host}`
+		log('config', 'generated tailscale certs', { host })
+	}
+
+	return { cert: certPath, key: keyPath }
 }
 
 interface Config {

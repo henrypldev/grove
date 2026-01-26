@@ -12,14 +12,13 @@ import {
 import { StyleSheet } from 'react-native-unistyles'
 import { api, type Repo, type Worktree } from '@/services/api'
 
-type Step = 'repo' | 'worktree' | 'create'
+type Step = 'repo' | 'worktree'
 
 export default function NewSessionScreen() {
 	const [step, setStep] = useState<Step>('repo')
 	const [repos, setRepos] = useState<Repo[]>([])
 	const [worktrees, setWorktrees] = useState<Worktree[]>([])
 	const [selectedRepo, setSelectedRepo] = useState<Repo | null>(null)
-	const [, setSelectedWorktree] = useState<Worktree | null>(null)
 	const [newBranch, setNewBranch] = useState('')
 	const [baseBranch, setBaseBranch] = useState('main')
 	const [loading, setLoading] = useState(false)
@@ -52,7 +51,6 @@ export default function NewSessionScreen() {
 	}
 
 	const selectWorktree = (worktree: Worktree) => {
-		setSelectedWorktree(worktree)
 		createSession(worktree.branch)
 	}
 
@@ -113,17 +111,20 @@ export default function NewSessionScreen() {
 	if (step === 'repo') {
 		return (
 			<View style={styles.container}>
-				<Text style={styles.stepTitle}>Select Repository</Text>
+				<Text style={styles.sectionHeader}>SELECT REPOSITORY</Text>
 				<FlatList
 					data={repos}
 					keyExtractor={item => item.id}
 					contentContainerStyle={styles.list}
 					ListEmptyComponent={
-						<Text style={styles.emptyText}>No repos. Add one first.</Text>
+						<View style={styles.centered}>
+							<Text style={styles.emptyText}>No repos added yet.</Text>
+						</View>
 					}
 					renderItem={({ item }) => (
-						<Pressable style={styles.item} onPress={() => selectRepo(item)}>
-							<Text style={styles.itemText}>{item.name}</Text>
+						<Pressable style={styles.card} onPress={() => selectRepo(item)}>
+							<Text style={styles.cardTitle}>{item.name}</Text>
+							<Text style={styles.cardSubtitle}>{item.path}</Text>
 						</Pressable>
 					)}
 				/>
@@ -131,94 +132,101 @@ export default function NewSessionScreen() {
 		)
 	}
 
-	if (step === 'worktree') {
-		const mainWorktree = worktrees.find(w => w.isMain)
-		const otherWorktrees = worktrees.filter(w => !w.isMain)
+	const mainWorktree = worktrees.find(w => w.isMain)
+	const otherWorktrees = worktrees.filter(w => !w.isMain)
 
-		return (
-			<View style={styles.container}>
-				<Pressable onPress={() => setStep('repo')}>
-					<Text style={styles.backText}>{'< Back'}</Text>
-				</Pressable>
-				<Text style={styles.stepTitle}>Start Session</Text>
+	return (
+		<View style={styles.container}>
+			<Pressable style={styles.backButton} onPress={() => setStep('repo')}>
+				<Text style={styles.backText}>← Back</Text>
+			</Pressable>
 
-				<View style={styles.toggleRow}>
-					<Text style={styles.toggleLabel}>Skip Permissions</Text>
-					<Switch
-						value={skipPermissions}
-						onValueChange={setSkipPermissions}
-						trackColor={{ false: '#333', true: '#00FF00' }}
-						thumbColor="#FFFFFF"
-					/>
+			<View style={styles.optionRow}>
+				<View>
+					<Text style={styles.optionLabel}>Skip Permissions</Text>
+					<Text style={styles.optionHint}>Start session without asking</Text>
 				</View>
-
-				{mainWorktree && (
-					<View style={styles.currentBranchSection}>
-						<Text style={styles.sectionLabel}>Current Branch</Text>
-						<Pressable
-							onPress={() => selectWorktree(mainWorktree)}
-							disabled={loading}
-						>
-							<View style={styles.currentBranchItem}>
-								<Text style={styles.itemText}>{mainWorktree.branch}</Text>
-							</View>
-						</Pressable>
-					</View>
-				)}
-
-				<FlatList
-					data={otherWorktrees}
-					keyExtractor={item => item.path}
-					contentContainerStyle={styles.list}
-					ListHeaderComponent={
-						<View style={styles.createSection}>
-							<Text style={styles.sectionLabel}>Create New Worktree</Text>
-							<TextInput
-								style={styles.input}
-								value={newBranch}
-								onChangeText={setNewBranch}
-								placeholder="feature/my-feature"
-								placeholderTextColor="#888888"
-								autoCapitalize="none"
-								autoCorrect={false}
-							/>
-							<Text style={styles.hint}>Base branch: {baseBranch}</Text>
-							<Pressable
-								style={[styles.createButton, loading && styles.buttonDisabled]}
-								onPress={createWorktreeAndSession}
-								disabled={loading || !newBranch.trim()}
-							>
-								<Text style={styles.createButtonText}>
-									{loading ? '[ CREATING... ]' : '[ CREATE & START ]'}
-								</Text>
-							</Pressable>
-							{otherWorktrees.length > 0 && (
-								<Text style={styles.sectionLabel}>Or Select Worktree</Text>
-							)}
-						</View>
-					}
-					renderItem={({ item }) => (
-						<View style={styles.itemRow}>
-							<Pressable
-								style={styles.item}
-								onPress={() => selectWorktree(item)}
-								disabled={loading}
-							>
-								<Text style={styles.itemText}>{item.branch}</Text>
-							</Pressable>
-							<Pressable onPress={() => deleteWorktree(item)}>
-								<View style={styles.deleteButton}>
-									<Text style={styles.deleteText}>×</Text>
-								</View>
-							</Pressable>
-						</View>
-					)}
+				<Switch
+					value={skipPermissions}
+					onValueChange={setSkipPermissions}
+					trackColor={{ false: '#38383A', true: '#30D158' }}
+					thumbColor="#FFFFFF"
 				/>
 			</View>
-		)
-	}
 
-	return null
+			{mainWorktree && (
+				<>
+					<Text style={styles.sectionHeader}>CURRENT BRANCH</Text>
+					<Pressable
+						style={styles.cardHighlight}
+						onPress={() => selectWorktree(mainWorktree)}
+						disabled={loading}
+					>
+						<Text style={styles.cardTitleMono}>{mainWorktree.branch}</Text>
+					</Pressable>
+				</>
+			)}
+
+			<Text style={styles.sectionHeader}>CREATE NEW WORKTREE</Text>
+			<View style={styles.createSection}>
+				<TextInput
+					style={styles.input}
+					value={newBranch}
+					onChangeText={setNewBranch}
+					placeholder="feature/my-feature"
+					placeholderTextColor="#636366"
+					autoCapitalize="none"
+					autoCorrect={false}
+				/>
+				<Text style={styles.hint}>Branch from: {baseBranch}</Text>
+				<Pressable
+					style={[
+						styles.button,
+						(loading || !newBranch.trim()) && styles.buttonDisabled,
+					]}
+					onPress={createWorktreeAndSession}
+					disabled={loading || !newBranch.trim()}
+				>
+					<Text
+						style={[
+							styles.buttonText,
+							(loading || !newBranch.trim()) && styles.buttonTextDisabled,
+						]}
+					>
+						{loading ? 'Creating...' : 'Create & Start'}
+					</Text>
+				</Pressable>
+			</View>
+
+			{otherWorktrees.length > 0 && (
+				<>
+					<Text style={styles.sectionHeader}>EXISTING WORKTREES</Text>
+					<FlatList
+						data={otherWorktrees}
+						keyExtractor={item => item.path}
+						scrollEnabled={false}
+						renderItem={({ item }) => (
+							<View style={styles.cardRow}>
+								<Pressable
+									style={styles.cardFlex}
+									onPress={() => selectWorktree(item)}
+									disabled={loading}
+								>
+									<Text style={styles.cardTitleMono}>{item.branch}</Text>
+								</Pressable>
+								<Pressable
+									style={styles.deleteButton}
+									onPress={() => deleteWorktree(item)}
+								>
+									<Text style={styles.deleteText}>Remove</Text>
+								</Pressable>
+							</View>
+						)}
+					/>
+				</>
+			)}
+		</View>
+	)
 }
 
 const styles = StyleSheet.create(theme => ({
@@ -227,122 +235,134 @@ const styles = StyleSheet.create(theme => ({
 		backgroundColor: theme.colors.background,
 		padding: theme.spacing(4),
 	},
+	backButton: {
+		marginBottom: theme.spacing(4),
+	},
 	backText: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 12,
-		marginBottom: theme.spacing(4),
-	},
-	stepTitle: {
-		color: theme.colors.text,
-		fontFamily: theme.fonts.mono,
+		color: theme.colors.accent,
 		fontSize: 16,
-		marginBottom: theme.spacing(4),
 	},
-	toggleRow: {
-		flexDirection: 'row',
-		alignItems: 'center',
-		justifyContent: 'space-between',
-		marginBottom: theme.spacing(4),
-		paddingVertical: theme.spacing(2),
-	},
-	toggleLabel: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 12,
+	sectionHeader: {
+		color: theme.colors.textSecondary,
+		fontSize: 13,
+		fontWeight: '500',
+		marginBottom: theme.spacing(2),
+		marginTop: theme.spacing(4),
 	},
 	list: {
 		flexGrow: 1,
 	},
-	emptyText: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 14,
-		textAlign: 'center',
-		marginTop: theme.spacing(10),
-	},
-	itemRow: {
-		flexDirection: 'row',
-		alignItems: 'stretch',
-		marginBottom: theme.spacing(2),
-		gap: theme.spacing(1),
-	},
-	item: {
+	centered: {
 		flex: 1,
-		borderWidth: 1,
-		borderColor: theme.colors.border,
-		padding: theme.spacing(4),
-		flexDirection: 'row',
-		alignItems: 'center',
-	},
-	deleteButton: {
-		borderWidth: 1,
-		borderColor: '#FF4444F9',
-		paddingHorizontal: theme.spacing(4),
 		justifyContent: 'center',
 		alignItems: 'center',
-		flex: 1,
+		paddingTop: theme.spacing(20),
 	},
-	deleteText: {
-		color: '#FF4444F9',
-		fontFamily: theme.fonts.mono,
-		fontSize: 20,
+	emptyText: {
+		color: theme.colors.textSecondary,
+		fontSize: 16,
 	},
-	itemText: {
-		color: theme.colors.text,
-		fontFamily: theme.fonts.mono,
-		fontSize: 14,
+	card: {
+		backgroundColor: theme.colors.surface,
+		padding: theme.spacing(4),
+		borderRadius: theme.radius.md,
+		marginBottom: theme.spacing(3),
 	},
-	mainBadge: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 10,
-	},
-	currentBranchSection: {
-		marginBottom: theme.spacing(4),
-	},
-	currentBranchItem: {
+	cardHighlight: {
+		backgroundColor: theme.colors.surface,
+		padding: theme.spacing(4),
+		borderRadius: theme.radius.md,
 		borderWidth: 1,
 		borderColor: theme.colors.accent,
-		padding: theme.spacing(4),
 	},
-	createSection: {
-		marginBottom: theme.spacing(4),
-	},
-	sectionLabel: {
-		color: theme.colors.textDim,
-		fontFamily: theme.fonts.mono,
-		fontSize: 12,
+	cardRow: {
+		flexDirection: 'row',
+		gap: theme.spacing(2),
 		marginBottom: theme.spacing(2),
-		marginTop: theme.spacing(4),
 	},
-	input: {
-		borderWidth: 1,
-		borderColor: theme.colors.border,
-		padding: theme.spacing(3),
+	cardFlex: {
+		flex: 1,
+		backgroundColor: theme.colors.surface,
+		padding: theme.spacing(4),
+		borderRadius: theme.radius.md,
+	},
+	cardTitle: {
 		color: theme.colors.text,
-		fontFamily: theme.fonts.mono,
-		fontSize: 14,
+		fontSize: 17,
+		fontWeight: '500',
 	},
-	hint: {
-		color: theme.colors.textDim,
+	cardTitleMono: {
+		color: theme.colors.text,
+		fontSize: 16,
 		fontFamily: theme.fonts.mono,
-		fontSize: 11,
+	},
+	cardSubtitle: {
+		color: theme.colors.textSecondary,
+		fontSize: 13,
+		fontFamily: theme.fonts.mono,
 		marginTop: theme.spacing(1),
 	},
-	createButton: {
-		borderWidth: 1,
-		borderColor: theme.colors.accent,
-		padding: theme.spacing(3),
+	optionRow: {
+		flexDirection: 'row',
 		alignItems: 'center',
-		marginTop: theme.spacing(3),
+		justifyContent: 'space-between',
+		backgroundColor: theme.colors.surface,
+		padding: theme.spacing(4),
+		borderRadius: theme.radius.md,
+	},
+	optionLabel: {
+		color: theme.colors.text,
+		fontSize: 16,
+	},
+	optionHint: {
+		color: theme.colors.textSecondary,
+		fontSize: 13,
+		marginTop: theme.spacing(1),
+	},
+	createSection: {
+		backgroundColor: theme.colors.surface,
+		padding: theme.spacing(4),
+		borderRadius: theme.radius.md,
+	},
+	input: {
+		backgroundColor: theme.colors.background,
+		borderRadius: theme.radius.sm,
+		padding: theme.spacing(3),
+		color: theme.colors.text,
+		fontSize: 16,
+		fontFamily: theme.fonts.mono,
+	},
+	hint: {
+		color: theme.colors.textSecondary,
+		fontSize: 13,
+		marginTop: theme.spacing(2),
+	},
+	button: {
+		backgroundColor: theme.colors.accent,
+		padding: theme.spacing(3),
+		borderRadius: theme.radius.sm,
+		alignItems: 'center',
+		marginTop: theme.spacing(4),
 	},
 	buttonDisabled: {
-		borderColor: theme.colors.border,
+		backgroundColor: theme.colors.border,
 	},
-	createButtonText: {
-		color: theme.colors.accent,
-		fontFamily: theme.fonts.mono,
-		fontSize: 12,
+	buttonText: {
+		color: theme.colors.text,
+		fontSize: 16,
+		fontWeight: '600',
+	},
+	buttonTextDisabled: {
+		color: theme.colors.textTertiary,
+	},
+	deleteButton: {
+		backgroundColor: theme.colors.surface,
+		paddingHorizontal: theme.spacing(4),
+		borderRadius: theme.radius.md,
+		justifyContent: 'center',
+	},
+	deleteText: {
+		color: theme.colors.destructive,
+		fontSize: 14,
 	},
 }))

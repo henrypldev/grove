@@ -40,15 +40,28 @@ export default function RootLayout() {
 				}}
 			>
 				<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-				<Stack.Screen name="new-session" options={{ title: 'New Session' }} />
+				<Stack.Screen
+					name="new-session"
+					options={{
+						title: 'New Session',
+						presentation: 'modal',
+					}}
+				/>
 				<Stack.Screen name="sessions/[id]" options={{ title: '' }} />
 				<Stack.Screen
 					name="add-repo"
-					options={{ title: 'Add Repo', presentation: 'modal' }}
+					options={{
+						title: 'Add Repo',
+						presentation: 'modal',
+					}}
 				/>
 				<Stack.Screen
 					name="setup"
-					options={{ headerShown: false, presentation: 'modal' }}
+					options={{
+						headerShown: false,
+						presentation: 'modal',
+						sheetAllowedDetents: 'fitToContents',
+					}}
 				/>
 			</Stack>
 		</KeyboardProvider>

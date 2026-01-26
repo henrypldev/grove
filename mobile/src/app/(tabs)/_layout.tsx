@@ -1,24 +1,6 @@
-// import { usePathname } from 'expo-router'
 import { NativeTabs } from 'expo-router/unstable-native-tabs'
 
 export default function TabLayout() {
-	// const pathname = usePathname()
-	// console.log(pathname)
-
-	// const getSearchIcon = () => {
-	// 	if (pathname === '/') {
-	// 		return {
-	// 			default: 'apple.terminal.on.rectangle',
-	// 			selected: 'apple.terminal.on.rectangle.fill',
-	// 		}
-	// 	} else if (pathname === '/repos') {
-	// 		return {
-	// 			default: 'folder.badge.plus',
-	// 			selected: 'folder.fill.badge.plus',
-	// 		}
-	// 	}
-	// }
-
 	return (
 		<NativeTabs>
 			<NativeTabs.Trigger name="index">

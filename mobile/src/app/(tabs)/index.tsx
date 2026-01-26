@@ -1,3 +1,4 @@
+import { GlassView } from 'expo-glass-effect'
 import { Link, useFocusEffect } from 'expo-router'
 import { useCallback, useState } from 'react'
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native'
@@ -86,11 +87,18 @@ export default function SessionsScreen() {
 					</Link>
 				)}
 			/>
+			<Link href="/new-session" asChild>
+				<Pressable style={styles.fab}>
+					<GlassView style={styles.fabGlass}>
+						<Text style={styles.fabText}>+</Text>
+					</GlassView>
+				</Pressable>
+			</Link>
 		</View>
 	)
 }
 
-const styles = StyleSheet.create(theme => ({
+const styles = StyleSheet.create((theme, rt) => ({
 	container: {
 		flex: 1,
 		backgroundColor: theme.colors.background,
@@ -154,5 +162,22 @@ const styles = StyleSheet.create(theme => ({
 		color: theme.colors.textSecondary,
 		fontSize: 14,
 		marginTop: theme.spacing(1),
+	},
+	fab: {
+		position: 'absolute',
+		right: theme.spacing(4),
+		top: rt.insets.top + 8,
+	},
+	fabGlass: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	fabText: {
+		color: theme.colors.text,
+		fontSize: 24,
+		fontWeight: '300',
 	},
 }))

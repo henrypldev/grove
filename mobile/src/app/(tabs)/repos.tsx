@@ -1,3 +1,5 @@
+import { GlassView } from 'expo-glass-effect'
+import { Link } from 'expo-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
 	Alert,
@@ -91,11 +93,18 @@ export default function ReposScreen() {
 					</Pressable>
 				)}
 			/>
+			<Link href="/add-repo" asChild>
+				<Pressable style={styles.fab}>
+					<GlassView style={styles.fabGlass}>
+						<Text style={styles.fabText}>+</Text>
+					</GlassView>
+				</Pressable>
+			</Link>
 		</View>
 	)
 }
 
-const styles = StyleSheet.create(theme => ({
+const styles = StyleSheet.create((theme, rt) => ({
 	container: {
 		flex: 1,
 		backgroundColor: theme.colors.background,
@@ -143,5 +152,22 @@ const styles = StyleSheet.create(theme => ({
 	deleteText: {
 		color: theme.colors.destructive,
 		fontSize: 14,
+	},
+	fab: {
+		position: 'absolute',
+		right: theme.spacing(4),
+		top: rt.insets.top + 8,
+	},
+	fabGlass: {
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		alignItems: 'center',
+		justifyContent: 'center',
+	},
+	fabText: {
+		color: theme.colors.text,
+		fontSize: 24,
+		fontWeight: '300',
 	},
 }))

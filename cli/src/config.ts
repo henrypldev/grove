@@ -12,7 +12,7 @@ export interface Config {
 	port: number
 }
 
-const CONFIG_DIR = join(homedir(), '.config', 'klaude')
+const CONFIG_DIR = join(homedir(), '.config', 'grove')
 const CONFIG_FILE = join(CONFIG_DIR, 'cli.json')
 const PID_FILE = join(CONFIG_DIR, 'pid')
 

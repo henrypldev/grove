@@ -1,13 +1,11 @@
 {
-	"name": "klaude",
+	"name": "grove",
 	"private": true,
 	"workspaces": [
-		"mobile",
 		"server",
 		"cli"
 	],
 	"scripts": {
-		"mobile": "bun run --cwd mobile start",
 		"server": "bun run --cwd server start",
 		"dev": "bun run --cwd server dev",
 		"cli": "bun run --cwd cli dev",
@@ -20,6 +18,7 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.3.12"
+		"@biomejs/biome": "^2.3.12",
+		"@types/bun": "latest"
 	}
 }

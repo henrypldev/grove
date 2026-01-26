@@ -1,10 +1,10 @@
-# Klaude Design Document
+# grove Design Document
 
 Remote Claude Code session manager for iOS/Android.
 
 ## Overview
 
-Klaude is a mobile app that lets you remotely control Claude Code sessions running on your laptop. It uses ttyd for terminal streaming over WebSocket and a Bun server for session/worktree management.
+grove is a mobile app that lets you remotely control Claude Code sessions running on your laptop. It uses ttyd for terminal streaming over WebSocket and a Bun server for session/worktree management.
 
 ## Architecture
 
@@ -32,14 +32,14 @@ Klaude is a mobile app that lets you remotely control Claude Code sessions runni
 
 | Aspect | Decision |
 |--------|----------|
-| Structure | `klaude/mobile` + `klaude/server` monorepo |
+| Structure | `grove/mobile` + `grove/server` monorepo |
 | Server | Bun + REST API + ttyd process management |
 | Terminal | ttyd WebSocket → xterm.js in WebView |
 | Sessions | Multi-session with list/drawer |
 | Worktrees | Guided creation (repo, branch, base) |
 | Repos | Manual add through app UI |
 | Auth | Tailscale-only (trust the network) |
-| Config | XDG-compliant (`~/.config/klaude/`) |
+| Config | XDG-compliant (`~/.config/grove/`) |
 | Input | Text field + sticky shortcuts above keyboard |
 | UI | Terminal aesthetic: mono font, black/white, sharp corners |
 

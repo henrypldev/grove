@@ -837,7 +837,7 @@ var require_react_development = __commonJS((exports, module) => {
             if (moduleObject === undefined) {
               error("lazy: Expected the result of a dynamic imp" + "ort() call. " + `Instead received: %s
 
-Your code should look like: 
+Your code should look like:
   ` + "const MyComponent = lazy(() => imp" + `ort('./MyComponent'))
 
 ` + "Did you accidentally put curly braces around the import?", moduleObject);
@@ -847,7 +847,7 @@ Your code should look like:
             if (!("default" in moduleObject)) {
               error("lazy: Expected the result of a dynamic imp" + "ort() call. " + `Instead received: %s
 
-Your code should look like: 
+Your code should look like:
   ` + "const MyComponent = lazy(() => imp" + "ort('./MyComponent'))", moduleObject);
             }
           }
@@ -31402,7 +31402,7 @@ In order to be iterable, non-array objects must have a [Symbol.iterator]() metho
                 if (error.cause != null) {
                   var componentName = getDisplayNameForElementID(id);
                   console.error("React DevTools encountered an error while trying to inspect hooks. " + "This is most likely caused by an error in current inspected component" + (componentName != null ? ': "'.concat(componentName, '".') : ".") + `
-The error thrown in the component is: 
+The error thrown in the component is:
 
 `, error.cause);
                   if (error.cause instanceof Error) {
@@ -43638,7 +43638,7 @@ import {
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-var CONFIG_DIR = join(homedir(), ".config", "klaude");
+var CONFIG_DIR = join(homedir(), ".config", "grove");
 var CONFIG_FILE = join(CONFIG_DIR, "cli.json");
 var PID_FILE = join(CONFIG_DIR, "pid");
 var DEFAULT_CONFIG = {
@@ -43700,7 +43700,7 @@ function getTailscaleInfo() {
 }
 function startFunnel(port) {
   try {
-    execSync(`tailscale funnel --bg --set-path /klaude localhost:${port}`, {
+    execSync(`tailscale funnel --bg --set-path /grove localhost:${port}`, {
       stdio: "inherit"
     });
     return true;
@@ -43710,14 +43710,14 @@ function startFunnel(port) {
 }
 function stopFunnel() {
   try {
-    spawnSync("tailscale", ["funnel", "--set-path", "/klaude", "off"], {
+    spawnSync("tailscale", ["funnel", "--set-path", "/grove", "off"], {
       stdio: "ignore"
     });
   } catch {}
 }
 
 // src/cleanup.ts
-var SESSIONS_FILE = join2(homedir2(), ".config", "klaude", "sessions.json");
+var SESSIONS_FILE = join2(homedir2(), ".config", "grove", "sessions.json");
 function loadSessions() {
   if (!existsSync3(SESSIONS_FILE)) {
     return { sessions: [] };
@@ -43738,7 +43738,7 @@ function killProcess(pid) {
   }
 }
 function killTmuxSession(sessionId) {
-  spawnSync2("tmux", ["kill-session", "-t", `klaude-${sessionId}`], {
+  spawnSync2("tmux", ["kill-session", "-t", `grove-${sessionId}`], {
     stdio: "ignore"
   });
 }
@@ -43752,7 +43752,7 @@ function stopAll() {
     killProcess(session.pid);
     killTmuxSession(session.id);
   }
-  spawnSync2("tmux", ["kill-session", "-t", "klaude"], { stdio: "ignore" });
+  spawnSync2("tmux", ["kill-session", "-t", "grove"], { stdio: "ignore" });
   killProcess(pid);
   stopFunnel();
   removePid();
@@ -43760,7 +43760,7 @@ function stopAll() {
   const sessionText = sessionCount === 1 ? "session" : "sessions";
   return {
     stopped: true,
-    message: `Klaude stopped (killed ${sessionCount} ${sessionText})`
+    message: `grove stopped (killed ${sessionCount} ${sessionText})`
   };
 }
 function isRunning() {
@@ -44473,7 +44473,7 @@ var jsx_dev_runtime2 = __toESM(require_jsx_dev_runtime(), 1);
 function Running({ serverUrl, terminalHost, background, pid }) {
   const [qr, setQr] = import_react26.useState("");
   const { exit } = use_app_default();
-  const deepLink = `klaude://setup?serverUrl=${encodeURIComponent(serverUrl)}&terminalHost=${encodeURIComponent(terminalHost)}`;
+  const deepLink = `grove://setup?serverUrl=${encodeURIComponent(serverUrl)}&terminalHost=${encodeURIComponent(terminalHost)}`;
   import_react26.useEffect(() => {
     import_qrcode_terminal.default.generate(deepLink, { small: true }, (code) => {
       setQr(code);
@@ -44495,7 +44495,7 @@ function Running({ serverUrl, terminalHost, background, pid }) {
         children: [
           /* @__PURE__ */ jsx_dev_runtime2.jsxDEV(Text, {
             color: "green",
-            children: "✓ Klaude running at: "
+            children: "✓ grove running at: "
           }, undefined, false, undefined, this),
           /* @__PURE__ */ jsx_dev_runtime2.jsxDEV(Text, {
             color: "cyan",
@@ -44506,7 +44506,7 @@ function Running({ serverUrl, terminalHost, background, pid }) {
       }, undefined, true, undefined, this),
       /* @__PURE__ */ jsx_dev_runtime2.jsxDEV(Text, {
         dimColor: true,
-        children: "Scan QR code to configure the Klaude app automatically."
+        children: "Scan QR code to configure the grove app automatically."
       }, undefined, false, undefined, this),
       /* @__PURE__ */ jsx_dev_runtime2.jsxDEV(Box_default, {
         marginTop: 1,
@@ -44529,7 +44529,7 @@ function Running({ serverUrl, terminalHost, background, pid }) {
             }, undefined, true, undefined, this),
             /* @__PURE__ */ jsx_dev_runtime2.jsxDEV(Text, {
               dimColor: true,
-              children: 'Run "klaude --stop" to stop'
+              children: 'Run "grove --stop" to stop'
             }, undefined, false, undefined, this)
           ]
         }, undefined, true, undefined, this) : /* @__PURE__ */ jsx_dev_runtime2.jsxDEV(Text, {
@@ -44556,9 +44556,9 @@ function parseArgs() {
 }
 function printHelp() {
   console.log(`
-klaude - Mobile terminal server for Claude Code
+grove - Mobile terminal server for Claude Code
 
-Usage: klaude [options]
+Usage: grove [options]
 
 Options:
   -b, --background    Start server in background and free terminal
@@ -44613,7 +44613,7 @@ function App2({ background, port }) {
         setState("error");
         return;
       }
-      setServerUrl(`https://${info.hostname}/klaude`);
+      setServerUrl(`https://${info.hostname}/grove`);
       setTerminalHost(info.ip);
       setState("running");
     }, 1000);
@@ -44647,7 +44647,7 @@ function App2({ background, port }) {
           /* @__PURE__ */ jsx_dev_runtime3.jsxDEV(build_default, {
             type: "dots"
           }, undefined, false, undefined, this),
-          " Starting Klaude server on port ",
+          " Starting grove server on port ",
           port,
           "..."
         ]
@@ -44690,8 +44690,8 @@ if (args.stop) {
 }
 if (isRunning()) {
   const pid = loadPid();
-  console.log(`✗ Klaude is already running in background (PID: ${pid})`);
-  console.log('  Run "klaude --stop" to stop it first');
+  console.log(`✗ grove is already running in background (PID: ${pid})`);
+  console.log('  Run "grove --stop" to stop it first');
   process.exit(1);
 }
 var config = loadConfig();

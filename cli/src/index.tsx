@@ -36,9 +36,9 @@ function parseArgs(): ParsedArgs {
 
 function printHelp() {
 	console.log(`
-klaude - Mobile terminal server for Claude Code
+grove - Mobile terminal server for Claude Code
 
-Usage: klaude [options]
+Usage: grove [options]
 
 Options:
   -b, --background    Start server in background and free terminal
@@ -113,7 +113,7 @@ function App({ background, port }: AppProps) {
 				return
 			}
 
-			setServerUrl(`https://${info.hostname}/klaude`)
+			setServerUrl(`https://${info.hostname}/grove`)
 			setTerminalHost(info.ip)
 			setState('running')
 		}, 1000)
@@ -147,7 +147,7 @@ function App({ background, port }: AppProps) {
 		return (
 			<Box>
 				<Text>
-					<Spinner type="dots" /> Starting Klaude server on port {port}...
+					<Spinner type="dots" /> Starting grove server on port {port}...
 				</Text>
 			</Box>
 		)
@@ -190,8 +190,8 @@ if (args.stop) {
 
 if (isRunning()) {
 	const pid = loadPid()
-	console.log(`✗ Klaude is already running in background (PID: ${pid})`)
-	console.log('  Run "klaude --stop" to stop it first')
+	console.log(`✗ grove is already running in background (PID: ${pid})`)
+	console.log('  Run "grove --stop" to stop it first')
 	process.exit(1)
 }
 

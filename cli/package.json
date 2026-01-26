@@ -1,14 +1,14 @@
 {
-	"name": "klaude-cli",
+	"name": "grove-cli",
 	"version": "1.0.0",
 	"type": "module",
 	"bin": {
-		"klaude": "./dist/index.js"
+		"grove": "./dist/index.js"
 	},
 	"scripts": {
 		"dev": "tsx src/index.tsx",
 		"build": "bun build --target=node src/index.tsx --outdir=dist",
-		"compile": "bun build --compile --minify src/index.tsx --outfile=klaude"
+		"compile": "bun build --compile --minify src/index.tsx --outfile=grove"
 	},
 	"dependencies": {
 		"ink": "^5.1.0",

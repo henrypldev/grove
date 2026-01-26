@@ -1,11 +1,11 @@
-# Klaude CLI Design
+# grove CLI Design
 
-A CLI package that provides an interactive setup wizard and runs the Klaude server with automatic Tailscale Funnel configuration.
+A CLI package that provides an interactive setup wizard and runs the grove server with automatic Tailscale Funnel configuration.
 
 ## User Flow
 
 ```
-$ klaude
+$ grove
 
 Checking dependencies...
 ✓ ttyd found
@@ -15,7 +15,7 @@ Checking dependencies...
 Starting server on port 3000...
 Setting up Tailscale Funnel...
 
-✓ Klaude running at: https://mac-studio.tailnet.ts.net/klaude
+✓ grove running at: https://mac-studio.tailnet.ts.net/grove
   Scan QR code in app or enter URL manually.
 
 [QR CODE]
@@ -51,35 +51,35 @@ Installing tailscale...
 ## Port Configuration
 
 Order of precedence:
-1. CLI flag: `klaude --port 3001`
+1. CLI flag: `grove --port 3001`
 2. Saved config from previous run
 3. Default: 3000
 
-Config saved to `~/.config/klaude/cli.json`.
+Config saved to `~/.config/grove/cli.json`.
 
 ## Tailscale Funnel
 
-URL format: `https://{machine}.{tailnet}.ts.net/klaude`
+URL format: `https://{machine}.{tailnet}.ts.net/grove`
 
 Uses path-based routing to keep root URL available for other uses.
 
 ### On Start
 
 1. Start server on `localhost:{port}`
-2. Run: `tailscale funnel --bg --set-path /klaude localhost:{port}`
+2. Run: `tailscale funnel --bg --set-path /grove localhost:{port}`
 3. Get hostname from: `tailscale status --json`
 4. Display URL with QR code
 
 ### On Stop (Ctrl+C)
 
-1. Run: `tailscale funnel --set-path /klaude off`
+1. Run: `tailscale funnel --set-path /grove off`
 2. Stop server
 
 ## CLI Interface
 
 ```
-klaude                  # Interactive start
-klaude --port 3001      # Override port
+grove                  # Interactive start
+grove --port 3001      # Override port
 ```
 
 ## Package Structure
@@ -107,7 +107,7 @@ cli/
 ## Future Scope (not in MVP)
 
 - ngrok and Cloudflare Tunnel support
-- `klaude stop` command
+- `grove stop` command
 - TUI dashboard with session management
 - Multi-instance support
 - Linux/Windows support

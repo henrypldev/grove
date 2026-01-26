@@ -1,8 +1,8 @@
 import { join } from 'node:path'
 
 const CONFIG_DIR = Bun.env.XDG_CONFIG_HOME
-	? join(Bun.env.XDG_CONFIG_HOME, 'klaude')
-	: join(Bun.env.HOME ?? '', '.config', 'klaude')
+	? join(Bun.env.XDG_CONFIG_HOME, 'grove')
+	: join(Bun.env.HOME ?? '', '.config', 'grove')
 
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const SESSIONS_FILE = join(CONFIG_DIR, 'sessions.json')

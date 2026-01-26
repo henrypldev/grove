@@ -27,7 +27,7 @@ export function getTailscaleInfo(): TailscaleInfo | null {
 
 export function startFunnel(port: number): boolean {
 	try {
-		execSync(`tailscale funnel --bg --set-path /klaude localhost:${port}`, {
+		execSync(`tailscale funnel --bg --set-path /grove localhost:${port}`, {
 			stdio: 'inherit',
 		})
 		return true
@@ -38,7 +38,7 @@ export function startFunnel(port: number): boolean {
 
 export function stopFunnel(): void {
 	try {
-		spawnSync('tailscale', ['funnel', '--set-path', '/klaude', 'off'], {
+		spawnSync('tailscale', ['funnel', '--set-path', '/grove', 'off'], {
 			stdio: 'ignore',
 		})
 	} catch {
@@ -49,7 +49,7 @@ export function stopFunnel(): void {
 export function isFunnelEnabled(): boolean {
 	try {
 		const result = execSync('tailscale funnel status', { encoding: 'utf-8' })
-		return result.includes('/klaude')
+		return result.includes('/grove')
 	} catch {
 		return false
 	}

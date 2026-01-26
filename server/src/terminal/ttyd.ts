@@ -32,7 +32,7 @@ export async function startSession(session: SessionData): Promise<boolean> {
 			'new-session',
 			'-A',
 			'-s',
-			`klaude-${session.id}`,
+			`grove-${session.id}`,
 			'-c',
 			session.worktree,
 			claudeCmd,
@@ -66,7 +66,7 @@ export async function stopSession(sessionId: string): Promise<boolean> {
 		log('ttyd', 'killed ttyd process', { id: sessionId })
 	}
 
-	await Bun.$`tmux kill-session -t klaude-${sessionId}`.quiet().nothrow()
+	await Bun.$`tmux kill-session -t grove-${sessionId}`.quiet().nothrow()
 	log('ttyd', 'killed tmux session', { id: sessionId })
 
 	const state = await loadSessions()
@@ -90,7 +90,7 @@ export async function cleanupStaleSessions() {
 				id: session.id,
 				pid: session.pid,
 			})
-			await Bun.$`tmux kill-session -t klaude-${session.id}`.quiet().nothrow()
+			await Bun.$`tmux kill-session -t grove-${session.id}`.quiet().nothrow()
 		}
 	}
 
@@ -117,7 +117,7 @@ export type SessionState = 'waiting' | 'busy' | 'idle'
 export async function getSessionState(
 	sessionId: string,
 ): Promise<SessionState> {
-	const result = await Bun.$`tmux capture-pane -t klaude-${sessionId} -p`
+	const result = await Bun.$`tmux capture-pane -t grove-${sessionId} -p`
 		.quiet()
 		.nothrow()
 	if (result.exitCode !== 0) {

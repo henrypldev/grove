@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { loadPid, removePid } from './config.js'
 import { stopFunnel } from './tunnel.js'
 
-const SESSIONS_FILE = join(homedir(), '.config', 'klaude', 'sessions.json')
+const SESSIONS_FILE = join(homedir(), '.config', 'grove', 'sessions.json')
 
 interface SessionData {
 	id: string
@@ -38,7 +38,7 @@ function killProcess(pid: number): boolean {
 }
 
 function killTmuxSession(sessionId: string): void {
-	spawnSync('tmux', ['kill-session', '-t', `klaude-${sessionId}`], {
+	spawnSync('tmux', ['kill-session', '-t', `grove-${sessionId}`], {
 		stdio: 'ignore',
 	})
 }
@@ -55,7 +55,7 @@ export function stopAll(): { stopped: boolean; message: string } {
 		killTmuxSession(session.id)
 	}
 
-	spawnSync('tmux', ['kill-session', '-t', 'klaude'], { stdio: 'ignore' })
+	spawnSync('tmux', ['kill-session', '-t', 'grove'], { stdio: 'ignore' })
 
 	killProcess(pid)
 	stopFunnel()
@@ -65,7 +65,7 @@ export function stopAll(): { stopped: boolean; message: string } {
 	const sessionText = sessionCount === 1 ? 'session' : 'sessions'
 	return {
 		stopped: true,
-		message: `Klaude stopped (killed ${sessionCount} ${sessionText})`,
+		message: `grove stopped (killed ${sessionCount} ${sessionText})`,
 	}
 }
 

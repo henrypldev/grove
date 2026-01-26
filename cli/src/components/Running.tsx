@@ -13,7 +13,7 @@ export function Running({ serverUrl, terminalHost, background, pid }: Props) {
 	const [qr, setQr] = useState<string>('')
 	const { exit } = useApp()
 
-	const deepLink = `klaude://setup?serverUrl=${encodeURIComponent(serverUrl)}&terminalHost=${encodeURIComponent(terminalHost)}`
+	const deepLink = `grove://setup?serverUrl=${encodeURIComponent(serverUrl)}&terminalHost=${encodeURIComponent(terminalHost)}`
 
 	useEffect(() => {
 		qrcode.generate(deepLink, { small: true }, code => {
@@ -33,13 +33,13 @@ export function Running({ serverUrl, terminalHost, background, pid }: Props) {
 	return (
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
-				<Text color="green">✓ Klaude running at: </Text>
+				<Text color="green">✓ grove running at: </Text>
 				<Text color="cyan" bold>
 					{serverUrl}
 				</Text>
 			</Box>
 			<Text dimColor>
-				Scan QR code to configure the Klaude app automatically.
+				Scan QR code to configure the grove app automatically.
 			</Text>
 			<Box marginTop={1}>
 				<Text>{qr}</Text>
@@ -48,7 +48,7 @@ export function Running({ serverUrl, terminalHost, background, pid }: Props) {
 				{background ? (
 					<Box flexDirection="column">
 						<Text color="yellow">Running in background (PID: {pid})</Text>
-						<Text dimColor>Run "klaude --stop" to stop</Text>
+						<Text dimColor>Run "grove --stop" to stop</Text>
 					</Box>
 				) : (
 					<Text dimColor>Press Ctrl+C to stop</Text>

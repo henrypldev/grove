@@ -2,7 +2,7 @@
 
 ## Overview
 
-Redesign the Klaude mobile app from a terminal aesthetic to a clean, modern iOS app using native bottom tabs.
+Redesign the grove mobile app from a terminal aesthetic to a clean, modern iOS app using native bottom tabs.
 
 ## Navigation Structure
 

@@ -24,9 +24,9 @@ Redesign the sessions home screen to match Tailscale's clean list UI style.
 ├─────────────────────────────────────────┤
 │  ● cora · feat/my-branch              › │
 ├─────────────────────────────────────────┤
-│  ● klaude · main                      › │
+│  ● grove · main                      › │
 ├─────────────────────────────────────────┤
-│    klaude · feat/old-branch           › │
+│    grove · feat/old-branch           › │
 └─────────────────────────────────────────┘
 ```
 

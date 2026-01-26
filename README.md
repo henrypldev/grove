@@ -14,14 +14,14 @@ Server and CLI for managing Git repositories and terminal sessions from your pho
 ### Homebrew (recommended)
 
 ```bash
-brew tap henrypl/grove
+brew tap henrypldev/grove
 brew install grove
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/henrypl/grove.git
+git clone https://github.com/henrypldev/grove.git
 cd grove
 bun install
 ```

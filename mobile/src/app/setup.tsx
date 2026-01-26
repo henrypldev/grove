@@ -2,19 +2,16 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect } from 'react'
 import { Alert, Text, View } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
-import { setServerUrl, setTerminalHost } from '@/services/api'
+import { setServerUrl } from '@/services/api'
 
 export default function SetupScreen() {
-	const params = useLocalSearchParams<{
-		serverUrl?: string
-		terminalHost?: string
-	}>()
+	const params = useLocalSearchParams<{ serverUrl?: string }>()
 
 	useEffect(() => {
-		const { serverUrl, terminalHost } = params
+		const { serverUrl } = params
 
-		if (serverUrl && terminalHost) {
-			Promise.all([setServerUrl(serverUrl), setTerminalHost(terminalHost)])
+		if (serverUrl) {
+			setServerUrl(serverUrl)
 				.then(() => {
 					Alert.alert('Connected', `Server configured:\n${serverUrl}`, [
 						{ text: 'OK', onPress: () => router.replace('/(tabs)') },

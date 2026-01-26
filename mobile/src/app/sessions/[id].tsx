@@ -4,18 +4,15 @@ import { Pressable, Text, View } from 'react-native'
 import { KeyboardStickyView } from 'react-native-keyboard-controller'
 import { StyleSheet } from 'react-native-unistyles'
 import { WebView } from 'react-native-webview'
-import { api, getTerminalHost, type Session } from '@/services/api'
+import { api, type Session } from '@/services/api'
 
 export default function SessionScreen() {
 	const { id } = useLocalSearchParams<{ id: string }>()
 	const [session, setSession] = useState<Session | null>(null)
-	const [terminalHost, setTerminalHostState] = useState<string | null>(null)
 	const webViewRef = useRef<WebView>(null)
 
 	const loadSession = useCallback(async () => {
 		try {
-			const host = await getTerminalHost()
-			setTerminalHostState(host)
 			const sessions = await api.getSessions()
 			const found = sessions.find(s => s.id === id)
 			setSession(found || null)
@@ -48,17 +45,19 @@ export default function SessionScreen() {
 		}
 	}
 
-	if (!session || !terminalHost) {
+	if (!session || !session.terminalUrl) {
 		return (
 			<View style={styles.container}>
 				<View style={styles.centered}>
-					<Text style={styles.loadingText}>Loading...</Text>
+					<Text style={styles.loadingText}>
+						{session
+							? `No terminal URL: ${JSON.stringify(session)}`
+							: 'Loading...'}
+					</Text>
 				</View>
 			</View>
 		)
 	}
-
-	const terminalUrl = `http://${terminalHost}:${session.port}`
 
 	return (
 		<>
@@ -78,7 +77,7 @@ export default function SessionScreen() {
 			<View style={styles.container}>
 				<WebView
 					ref={webViewRef}
-					source={{ uri: terminalUrl }}
+					source={{ uri: session.terminalUrl }}
 					style={styles.webview}
 					javaScriptEnabled
 					domStorageEnabled

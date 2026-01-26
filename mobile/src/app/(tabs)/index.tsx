@@ -102,6 +102,7 @@ const styles = StyleSheet.create((theme, rt) => ({
 	container: {
 		flex: 1,
 		backgroundColor: theme.colors.background,
+		paddingTop: rt.insets.top + 48,
 	},
 	centered: {
 		flex: 1,
@@ -166,7 +167,7 @@ const styles = StyleSheet.create((theme, rt) => ({
 	fab: {
 		position: 'absolute',
 		right: theme.spacing(4),
-		top: rt.insets.top + 8,
+		top: rt.insets.top,
 	},
 	fabGlass: {
 		width: 44,

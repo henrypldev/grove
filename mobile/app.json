@@ -18,13 +18,7 @@
 			"infoPlist": {
 				"NSAppTransportSecurity": {
 					"NSAllowsArbitraryLoads": true,
-					"NSAllowsLocalNetworking": true,
-					"NSExceptionDomains": {
-						"*": {
-							"NSExceptionAllowsInsecureHTTPLoads": true,
-							"NSIncludesSubdomains": true
-						}
-					}
+					"NSAllowsLocalNetworking": true
 				}
 			},
 			"appleTeamId": "M52W2L8ZQV"

@@ -1,10 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const SERVER_URL_KEY = 'klaude_server_url'
-const TERMINAL_HOST_KEY = 'klaude_terminal_host'
 
 let serverUrl: string | null = null
-let terminalHost: string | null = null
 
 export async function getServerUrl(): Promise<string | null> {
 	if (serverUrl) return serverUrl
@@ -15,17 +13,6 @@ export async function getServerUrl(): Promise<string | null> {
 export async function setServerUrl(url: string): Promise<void> {
 	serverUrl = url
 	await AsyncStorage.setItem(SERVER_URL_KEY, url)
-}
-
-export async function getTerminalHost(): Promise<string | null> {
-	if (terminalHost) return terminalHost
-	terminalHost = await AsyncStorage.getItem(TERMINAL_HOST_KEY)
-	return terminalHost
-}
-
-export async function setTerminalHost(host: string): Promise<void> {
-	terminalHost = host
-	await AsyncStorage.setItem(TERMINAL_HOST_KEY, host)
 }
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
@@ -53,6 +40,7 @@ export interface Session {
 	worktree: string
 	branch: string
 	port: number
+	terminalUrl: string
 	createdAt: string
 }
 

@@ -9,35 +9,21 @@ import {
 	View,
 } from 'react-native'
 import { StyleSheet } from 'react-native-unistyles'
-import {
-	getServerUrl,
-	getTerminalHost,
-	setServerUrl,
-	setTerminalHost,
-} from '@/services/api'
+import { getServerUrl, setServerUrl } from '@/services/api'
 
 export default function SettingsScreen() {
 	const [url, setUrl] = useState('')
-	const [host, setHost] = useState('')
 	const [loading, setLoading] = useState(true)
 	const [hasChanges, setHasChanges] = useState(false)
 	const [originalUrl, setOriginalUrl] = useState('')
-	const [originalHost, setOriginalHost] = useState('')
 
 	const version = Constants.expoConfig?.version ?? '1.0.0'
 
 	const loadSettings = useCallback(async () => {
-		const [currentUrl, currentHost] = await Promise.all([
-			getServerUrl(),
-			getTerminalHost(),
-		])
+		const currentUrl = await getServerUrl()
 		if (currentUrl) {
 			setUrl(currentUrl)
 			setOriginalUrl(currentUrl)
-		}
-		if (currentHost) {
-			setHost(currentHost)
-			setOriginalHost(currentHost)
 		}
 		setLoading(false)
 	}, [])
@@ -47,16 +33,12 @@ export default function SettingsScreen() {
 	}, [loadSettings])
 
 	useEffect(() => {
-		setHasChanges(url !== originalUrl || host !== originalHost)
-	}, [url, host, originalUrl, originalHost])
+		setHasChanges(url !== originalUrl)
+	}, [url, originalUrl])
 
 	const handleSave = useCallback(async () => {
 		if (!url.trim()) {
 			Alert.alert('Error', 'Please enter a server URL')
-			return
-		}
-		if (!host.trim()) {
-			Alert.alert('Error', 'Please enter a terminal host')
 			return
 		}
 		let normalizedUrl = url.trim()
@@ -67,15 +49,11 @@ export default function SettingsScreen() {
 		if (normalizedUrl.endsWith('/')) {
 			normalizedUrl = normalizedUrl.slice(0, -1)
 		}
-		await Promise.all([
-			setServerUrl(normalizedUrl),
-			setTerminalHost(host.trim()),
-		])
+		await setServerUrl(normalizedUrl)
 		setOriginalUrl(normalizedUrl)
-		setOriginalHost(host.trim())
 		setUrl(normalizedUrl)
 		Alert.alert('Saved', 'Settings updated successfully')
-	}, [url, host])
+	}, [url])
 
 	if (loading) {
 		return (
@@ -105,24 +83,9 @@ export default function SettingsScreen() {
 							keyboardType="url"
 						/>
 					</View>
-					<View style={styles.separator} />
-					<View style={styles.row}>
-						<Text style={styles.label}>Terminal Host</Text>
-						<TextInput
-							style={styles.input}
-							value={host}
-							onChangeText={setHost}
-							placeholder="100.x.x.x"
-							placeholderTextColor="#636366"
-							autoCapitalize="none"
-							autoCorrect={false}
-							keyboardType="url"
-						/>
-					</View>
 				</View>
 				<Text style={styles.footnote}>
-					API Server is the Tailscale Funnel URL. Terminal Host is the direct
-					Tailscale IP for terminal connections.
+					The Tailscale Funnel URL for the Klaude server.
 				</Text>
 
 				{hasChanges && (
@@ -143,10 +106,11 @@ export default function SettingsScreen() {
 	)
 }
 
-const styles = StyleSheet.create(theme => ({
+const styles = StyleSheet.create((theme, rt) => ({
 	container: {
 		flex: 1,
 		backgroundColor: theme.colors.background,
+		paddingTop: rt.insets.top,
 	},
 	centered: {
 		flex: 1,
@@ -177,11 +141,6 @@ const styles = StyleSheet.create(theme => ({
 		flexDirection: 'row',
 		alignItems: 'center',
 		padding: theme.spacing(4),
-	},
-	separator: {
-		height: 1,
-		backgroundColor: theme.colors.border,
-		marginLeft: theme.spacing(4),
 	},
 	label: {
 		color: theme.colors.text,

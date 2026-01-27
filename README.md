@@ -76,6 +76,10 @@ This launches the command in the current directory, sets up a secure terminal se
 | DELETE | `/worktrees` | Delete a worktree |
 | GET | `/events` | SSE stream for real-time updates |
 
+## Environment Files
+
+When creating a new worktree, Grove automatically copies untracked `.env*` files (e.g. `.env.local`, `.env.development.local`) from the repository root into the new worktree. This ensures new worktrees have the same environment configuration as the main working directory without manual setup.
+
 ## Configuration
 
 Config is stored in `~/.config/grove/`:

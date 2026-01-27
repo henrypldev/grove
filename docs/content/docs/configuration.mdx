@@ -46,6 +46,12 @@ Each session entry contains:
 - ttyd process PID
 - The command being run (for `grove run` sessions)
 
+## Environment Files
+
+When creating a new worktree, Grove automatically copies untracked `.env*` files (e.g. `.env.local`, `.env.development.local`) from the repository root into the new worktree. This ensures new worktrees have the same environment configuration as the main working directory without manual setup.
+
+Only files that are not tracked by Git are copied, so checked-in `.env` files that are already part of the worktree checkout are not duplicated.
+
 ## TLS Certificates
 
 Grove uses Tailscale certificates for HTTPS terminal access. Certificates are generated automatically using `tailscale cert` and stored in `~/.config/grove/certs/`. They are reused across sessions for the same Tailscale hostname.

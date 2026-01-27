@@ -92,11 +92,42 @@ export async function createWorktree(
 		return null
 	}
 
+	await copyUntrackedEnvFiles(repo.path, worktreePath)
+
 	log('worktrees', 'worktree created', { worktreePath, branch })
 	return {
 		path: worktreePath,
 		branch,
 		isMain: false,
+	}
+}
+
+async function copyUntrackedEnvFiles(
+	repoPath: string,
+	worktreePath: string,
+): Promise<void> {
+	const result =
+		await Bun.$`git -C ${repoPath} ls-files --others --exclude-standard`
+			.quiet()
+			.nothrow()
+
+	if (result.exitCode !== 0) return
+
+	const files = result.stdout
+		.toString()
+		.trim()
+		.split('\n')
+		.filter(f => f.startsWith('.env') && !f.includes('/'))
+
+	for (const file of files) {
+		const src = join(repoPath, file)
+		const dest = join(worktreePath, file)
+		try {
+			await Bun.write(dest, Bun.file(src))
+			log('worktrees', 'copied env file', { file })
+		} catch {
+			log('worktrees', 'failed to copy env file', { file })
+		}
 	}
 }
 

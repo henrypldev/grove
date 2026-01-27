@@ -1,0 +1,71 @@
+---
+title: Getting Started
+description: Install Grove and start managing terminal sessions from your phone.
+---
+
+Grove is a server and CLI for managing Git repositories and terminal sessions from a mobile device. Run Claude Code sessions on your dev machine, access them from anywhere.
+
+## Requirements
+
+- [Bun](https://bun.sh)
+- [Tailscale](https://tailscale.com) with Funnel enabled
+- [ttyd](https://github.com/tsl0922/ttyd)
+- [tmux](https://github.com/tmux/tmux)
+
+## Installation
+
+### Homebrew (recommended)
+
+```bash
+brew tap henrypldev/grove
+brew install grove
+```
+
+### From source
+
+```bash
+git clone https://github.com/henrypldev/grove.git
+cd grove
+bun install
+```
+
+### Install dependencies
+
+tmux and ttyd are required for terminal sessions:
+
+```bash
+brew install tmux ttyd
+```
+
+Tailscale is required for secure remote access:
+
+```bash
+brew install --cask tailscale
+```
+
+Make sure Tailscale is running and you're logged in before using Grove.
+
+## Quick Start
+
+### Start the server
+
+```bash
+grove
+```
+
+This starts the Grove server interactively. It will check that all dependencies are installed, start the HTTP server, and set up a Tailscale Funnel for external access.
+
+### Run a command with mobile access
+
+```bash
+grove run claude
+```
+
+This launches Claude Code in a tmux session with a ttyd web terminal, accessible over HTTPS via your Tailscale hostname. Open the printed URL on your phone to interact with the session.
+
+## How it works
+
+1. **grove CLI** starts the server and sets up a Tailscale Funnel for external HTTPS access
+2. **grove server** exposes a REST API for managing repos, worktrees, and terminal sessions
+3. **Terminal sessions** are tmux sessions served via ttyd over HTTPS
+4. **Grove mobile app** (separate repo) connects to the server to create and manage sessions

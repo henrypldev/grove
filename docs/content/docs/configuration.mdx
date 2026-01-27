@@ -1,0 +1,51 @@
+---
+title: Configuration
+description: Grove configuration files and options.
+---
+
+Grove stores its configuration in `~/.config/grove/`.
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `cli.json` | CLI configuration (port, etc.) |
+| `config.json` | Registered repositories |
+| `sessions.json` | Active session state |
+| `certs/` | Tailscale TLS certificates for ttyd |
+| `pid` | PID file for the background server process |
+
+## CLI Configuration
+
+The CLI configuration file at `~/.config/grove/cli.json` stores persistent settings.
+
+```json
+{
+  "port": 3000
+}
+```
+
+### Options
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `port` | `number` | `3000` | Server port |
+
+The port can also be set per-invocation with the `--port` flag, which takes precedence and updates the saved config.
+
+## Sessions
+
+Active terminal sessions are tracked in `~/.config/grove/sessions.json`. This file is managed automatically — sessions are added when created and removed when cleaned up.
+
+Each session entry contains:
+
+- Session ID
+- Repository name and branch
+- Working directory
+- Terminal URL and port
+- ttyd process PID
+- The command being run (for `grove run` sessions)
+
+## TLS Certificates
+
+Grove uses Tailscale certificates for HTTPS terminal access. Certificates are generated automatically using `tailscale cert` and stored in `~/.config/grove/certs/`. They are reused across sessions for the same Tailscale hostname.

@@ -37,6 +37,14 @@ grove --port 3001        # Custom port
 grove --stop             # Stop background server
 ```
 
+### Run a command with mobile access
+
+```bash
+grove run claude     # Run Claude Code in a tmux+ttyd session accessible over Tailscale
+```
+
+This launches the command in the current directory, sets up a secure terminal session, and prints the HTTPS URL you can open from your phone.
+
 ### CLI Options
 
 ```

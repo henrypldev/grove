@@ -1,4 +1,3 @@
-import { copyFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { loadConfig, log, WORKTREES_DIR } from '../config'
 
@@ -124,7 +123,7 @@ async function copyUntrackedEnvFiles(
 		const src = join(repoPath, file)
 		const dest = join(worktreePath, file)
 		try {
-			await copyFile(src, dest)
+			await Bun.write(dest, Bun.file(src))
 			log('worktrees', 'copied env file', { file })
 		} catch {
 			log('worktrees', 'failed to copy env file', { file })

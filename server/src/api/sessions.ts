@@ -7,7 +7,6 @@ import {
 	type SessionData,
 } from '../config'
 import {
-	getNextPort,
 	getSessionState,
 	isSessionActive,
 	type SessionState,
@@ -105,7 +104,6 @@ export async function createSession(
 		return null
 	}
 
-	const port = await getNextPort()
 	const terminalHost = await getTerminalHost()
 	const session: SessionData = {
 		id: generateId(),
@@ -113,21 +111,22 @@ export async function createSession(
 		repoName: repo.name,
 		worktree: worktree.path,
 		branch: worktree.branch,
-		port,
-		terminalUrl: `https://${terminalHost}:${port}`,
+		port: 0,
+		terminalUrl: '',
 		pid: 0,
 		createdAt: new Date().toISOString(),
 		skipPermissions,
 	}
 
-	log('sessions', 'starting session', { id: session.id, port: session.port })
+	log('sessions', 'starting session', { id: session.id })
 	const started = await startSession(session)
 	if (!started) {
 		log('sessions', 'failed to start session', { id: session.id })
 		return null
 	}
 
-	log('sessions', 'session created', { id: session.id })
+	session.terminalUrl = `https://${terminalHost}:${session.port}`
+	log('sessions', 'session created', { id: session.id, port: session.port })
 	broadcastSessions()
 	return session
 }

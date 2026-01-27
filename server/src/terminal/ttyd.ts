@@ -9,52 +9,69 @@ import {
 
 const processes = new Map<string, Subprocess>()
 
+let sessionLock: Promise<void> = Promise.resolve()
+
 export async function startSession(session: SessionData): Promise<boolean> {
-	log('ttyd', 'starting ttyd', { id: session.id, port: session.port })
-	const { cert, key } = await ensureTailscaleCerts()
-	const claudeCmd = session.skipPermissions
-		? 'claude --dangerously-skip-permissions'
-		: 'claude'
-	const proc = spawn({
-		cmd: [
-			'ttyd',
-			'-p',
-			String(session.port),
-			'-S',
-			'-C',
-			cert,
-			'-K',
-			key,
-			'-W',
-			'-t',
-			'fontSize=30',
-			'tmux',
-			'new-session',
-			'-A',
-			'-s',
-			`grove-${session.id}`,
-			'-c',
-			session.worktree,
-			claudeCmd,
-		],
-		stdout: 'ignore',
-		stderr: 'ignore',
+	let resolve: () => void = () => {}
+	const prevLock = sessionLock
+	sessionLock = new Promise(r => {
+		resolve = r
 	})
 
-	if (!proc.pid) {
-		log('ttyd', 'failed to start ttyd', { id: session.id })
-		return false
+	try {
+		await prevLock
+
+		const state = await loadSessions()
+		const port = state.nextPort || 7681
+		session.port = port
+
+		log('ttyd', 'starting ttyd', { id: session.id, port })
+		const { cert, key } = await ensureTailscaleCerts()
+		const claudeCmd = session.skipPermissions
+			? 'claude --dangerously-skip-permissions'
+			: 'claude'
+		const proc = spawn({
+			cmd: [
+				'ttyd',
+				'-p',
+				String(port),
+				'-S',
+				'-C',
+				cert,
+				'-K',
+				key,
+				'-W',
+				'-t',
+				'fontSize=30',
+				'tmux',
+				'new-session',
+				'-A',
+				'-s',
+				`grove-${session.id}`,
+				'-c',
+				session.worktree,
+				claudeCmd,
+			],
+			stdout: 'ignore',
+			stderr: 'ignore',
+		})
+
+		if (!proc.pid) {
+			log('ttyd', 'failed to start ttyd', { id: session.id })
+			return false
+		}
+
+		log('ttyd', 'ttyd started', { id: session.id, pid: proc.pid })
+		processes.set(session.id, proc)
+
+		state.sessions.push({ ...session, pid: proc.pid })
+		state.nextPort = port + 1
+		await saveSessions(state)
+
+		return true
+	} finally {
+		resolve()
 	}
-
-	log('ttyd', 'ttyd started', { id: session.id, pid: proc.pid })
-	processes.set(session.id, proc)
-
-	const state = await loadSessions()
-	state.sessions.push({ ...session, pid: proc.pid })
-	state.nextPort = session.port + 1
-	await saveSessions(state)
-
-	return true
 }
 
 export async function stopSession(sessionId: string): Promise<boolean> {
@@ -64,6 +81,13 @@ export async function stopSession(sessionId: string): Promise<boolean> {
 		proc.kill()
 		processes.delete(sessionId)
 		log('ttyd', 'killed ttyd process', { id: sessionId })
+	} else {
+		const state = await loadSessions()
+		const session = state.sessions.find(s => s.id === sessionId)
+		if (session?.pid) {
+			await Bun.$`kill ${session.pid}`.quiet().nothrow()
+			log('ttyd', 'killed ttyd by pid', { id: sessionId, pid: session.pid })
+		}
 	}
 
 	await Bun.$`tmux kill-session -t grove-${sessionId}`.quiet().nothrow()
@@ -100,11 +124,6 @@ export async function cleanupStaleSessions() {
 	})
 	state.sessions = validSessions
 	await saveSessions(state)
-}
-
-export async function getNextPort(): Promise<number> {
-	const state = await loadSessions()
-	return state.nextPort || 7681
 }
 
 export async function isSessionActive(pid: number): Promise<boolean> {

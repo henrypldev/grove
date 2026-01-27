@@ -10,11 +10,34 @@ import { createWorktree, deleteWorktree, getWorktrees } from './api/worktrees'
 import { log, setLogsEnabled } from './config'
 
 export { setLogsEnabled }
+
 import { cleanupStaleSessions } from './terminal/ttyd'
+
+function matchRoute(
+	path: string,
+	pattern: string,
+): Record<string, string> | null {
+	const pathParts = path.split('/').filter(Boolean)
+	const patternParts = pattern.split('/').filter(Boolean)
+	if (pathParts.length !== patternParts.length) return null
+	const params: Record<string, string> = {}
+	for (let i = 0; i < patternParts.length; i++) {
+		if (patternParts[i].startsWith(':')) {
+			params[patternParts[i].slice(1)] = pathParts[i]
+		} else if (patternParts[i] !== pathParts[i]) {
+			return null
+		}
+	}
+	return params
+}
 
 export async function startServer(port: number) {
 	log('server', 'starting up')
 	await cleanupStaleSessions()
+
+	setInterval(async () => {
+		await cleanupStaleSessions()
+	}, 30000)
 
 	Bun.serve({
 		port,
@@ -35,6 +58,10 @@ export async function startServer(port: number) {
 			}
 
 			log('http', `${method} ${path}`)
+
+			if (path === '/health' && method === 'GET') {
+				return Response.json({ status: 'ok' }, { headers })
+			}
 
 			if (path === '/events' && method === 'GET') {
 				const stream = new ReadableStream({
@@ -85,9 +112,9 @@ export async function startServer(port: number) {
 					return Response.json(repo, { headers })
 				}
 
-				if (path.startsWith('/repos/') && method === 'DELETE') {
-					const id = path.split('/')[2]
-					const deleted = await deleteRepo(id)
+				const repoMatch = matchRoute(path, '/repos/:id')
+				if (repoMatch && method === 'DELETE') {
+					const deleted = await deleteRepo(repoMatch.id)
 					if (!deleted) {
 						return Response.json(
 							{ error: 'Repo not found' },
@@ -117,9 +144,9 @@ export async function startServer(port: number) {
 					return Response.json(session, { headers })
 				}
 
-				if (path.startsWith('/sessions/') && method === 'DELETE') {
-					const id = path.split('/')[2]
-					const deleted = await deleteSession(id)
+				const sessionMatch = matchRoute(path, '/sessions/:id')
+				if (sessionMatch && method === 'DELETE') {
+					const deleted = await deleteSession(sessionMatch.id)
 					if (!deleted) {
 						return Response.json(
 							{ error: 'Session not found' },
@@ -129,9 +156,9 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
-				if (path.startsWith('/worktrees/') && method === 'GET') {
-					const repoId = path.split('/')[2]
-					const worktrees = await getWorktrees(repoId)
+				const worktreeMatch = matchRoute(path, '/worktrees/:repoId')
+				if (worktreeMatch && method === 'GET') {
+					const worktrees = await getWorktrees(worktreeMatch.repoId)
 					return Response.json(worktrees, { headers })
 				}
 

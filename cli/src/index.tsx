@@ -3,11 +3,12 @@ import { spawn } from 'node:child_process'
 import { Box, render, Text } from 'ink'
 import Spinner from 'ink-spinner'
 import { useEffect, useState } from 'react'
-import { startServer, setLogsEnabled } from '../../server/src/index.ts'
+import { setLogsEnabled, startServer } from '../../server/src/index.ts'
 import { isRunning, stopAll } from './cleanup.js'
 import { DepsCheck } from './components/DepsCheck.js'
 import { Running } from './components/Running.js'
 import { loadConfig, loadPid, saveConfig, savePid } from './config.js'
+import { runCommand } from './run.js'
 import { getTailscaleInfo, startFunnel, stopFunnel } from './tunnel.js'
 
 interface ParsedArgs {
@@ -16,6 +17,7 @@ interface ParsedArgs {
 	daemon: boolean
 	stop: boolean
 	help: boolean
+	run?: string
 }
 
 function parseArgs(): ParsedArgs {
@@ -29,7 +31,14 @@ function parseArgs(): ParsedArgs {
 	const daemon = args.includes('--_daemon')
 	const stop = args.includes('--stop') || args.includes('stop')
 	const help = args.includes('--help') || args.includes('-h')
-	return { port, background, daemon, stop, help }
+
+	let run: string | undefined
+	const runIndex = args.indexOf('run')
+	if (runIndex !== -1 && args[runIndex + 1]) {
+		run = args.slice(runIndex + 1).join(' ')
+	}
+
+	return { port, background, daemon, stop, help, run }
 }
 
 function printHelp() {
@@ -37,6 +46,10 @@ function printHelp() {
 grove - Mobile terminal server for Claude Code
 
 Usage: grove [options]
+       grove run <command>
+
+Commands:
+  run <command>       Run a CLI agent (e.g., grove run claude) with mobile access
 
 Options:
   -b, --background    Start server in background and free terminal
@@ -217,13 +230,13 @@ if (args.help) {
 	process.exit(0)
 }
 
-if (args.stop) {
+if (args.run) {
+	runCommand(args.run)
+} else if (args.stop) {
 	const result = stopAll()
 	console.log(result.stopped ? `✓ ${result.message}` : `✗ ${result.message}`)
 	process.exit(result.stopped ? 0 : 1)
-}
-
-if (args.daemon) {
+} else if (args.daemon) {
 	const config = loadConfig()
 	const port = args.port ?? config.port
 	runDaemon(port)

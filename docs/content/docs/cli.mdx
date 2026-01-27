@@ -1,0 +1,81 @@
+---
+title: CLI Reference
+description: All Grove CLI commands and options.
+---
+
+## Usage
+
+```bash
+grove [options]
+grove run <command>
+```
+
+## Commands
+
+### `grove`
+
+Start the Grove server. By default, runs interactively in the foreground.
+
+```bash
+grove
+```
+
+On startup, Grove will:
+
+1. Check that all dependencies are installed (tmux, ttyd, Tailscale)
+2. Offer to install any missing dependencies via Homebrew
+3. Start the HTTP server
+4. Set up a Tailscale Funnel for external access
+5. Display the server URL and a QR code for mobile access
+
+### `grove run <command>`
+
+Run a command in a tmux session with a web terminal accessible over HTTPS.
+
+```bash
+grove run claude
+```
+
+This will:
+
+1. Create a new tmux session running the specified command in the current directory
+2. Start a ttyd process serving the tmux session over HTTPS using Tailscale certificates
+3. Print the terminal URL
+4. Attach to the tmux session locally
+
+When you detach or the command exits, the session and ttyd process are cleaned up automatically.
+
+### `grove stop`
+
+Stop a background Grove server and kill all active sessions.
+
+```bash
+grove stop
+# or
+grove --stop
+```
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `-b, --background` | Start the server in the background, freeing the terminal |
+| `--port <number>` | Set the server port (default: `3000`) |
+| `--stop` | Stop the background server and kill all sessions |
+| `-h, --help` | Show help message |
+
+## Examples
+
+```bash
+# Start server interactively
+grove
+
+# Start server in background on custom port
+grove -b --port 4000
+
+# Run Claude Code with mobile access
+grove run claude
+
+# Stop background server
+grove stop
+```

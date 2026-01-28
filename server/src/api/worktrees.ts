@@ -134,8 +134,9 @@ async function copyUntrackedEnvFiles(
 export async function deleteWorktree(
 	repoId: string,
 	branch: string,
+	force?: boolean,
 ): Promise<boolean> {
-	log('worktrees', 'deleting worktree', { repoId, branch })
+	log('worktrees', 'deleting worktree', { repoId, branch, force })
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
@@ -155,10 +156,13 @@ export async function deleteWorktree(
 		return false
 	}
 
-	const result =
-		await Bun.$`git -C ${repo.path} worktree remove ${worktree.path}`
-			.quiet()
-			.nothrow()
+	const result = force
+		? await Bun.$`git -C ${repo.path} worktree remove --force ${worktree.path}`
+				.quiet()
+				.nothrow()
+		: await Bun.$`git -C ${repo.path} worktree remove ${worktree.path}`
+				.quiet()
+				.nothrow()
 
 	if (result.exitCode !== 0) {
 		log('worktrees', 'failed to delete worktree', {

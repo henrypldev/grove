@@ -183,7 +183,7 @@ export async function startServer(port: number) {
 
 				if (path === '/worktrees' && method === 'DELETE') {
 					const body = await req.json()
-					const deleted = await deleteWorktree(body.repoId, body.branch)
+					const deleted = await deleteWorktree(body.repoId, body.branch, body.force)
 					if (!deleted) {
 						return Response.json(
 							{ error: 'Failed to delete worktree' },

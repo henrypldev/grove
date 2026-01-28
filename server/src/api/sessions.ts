@@ -4,6 +4,7 @@ import {
 	loadConfig,
 	loadSessions,
 	log,
+	saveConfig,
 	type SessionData,
 } from '../config'
 import {
@@ -21,6 +22,7 @@ export type SessionWithStatus = Omit<SessionData, 'pid'> & {
 }
 
 const sseClients = new Set<ReadableStreamDefaultController>()
+const previousStates = new Map<string, SessionState>()
 let stateInterval: ReturnType<typeof setInterval> | null = null
 
 function startStatePolling() {
@@ -51,16 +53,71 @@ export function removeSSEClient(controller: ReadableStreamDefaultController) {
 	}
 }
 
-export async function broadcastSessions() {
-	const sessions = await getSessions()
-	const data = `data: ${JSON.stringify({ type: 'sessions', sessions })}\n\n`
+function broadcastSSE(data: string) {
+	const encoded = new TextEncoder().encode(data)
 	for (const controller of sseClients) {
 		try {
-			controller.enqueue(new TextEncoder().encode(data))
+			controller.enqueue(encoded)
 		} catch {
 			sseClients.delete(controller)
 		}
 	}
+}
+
+async function fireWebhook(payload: object) {
+	const config = await loadConfig()
+	if (!config.webhookUrl) return
+	try {
+		await fetch(config.webhookUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(payload),
+		})
+	} catch (err) {
+		log('webhook', 'failed to send', { error: String(err) })
+	}
+}
+
+export async function broadcastSessions() {
+	const sessions = await getSessions()
+
+	for (const session of sessions) {
+		const prev = previousStates.get(session.id)
+		if (prev === 'busy' && session.state === 'waiting') {
+			const payload = {
+				type: 'state_change',
+				session: {
+					id: session.id,
+					repoName: session.repoName,
+					branch: session.branch,
+				},
+				from: 'busy',
+				to: 'waiting',
+			}
+			broadcastSSE(`data: ${JSON.stringify(payload)}\n\n`)
+			fireWebhook(payload)
+		}
+		previousStates.set(session.id, session.state)
+	}
+
+	broadcastSSE(`data: ${JSON.stringify({ type: 'sessions', sessions })}\n\n`)
+}
+
+export async function setWebhookUrl(url: string) {
+	const config = await loadConfig()
+	config.webhookUrl = url
+	await saveConfig(config)
+}
+
+export async function removeWebhookUrl() {
+	const config = await loadConfig()
+	delete config.webhookUrl
+	await saveConfig(config)
+}
+
+export async function getWebhookUrl(): Promise<string | undefined> {
+	const config = await loadConfig()
+	return config.webhookUrl
 }
 
 export async function getSessions(): Promise<SessionWithStatus[]> {

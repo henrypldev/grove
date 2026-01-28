@@ -4,7 +4,10 @@ import {
 	createSession,
 	deleteSession,
 	getSessions,
+	getWebhookUrl,
 	removeSSEClient,
+	removeWebhookUrl,
+	setWebhookUrl,
 } from './api/sessions'
 import { createWorktree, deleteWorktree, getWorktrees } from './api/worktrees'
 import { log, setLogsEnabled } from './config'
@@ -187,6 +190,28 @@ export async function startServer(port: number) {
 							{ status: 400, headers },
 						)
 					}
+					return Response.json({ success: true }, { headers })
+				}
+
+				if (path === '/webhook' && method === 'GET') {
+					const url = await getWebhookUrl()
+					return Response.json({ webhookUrl: url ?? null }, { headers })
+				}
+
+				if (path === '/webhook' && method === 'POST') {
+					const body = await req.json()
+					if (!body.url || typeof body.url !== 'string') {
+						return Response.json(
+							{ error: 'Missing url field' },
+							{ status: 400, headers },
+						)
+					}
+					await setWebhookUrl(body.url)
+					return Response.json({ success: true }, { headers })
+				}
+
+				if (path === '/webhook' && method === 'DELETE') {
+					await removeWebhookUrl()
 					return Response.json({ success: true }, { headers })
 				}
 

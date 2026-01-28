@@ -78,6 +78,7 @@ export async function ensureTailscaleCerts(): Promise<{
 
 interface Config {
 	repos: Repo[]
+	webhookUrl?: string
 }
 
 interface SessionsState {

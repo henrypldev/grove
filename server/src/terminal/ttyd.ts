@@ -145,7 +145,10 @@ export async function getSessionState(
 		return 'idle'
 	}
 	const output = result.text()
-	if (output.includes('Esc to interrupt') || output.includes('✢')) {
+	if (
+		output.includes('✢') ||
+		/\w+\.\.\..*\((\d+(?:m \d+)?s|[Ee]sc to interrupt)\)/.test(output)
+	) {
 		return 'busy'
 	}
 	if (output.includes('? for shortcuts')) {

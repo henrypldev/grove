@@ -144,10 +144,8 @@ export async function getSessionState(
 	}
 	const output = result.text()
 	if (
-		output.includes('Esc to interrupt') ||
 		output.includes('✢') ||
-		/\(\d+s\)/.test(output) ||
-		/\(\d+m \d+s\)/.test(output)
+		/\w+\.\.\..*\((\d+(?:m \d+)?s|[Ee]sc to interrupt)\)/.test(output)
 	) {
 		return 'busy'
 	}

@@ -41,6 +41,8 @@ export async function startSession(session: SessionData): Promise<boolean> {
 				'-K',
 				key,
 				'-W',
+				'-R',
+				'1',
 				'-t',
 				'fontSize=30',
 				'tmux',

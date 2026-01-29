@@ -1,6 +1,6 @@
 {
 	"name": "server",
-	"version": "0.4.2",
+	"version": "0.4.3",
 	"scripts": {
 		"start": "bun run src/index.ts",
 		"dev": "bun run --watch src/index.ts"

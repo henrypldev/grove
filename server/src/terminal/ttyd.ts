@@ -64,6 +64,23 @@ export async function startSession(session: SessionData): Promise<boolean> {
 		}
 
 		log('ttyd', 'ttyd started', { id: session.id, pid: proc.pid })
+		setTimeout(async () => {
+			const s = `grove-${session.id}`
+			await Bun.$`tmux set-option -t ${s} mouse on`.quiet().nothrow()
+			await Bun.$`tmux bind-key -T copy-mode WheelUpPane send-keys -X scroll-up`
+				.quiet()
+				.nothrow()
+			await Bun.$`tmux bind-key -T copy-mode WheelDownPane send-keys -X scroll-down`
+				.quiet()
+				.nothrow()
+			await Bun.$`tmux bind-key -T copy-mode-vi WheelUpPane send-keys -X scroll-up`
+				.quiet()
+				.nothrow()
+			await Bun.$`tmux bind-key -T copy-mode-vi WheelDownPane send-keys -X scroll-down`
+				.quiet()
+				.nothrow()
+			log('ttyd', 'enabled mouse for session', { id: session.id })
+		}, 1000)
 		processes.set(session.id, proc)
 
 		state.sessions.push({ ...session, pid: proc.pid })

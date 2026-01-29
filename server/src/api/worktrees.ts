@@ -16,6 +16,8 @@ export async function getWorktrees(repoId: string): Promise<Worktree[]> {
 		return []
 	}
 
+	await Bun.$`git -C ${repo.path} worktree prune`.quiet().nothrow()
+
 	const result = await Bun.$`git -C ${repo.path} worktree list --porcelain`
 		.quiet()
 		.nothrow()
@@ -79,10 +81,17 @@ export async function createWorktree(
 	log('worktrees', 'creating directory', { worktreePath })
 	await Bun.$`mkdir -p ${WORKTREES_DIR}/${repo.name}`.quiet()
 
-	const result =
+	let result =
 		await Bun.$`git -C ${repo.path} worktree add -b ${branch} ${worktreePath} ${baseBranch}`
 			.quiet()
 			.nothrow()
+
+	if (result.exitCode !== 0) {
+		result =
+			await Bun.$`git -C ${repo.path} worktree add ${worktreePath} ${branch}`
+				.quiet()
+				.nothrow()
+	}
 
 	if (result.exitCode !== 0) {
 		log('worktrees', 'failed to create worktree', {
@@ -170,6 +179,19 @@ export async function deleteWorktree(
 			stderr: result.stderr.toString(),
 		})
 		return false
+	}
+
+	const branchDelete = force
+		? await Bun.$`git -C ${repo.path} branch -D ${branch}`.quiet().nothrow()
+		: await Bun.$`git -C ${repo.path} branch -d ${branch}`.quiet().nothrow()
+
+	if (branchDelete.exitCode !== 0) {
+		log('worktrees', 'failed to delete branch', {
+			branch,
+			stderr: branchDelete.stderr.toString(),
+		})
+	} else {
+		log('worktrees', 'branch deleted', { branch })
 	}
 
 	log('worktrees', 'worktree deleted', { branch })

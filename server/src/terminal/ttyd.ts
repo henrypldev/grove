@@ -27,9 +27,11 @@ export async function startSession(session: SessionData): Promise<boolean> {
 
 		log('ttyd', 'starting ttyd', { id: session.id, port })
 		const { cert, key } = await ensureTailscaleCerts()
-		const claudeCmd = session.skipPermissions
-			? 'claude --dangerously-skip-permissions'
-			: 'claude'
+		const claudePath =
+			(await Bun.$`which claude`.quiet().nothrow()).text().trim() || 'claude'
+		const claudeArgs = session.skipPermissions
+			? [claudePath, '--dangerously-skip-permissions']
+			: [claudePath]
 		const proc = spawn({
 			cmd: [
 				'ttyd',
@@ -41,8 +43,6 @@ export async function startSession(session: SessionData): Promise<boolean> {
 				'-K',
 				key,
 				'-W',
-				'-R',
-				'1',
 				'-t',
 				'fontSize=30',
 				'tmux',
@@ -52,7 +52,7 @@ export async function startSession(session: SessionData): Promise<boolean> {
 				`grove-${session.id}`,
 				'-c',
 				session.worktree,
-				claudeCmd,
+				...claudeArgs,
 			],
 			stdout: 'ignore',
 			stderr: 'ignore',

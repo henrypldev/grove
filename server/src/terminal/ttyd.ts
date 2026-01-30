@@ -1,7 +1,5 @@
+import { join } from 'node:path'
 import { type Subprocess, spawn } from 'bun'
-import { existsSync, writeFileSync, readFileSync } from 'fs'
-import { homedir } from 'os'
-import { join } from 'path'
 import {
 	ensureTailscaleCerts,
 	loadSessions,
@@ -10,16 +8,25 @@ import {
 	saveSessions,
 } from '../config'
 
-function ensureTmuxMouseConfig() {
-	const confPath = join(homedir(), '.tmux.conf')
-	const mouseLine = 'set -g mouse on'
-	if (existsSync(confPath)) {
-		const content = readFileSync(confPath, 'utf-8')
-		if (!content.includes(mouseLine)) {
-			writeFileSync(confPath, content.trimEnd() + '\n' + mouseLine + '\n')
+async function ensureTmuxConfig() {
+	const confPath = join(Bun.env.HOME || '', '.tmux.conf')
+	const requiredLines = [
+		'set -g mouse on',
+		'set -s extended-keys on',
+		"set -as terminal-features 'xterm*:extkeys'",
+	]
+	const file = Bun.file(confPath)
+	if (await file.exists()) {
+		const content = await file.text()
+		const missing = requiredLines.filter(line => !content.includes(line))
+		if (missing.length > 0) {
+			await Bun.write(
+				confPath,
+				content.trimEnd() + '\n' + missing.join('\n') + '\n',
+			)
 		}
 	} else {
-		writeFileSync(confPath, mouseLine + '\n')
+		await Bun.write(confPath, requiredLines.join('\n') + '\n')
 	}
 }
 
@@ -48,7 +55,7 @@ export async function startSession(session: SessionData): Promise<boolean> {
 		const claudeArgs = session.skipPermissions
 			? [claudePath, '--dangerously-skip-permissions']
 			: [claudePath]
-		ensureTmuxMouseConfig()
+		await ensureTmuxConfig()
 		const proc = spawn({
 			cmd: [
 				'ttyd',

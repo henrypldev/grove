@@ -5,6 +5,9 @@ import type { ReactNode } from 'react'
 export const metadata = {
 	title: 'Grove',
 	description: 'Mobile terminal server for Claude Code',
+	icons: {
+		icon: '/favicon.png',
+	},
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {

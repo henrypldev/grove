@@ -3,6 +3,7 @@ import {
 	addSSEClient,
 	createSession,
 	deleteSession,
+	getBehindMain,
 	getSessions,
 	getWebhookUrl,
 	removeSSEClient,
@@ -159,7 +160,19 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
-				const worktreeMatch = matchRoute(path, '/worktrees/:repoId')
+				const behindMainMatch = matchRoute(path, '/sessions/:id/behind-main')
+			if (behindMainMatch && method === 'GET') {
+				const behind = await getBehindMain(behindMainMatch.id)
+				if (behind === null) {
+					return Response.json(
+						{ error: 'Session not found' },
+						{ status: 404, headers },
+					)
+				}
+				return Response.json({ behind }, { headers })
+			}
+
+			const worktreeMatch = matchRoute(path, '/worktrees/:repoId')
 				if (worktreeMatch && method === 'GET') {
 					const worktrees = await getWorktrees(worktreeMatch.repoId)
 					return Response.json(worktrees, { headers })

@@ -194,3 +194,27 @@ export async function deleteSession(id: string): Promise<boolean> {
 	if (result) broadcastSessions()
 	return result
 }
+
+export async function getBehindMain(sessionId: string): Promise<number | null> {
+	const sessionsState = await loadSessions()
+	const session = sessionsState.sessions.find(s => s.id === sessionId)
+	if (!session) return null
+
+	const config = await loadConfig()
+	const repo = config.repos.find(r => r.id === session.repoId)
+	if (!repo) return null
+
+	const mainBranch = await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
+		.quiet()
+		.nothrow()
+	const mainRef = mainBranch.exitCode === 0
+		? mainBranch.stdout.toString().trim().replace('refs/remotes/origin/', '')
+		: 'main'
+
+	const result = await Bun.$`git -C ${repo.path} rev-list ${session.branch}..${mainRef} --count`
+		.quiet()
+		.nothrow()
+
+	if (result.exitCode !== 0) return null
+	return parseInt(result.stdout.toString().trim(), 10)
+}

@@ -8,7 +8,7 @@ export default function Layout({ children }: { children: ReactNode }) {
 			tree={source.getPageTree()}
 			nav={{
 				title: 'Grove',
-				url: '/docs',
+				url: '/',
 			}}
 			links={[{ text: 'GitHub', url: 'https://github.com/henrypldev/grove' }]}
 		>

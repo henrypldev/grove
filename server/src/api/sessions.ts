@@ -253,3 +253,51 @@ export async function mergeMain(sessionId: string, strategy: 'merge' | 'rebase')
 
 	return { success: true }
 }
+
+export async function createPR(sessionId: string): Promise<{ success: boolean; url?: string; error?: string }> {
+	const sessionsState = await loadSessions()
+	const session = sessionsState.sessions.find(s => s.id === sessionId)
+	if (!session) return { success: false, error: 'Session not found' }
+
+	const config = await loadConfig()
+	const repo = config.repos.find(r => r.id === session.repoId)
+	if (!repo) return { success: false, error: 'Repo not found' }
+
+	const push = await Bun.$`git -C ${session.worktree} push -u origin ${session.branch}`.quiet().nothrow()
+	if (push.exitCode !== 0) {
+		return { success: false, error: push.stderr.toString().trim() }
+	}
+
+	const existingPR = await Bun.$`gh pr view ${session.branch} --json url`.cwd(session.worktree).quiet().nothrow()
+	if (existingPR.exitCode === 0) {
+		const pr = JSON.parse(existingPR.stdout.toString().trim())
+		return { success: true, url: pr.url }
+	}
+
+	const remoteUrl = await Bun.$`git -C ${session.worktree} remote get-url origin`.quiet().nothrow()
+	if (remoteUrl.exitCode !== 0) {
+		return { success: false, error: 'Could not determine remote URL' }
+	}
+	const raw = remoteUrl.stdout.toString().trim()
+	const match = raw.match(/github\.com[:/](.+?)(?:\.git)?$/)
+	if (!match) return { success: false, error: 'Not a GitHub repository' }
+	const ownerRepo = match[1]
+
+	const mainBranch = await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
+		.quiet()
+		.nothrow()
+	const baseBranch = mainBranch.exitCode === 0
+		? mainBranch.stdout.toString().trim().replace('refs/remotes/origin/', '')
+		: 'main'
+
+	const logResult = await Bun.$`git -C ${session.worktree} log ${baseBranch}..${session.branch} --pretty=format:%s`.quiet().nothrow()
+	const commits = logResult.exitCode === 0 ? logResult.stdout.toString().trim().split('\n').filter(Boolean) : []
+
+	const title = commits.length === 1 ? commits[0] : session.branch.replace(/[-_/]/g, ' ').replace(/^\w+ /, '')
+	const body = commits.map(c => `- ${c}`).join('\n')
+
+	const params = new URLSearchParams({ expand: '1', title, body })
+	const url = `https://github.com/${ownerRepo}/compare/${baseBranch}...${session.branch}?${params}`
+
+	return { success: true, url }
+}

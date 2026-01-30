@@ -7,6 +7,7 @@ import {
 import { addRepo, deleteRepo, getRepos } from './api/repos'
 import {
 	addSSEClient,
+	createPR,
 	createSession,
 	deleteSession,
 	getBehindMain,
@@ -224,6 +225,18 @@ export async function startServer(port: number) {
 						)
 					}
 					return Response.json({ success: true }, { headers })
+				}
+
+				const createPRMatch = matchRoute(path, '/sessions/:id/create-pr')
+				if (createPRMatch && method === 'POST') {
+					const result = await createPR(createPRMatch.id)
+					if (!result.success) {
+						return Response.json(
+							{ error: result.error },
+							{ status: 400, headers },
+						)
+					}
+					return Response.json({ url: result.url }, { headers })
 				}
 
 				const worktreeMatch = matchRoute(path, '/worktrees/:repoId')

@@ -218,3 +218,38 @@ export async function getBehindMain(sessionId: string): Promise<number | null> {
 	if (result.exitCode !== 0) return null
 	return parseInt(result.stdout.toString().trim(), 10)
 }
+
+export async function mergeMain(sessionId: string, strategy: 'merge' | 'rebase'): Promise<{ success: boolean; error?: string }> {
+	const sessionsState = await loadSessions()
+	const session = sessionsState.sessions.find(s => s.id === sessionId)
+	if (!session) return { success: false, error: 'Session not found' }
+
+	const config = await loadConfig()
+	const repo = config.repos.find(r => r.id === session.repoId)
+	if (!repo) return { success: false, error: 'Repo not found' }
+
+	const mainBranch = await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
+		.quiet()
+		.nothrow()
+	const mainRef = mainBranch.exitCode === 0
+		? mainBranch.stdout.toString().trim().replace('refs/remotes/', '')
+		: 'origin/main'
+
+	await Bun.$`git -C ${session.worktree} fetch origin`.quiet().nothrow()
+
+	const result = strategy === 'rebase'
+		? await Bun.$`git -C ${session.worktree} rebase ${mainRef}`.quiet().nothrow()
+		: await Bun.$`git -C ${session.worktree} merge ${mainRef}`.quiet().nothrow()
+
+	if (result.exitCode !== 0) {
+		const stderr = result.stderr.toString().trim()
+		if (strategy === 'rebase') {
+			await Bun.$`git -C ${session.worktree} rebase --abort`.quiet().nothrow()
+		} else {
+			await Bun.$`git -C ${session.worktree} merge --abort`.quiet().nothrow()
+		}
+		return { success: false, error: stderr }
+	}
+
+	return { success: true }
+}

@@ -1,4 +1,7 @@
 import { type Subprocess, spawn } from 'bun'
+import { existsSync, writeFileSync, readFileSync } from 'fs'
+import { homedir } from 'os'
+import { join } from 'path'
 import {
 	ensureTailscaleCerts,
 	loadSessions,
@@ -6,6 +9,19 @@ import {
 	type SessionData,
 	saveSessions,
 } from '../config'
+
+function ensureTmuxMouseConfig() {
+	const confPath = join(homedir(), '.tmux.conf')
+	const mouseLine = 'set -g mouse on'
+	if (existsSync(confPath)) {
+		const content = readFileSync(confPath, 'utf-8')
+		if (!content.includes(mouseLine)) {
+			writeFileSync(confPath, content.trimEnd() + '\n' + mouseLine + '\n')
+		}
+	} else {
+		writeFileSync(confPath, mouseLine + '\n')
+	}
+}
 
 const processes = new Map<string, Subprocess>()
 
@@ -32,6 +48,7 @@ export async function startSession(session: SessionData): Promise<boolean> {
 		const claudeArgs = session.skipPermissions
 			? [claudePath, '--dangerously-skip-permissions']
 			: [claudePath]
+		ensureTmuxMouseConfig()
 		const proc = spawn({
 			cmd: [
 				'ttyd',
@@ -67,18 +84,6 @@ export async function startSession(session: SessionData): Promise<boolean> {
 		setTimeout(async () => {
 			const s = `grove-${session.id}`
 			await Bun.$`tmux set-option -t ${s} mouse on`.quiet().nothrow()
-			await Bun.$`tmux bind-key -T copy-mode WheelUpPane send-keys -X scroll-up`
-				.quiet()
-				.nothrow()
-			await Bun.$`tmux bind-key -T copy-mode WheelDownPane send-keys -X scroll-down`
-				.quiet()
-				.nothrow()
-			await Bun.$`tmux bind-key -T copy-mode-vi WheelUpPane send-keys -X scroll-up`
-				.quiet()
-				.nothrow()
-			await Bun.$`tmux bind-key -T copy-mode-vi WheelDownPane send-keys -X scroll-down`
-				.quiet()
-				.nothrow()
 			log('ttyd', 'enabled mouse for session', { id: session.id })
 		}, 1000)
 		processes.set(session.id, proc)

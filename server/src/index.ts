@@ -3,7 +3,9 @@ import {
 	addSSEClient,
 	createSession,
 	deleteSession,
+	getBehindMain,
 	getSessions,
+	mergeMain,
 	getWebhookUrl,
 	removeSSEClient,
 	removeWebhookUrl,
@@ -154,6 +156,37 @@ export async function startServer(port: number) {
 						return Response.json(
 							{ error: 'Session not found' },
 							{ status: 404, headers },
+						)
+					}
+					return Response.json({ success: true }, { headers })
+				}
+
+					const behindMainMatch = matchRoute(path, '/sessions/:id/behind-main')
+				if (behindMainMatch && method === 'GET') {
+					const behind = await getBehindMain(behindMainMatch.id)
+					if (behind === null) {
+						return Response.json(
+							{ error: 'Session not found' },
+							{ status: 404, headers },
+						)
+					}
+					return Response.json({ behind }, { headers })
+				}
+
+				const mergeMainMatch = matchRoute(path, '/sessions/:id/merge-main')
+				if (mergeMainMatch && method === 'POST') {
+					const body = await req.json()
+					if (body.strategy !== 'merge' && body.strategy !== 'rebase') {
+						return Response.json(
+							{ error: 'Invalid strategy' },
+							{ status: 400, headers },
+						)
+					}
+					const result = await mergeMain(mergeMainMatch.id, body.strategy)
+					if (!result.success) {
+						return Response.json(
+							{ error: result.error },
+							{ status: 400, headers },
 						)
 					}
 					return Response.json({ success: true }, { headers })

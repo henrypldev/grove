@@ -79,6 +79,7 @@ export async function ensureTailscaleCerts(): Promise<{
 interface Config {
 	repos: Repo[]
 	webhookUrl?: string
+	cloneDirectory?: string
 }
 
 interface SessionsState {
@@ -127,6 +128,11 @@ export async function loadSessions(): Promise<SessionsState> {
 export async function saveSessions(state: SessionsState) {
 	await ensureConfigDir()
 	await Bun.write(SESSIONS_FILE, JSON.stringify(state, null, 2))
+}
+
+export async function getCloneDirectory(): Promise<string> {
+	const config = await loadConfig()
+	return config.cloneDirectory ?? join(Bun.env.HOME ?? '', 'Developer')
 }
 
 export function generateId(): string {

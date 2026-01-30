@@ -1,3 +1,9 @@
+import {
+	cloneRepo,
+	getGitHubOrgs,
+	getGitHubRepos,
+	getOrgRepos,
+} from './api/github'
 import { addRepo, deleteRepo, getRepos } from './api/repos'
 import {
 	addSSEClient,
@@ -5,8 +11,8 @@ import {
 	deleteSession,
 	getBehindMain,
 	getSessions,
-	mergeMain,
 	getWebhookUrl,
+	mergeMain,
 	removeSSEClient,
 	removeWebhookUrl,
 	setWebhookUrl,
@@ -129,6 +135,34 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
+				const orgReposMatch = matchRoute(path, '/github/repos/orgs/:org')
+				if (orgReposMatch && method === 'GET') {
+					return Response.json(
+						{ repos: await getOrgRepos(orgReposMatch.org) },
+						{ headers },
+					)
+				}
+
+				if (path === '/github/repos/orgs' && method === 'GET') {
+					return Response.json({ orgs: await getGitHubOrgs() }, { headers })
+				}
+
+				if (path === '/github/repos' && method === 'GET') {
+					return Response.json({ repos: await getGitHubRepos() }, { headers })
+				}
+
+				if (path === '/repos/clone' && method === 'POST') {
+					const body = await req.json()
+					const repo = await cloneRepo(body.fullName)
+					if (!repo) {
+						return Response.json(
+							{ error: 'Failed to clone repo' },
+							{ status: 400, headers },
+						)
+					}
+					return Response.json(repo, { headers })
+				}
+
 				if (path === '/sessions' && method === 'GET') {
 					return Response.json(await getSessions(), { headers })
 				}
@@ -161,7 +195,7 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
-					const behindMainMatch = matchRoute(path, '/sessions/:id/behind-main')
+				const behindMainMatch = matchRoute(path, '/sessions/:id/behind-main')
 				if (behindMainMatch && method === 'GET') {
 					const behind = await getBehindMain(behindMainMatch.id)
 					if (behind === null) {

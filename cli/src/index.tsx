@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { Box, render, Text } from 'ink'
 import Spinner from 'ink-spinner'
 import { useEffect, useState } from 'react'
@@ -17,6 +19,7 @@ interface ParsedArgs {
 	daemon: boolean
 	stop: boolean
 	help: boolean
+	logs: boolean
 	run?: string
 }
 
@@ -31,6 +34,7 @@ function parseArgs(): ParsedArgs {
 	const daemon = args.includes('--_daemon')
 	const stop = args.includes('--stop') || args.includes('stop')
 	const help = args.includes('--help') || args.includes('-h')
+	const logs = args.includes('logs')
 
 	let run: string | undefined
 	const runIndex = args.indexOf('run')
@@ -38,7 +42,7 @@ function parseArgs(): ParsedArgs {
 		run = args.slice(runIndex + 1).join(' ')
 	}
 
-	return { port, background, daemon, stop, help, run }
+	return { port, background, daemon, stop, help, logs, run }
 }
 
 function printHelp() {
@@ -50,6 +54,7 @@ Usage: grove [options]
 
 Commands:
   run <command>       Run a CLI agent (e.g., grove run claude) with mobile access
+  logs                Tail the server log file
 
 Options:
   -b, --background    Start server in background and free terminal
@@ -230,7 +235,14 @@ if (args.help) {
 	process.exit(0)
 }
 
-if (args.run) {
+if (args.logs) {
+	const logFile = join(homedir(), '.config', 'grove', 'server.log')
+	const proc = spawn('tail', ['-f', logFile], { stdio: 'inherit' })
+	process.on('SIGINT', () => {
+		proc.kill()
+		process.exit(0)
+	})
+} else if (args.run) {
 	runCommand(args.run)
 } else if (args.stop) {
 	const result = stopAll()

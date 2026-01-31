@@ -20,13 +20,10 @@ async function ensureTmuxConfig() {
 		const content = await file.text()
 		const missing = requiredLines.filter(line => !content.includes(line))
 		if (missing.length > 0) {
-			await Bun.write(
-				confPath,
-				content.trimEnd() + '\n' + missing.join('\n') + '\n',
-			)
+			await Bun.write(confPath, `${content.trimEnd()}\n${missing.join('\n')}\n`)
 		}
 	} else {
-		await Bun.write(confPath, requiredLines.join('\n') + '\n')
+		await Bun.write(confPath, `${requiredLines.join('\n')}\n`)
 	}
 }
 

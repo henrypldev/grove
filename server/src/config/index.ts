@@ -1,3 +1,4 @@
+import { appendFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const CONFIG_DIR = Bun.env.XDG_CONFIG_HOME
@@ -6,6 +7,7 @@ const CONFIG_DIR = Bun.env.XDG_CONFIG_HOME
 
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
 const SESSIONS_FILE = join(CONFIG_DIR, 'sessions.json')
+export const LOG_FILE = join(CONFIG_DIR, 'server.log')
 export const WORKTREES_DIR = join(Bun.env.HOME ?? '', '.claude-worktrees')
 
 let logsEnabled = true
@@ -15,10 +17,15 @@ export function setLogsEnabled(enabled: boolean) {
 }
 
 export function log(context: string, message: string, data?: unknown) {
-	if (!logsEnabled) return
 	const timestamp = new Date().toISOString().slice(11, 23)
 	const dataStr = data !== undefined ? ` ${JSON.stringify(data)}` : ''
-	console.log(`[${timestamp}] [${context}] ${message}${dataStr}`)
+	const line = `[${timestamp}] [${context}] ${message}${dataStr}`
+	if (logsEnabled) {
+		console.log(line)
+	}
+	try {
+		appendFileSync(LOG_FILE, `${line}\n`)
+	} catch {}
 }
 
 export interface Repo {

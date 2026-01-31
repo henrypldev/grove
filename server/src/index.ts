@@ -301,7 +301,8 @@ export async function startServer(port: number) {
 
 				return Response.json({ error: 'Not found' }, { status: 404, headers })
 			} catch (e) {
-				log('http', 'error', e)
+				const err = e instanceof Error ? { message: e.message, stack: e.stack } : e
+				log('http', 'error', err)
 				return Response.json(
 					{ error: 'Internal server error' },
 					{ status: 500, headers },

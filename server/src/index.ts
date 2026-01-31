@@ -115,9 +115,9 @@ export async function startServer(port: number) {
 				if (path === '/repos' && method === 'POST') {
 					const body = await req.json()
 					const repo = await addRepo(body.path)
-					if (!repo) {
+					if (typeof repo === 'string') {
 						return Response.json(
-							{ error: 'Invalid repo path' },
+							{ error: repo },
 							{ status: 400, headers },
 						)
 					}
@@ -127,9 +127,9 @@ export async function startServer(port: number) {
 				const repoMatch = matchRoute(path, '/repos/:id')
 				if (repoMatch && method === 'DELETE') {
 					const deleted = await deleteRepo(repoMatch.id)
-					if (!deleted) {
+					if (typeof deleted === 'string') {
 						return Response.json(
-							{ error: 'Repo not found' },
+							{ error: deleted },
 							{ status: 404, headers },
 						)
 					}
@@ -155,9 +155,9 @@ export async function startServer(port: number) {
 				if (path === '/repos/clone' && method === 'POST') {
 					const body = await req.json()
 					const repo = await cloneRepo(body.fullName)
-					if (!repo) {
+					if (typeof repo === 'string') {
 						return Response.json(
-							{ error: 'Failed to clone repo' },
+							{ error: repo },
 							{ status: 400, headers },
 						)
 					}
@@ -175,9 +175,9 @@ export async function startServer(port: number) {
 						body.worktree,
 						body.skipPermissions,
 					)
-					if (!session) {
+					if (typeof session === 'string') {
 						return Response.json(
-							{ error: 'Failed to create session' },
+							{ error: session },
 							{ status: 400, headers },
 						)
 					}
@@ -199,9 +199,9 @@ export async function startServer(port: number) {
 				const behindMainMatch = matchRoute(path, '/sessions/:id/behind-main')
 				if (behindMainMatch && method === 'GET') {
 					const behind = await getBehindMain(behindMainMatch.id)
-					if (behind === null) {
+					if (typeof behind === 'string') {
 						return Response.json(
-							{ error: 'Session not found' },
+							{ error: behind },
 							{ status: 404, headers },
 						)
 					}
@@ -252,9 +252,9 @@ export async function startServer(port: number) {
 						body.branch,
 						body.baseBranch,
 					)
-					if (!worktree) {
+					if (typeof worktree === 'string') {
 						return Response.json(
-							{ error: 'Failed to create worktree' },
+							{ error: worktree },
 							{ status: 400, headers },
 						)
 					}
@@ -268,9 +268,9 @@ export async function startServer(port: number) {
 						body.branch,
 						body.force,
 					)
-					if (!deleted) {
+					if (typeof deleted === 'string') {
 						return Response.json(
-							{ error: 'Failed to delete worktree' },
+							{ error: deleted },
 							{ status: 400, headers },
 						)
 					}

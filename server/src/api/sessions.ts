@@ -145,20 +145,20 @@ export async function createSession(
 	repoId: string,
 	worktreeBranch: string,
 	skipPermissions?: boolean,
-): Promise<SessionData | null> {
+): Promise<SessionData | string> {
 	log('sessions', 'creating session', { repoId, worktreeBranch })
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
 		log('sessions', 'repo not found', { repoId })
-		return null
+		return `Repo not found: ${repoId}`
 	}
 
 	const worktrees = await getWorktrees(repoId)
 	const worktree = worktrees.find(w => w.branch === worktreeBranch)
 	if (!worktree) {
 		log('sessions', 'worktree not found', { worktreeBranch })
-		return null
+		return `Worktree not found: ${worktreeBranch}`
 	}
 
 	const terminalHost = await getTerminalHost()
@@ -179,7 +179,7 @@ export async function createSession(
 	const started = await startSession(session)
 	if (!started) {
 		log('sessions', 'failed to start session', { id: session.id })
-		return null
+		return 'Failed to start terminal session'
 	}
 
 	session.terminalUrl = `https://${terminalHost}:${session.port}`
@@ -195,14 +195,14 @@ export async function deleteSession(id: string): Promise<boolean> {
 	return result
 }
 
-export async function getBehindMain(sessionId: string): Promise<number | null> {
+export async function getBehindMain(sessionId: string): Promise<number | string> {
 	const sessionsState = await loadSessions()
 	const session = sessionsState.sessions.find(s => s.id === sessionId)
-	if (!session) return null
+	if (!session) return `Session not found: ${sessionId}`
 
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === session.repoId)
-	if (!repo) return null
+	if (!repo) return 'Repo not found for session'
 
 	const mainBranch = await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
 		.quiet()
@@ -215,7 +215,7 @@ export async function getBehindMain(sessionId: string): Promise<number | null> {
 		.quiet()
 		.nothrow()
 
-	if (result.exitCode !== 0) return null
+	if (result.exitCode !== 0) return 'Failed to count commits behind main'
 	return parseInt(result.stdout.toString().trim(), 10)
 }
 

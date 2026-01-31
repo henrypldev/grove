@@ -66,13 +66,13 @@ export async function createWorktree(
 	repoId: string,
 	branch: string,
 	baseBranch: string,
-): Promise<Worktree | null> {
+): Promise<Worktree | string> {
 	log('worktrees', 'creating worktree', { repoId, branch, baseBranch })
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
 		log('worktrees', 'repo not found', { repoId })
-		return null
+		return `Repo not found: ${repoId}`
 	}
 
 	const sanitizedBranch = sanitizeBranchName(branch)
@@ -94,11 +94,12 @@ export async function createWorktree(
 	}
 
 	if (result.exitCode !== 0) {
+		const stderr = result.stderr.toString().trim()
 		log('worktrees', 'failed to create worktree', {
 			exitCode: result.exitCode,
-			stderr: result.stderr.toString(),
+			stderr,
 		})
-		return null
+		return `Failed to create worktree: ${stderr}`
 	}
 
 	await copyUntrackedEnvFiles(repo.path, worktreePath)
@@ -115,18 +116,11 @@ async function copyUntrackedEnvFiles(
 	repoPath: string,
 	worktreePath: string,
 ): Promise<void> {
-	const result =
-		await Bun.$`git -C ${repoPath} ls-files --others --exclude-standard`
-			.quiet()
-			.nothrow()
-
-	if (result.exitCode !== 0) return
-
-	const files = result.stdout
-		.toString()
-		.trim()
-		.split('\n')
-		.filter(f => f.startsWith('.env') && !f.includes('/'))
+	const glob = new Bun.Glob('.env*')
+	const files: string[] = []
+	for await (const file of glob.scan({ cwd: repoPath, dot: true })) {
+		if (!file.includes('/')) files.push(file)
+	}
 
 	for (const file of files) {
 		const src = join(repoPath, file)
@@ -144,25 +138,25 @@ export async function deleteWorktree(
 	repoId: string,
 	branch: string,
 	force?: boolean,
-): Promise<boolean> {
+): Promise<true | string> {
 	log('worktrees', 'deleting worktree', { repoId, branch, force })
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
 		log('worktrees', 'repo not found', { repoId })
-		return false
+		return `Repo not found: ${repoId}`
 	}
 
 	const worktrees = await getWorktrees(repoId)
 	const worktree = worktrees.find(w => w.branch === branch)
 	if (!worktree) {
 		log('worktrees', 'worktree not found', { branch })
-		return false
+		return `Worktree not found: ${branch}`
 	}
 
 	if (worktree.isMain) {
 		log('worktrees', 'cannot delete main worktree', { branch })
-		return false
+		return 'Cannot delete main worktree'
 	}
 
 	const result = force
@@ -174,11 +168,12 @@ export async function deleteWorktree(
 				.nothrow()
 
 	if (result.exitCode !== 0) {
+		const stderr = result.stderr.toString().trim()
 		log('worktrees', 'failed to delete worktree', {
 			exitCode: result.exitCode,
-			stderr: result.stderr.toString(),
+			stderr,
 		})
-		return false
+		return `Failed to remove worktree: ${stderr}`
 	}
 
 	const branchDelete = force

@@ -4,8 +4,8 @@ import {
 	loadConfig,
 	loadSessions,
 	log,
-	saveConfig,
 	type SessionData,
+	saveConfig,
 } from '../config'
 import {
 	getSessionState,
@@ -145,20 +145,20 @@ export async function createSession(
 	repoId: string,
 	worktreeBranch: string,
 	skipPermissions?: boolean,
-): Promise<SessionData | null> {
+): Promise<SessionData | string> {
 	log('sessions', 'creating session', { repoId, worktreeBranch })
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === repoId)
 	if (!repo) {
 		log('sessions', 'repo not found', { repoId })
-		return null
+		return `Repo not found: ${repoId}`
 	}
 
 	const worktrees = await getWorktrees(repoId)
 	const worktree = worktrees.find(w => w.branch === worktreeBranch)
 	if (!worktree) {
 		log('sessions', 'worktree not found', { worktreeBranch })
-		return null
+		return `Worktree not found: ${worktreeBranch}`
 	}
 
 	const terminalHost = await getTerminalHost()
@@ -179,7 +179,7 @@ export async function createSession(
 	const started = await startSession(session)
 	if (!started) {
 		log('sessions', 'failed to start session', { id: session.id })
-		return null
+		return 'Failed to start terminal session'
 	}
 
 	session.terminalUrl = `https://${terminalHost}:${session.port}`
@@ -195,33 +195,41 @@ export async function deleteSession(id: string): Promise<boolean> {
 	return result
 }
 
-export async function getBehindMain(sessionId: string): Promise<number | null> {
+export async function getBehindMain(
+	sessionId: string,
+): Promise<number | string> {
 	const sessionsState = await loadSessions()
 	const session = sessionsState.sessions.find(s => s.id === sessionId)
-	if (!session) return null
+	if (!session) return `Session not found: ${sessionId}`
 
 	const config = await loadConfig()
 	const repo = config.repos.find(r => r.id === session.repoId)
-	if (!repo) return null
+	if (!repo) return 'Repo not found for session'
 
 	await Bun.$`git -C ${repo.path} fetch origin`.quiet().nothrow()
 
-	const mainBranch = await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
-		.quiet()
-		.nothrow()
-	const mainRef = mainBranch.exitCode === 0
-		? mainBranch.stdout.toString().trim().replace('refs/remotes/', '')
-		: 'origin/main'
+	const mainBranch =
+		await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
+			.quiet()
+			.nothrow()
+	const mainRef =
+		mainBranch.exitCode === 0
+			? mainBranch.stdout.toString().trim().replace('refs/remotes/', '')
+			: 'origin/main'
 
-	const result = await Bun.$`git -C ${repo.path} rev-list ${session.branch}..${mainRef} --count`
-		.quiet()
-		.nothrow()
+	const result =
+		await Bun.$`git -C ${repo.path} rev-list ${session.branch}..${mainRef} --count`
+			.quiet()
+			.nothrow()
 
-	if (result.exitCode !== 0) return null
+	if (result.exitCode !== 0) return 'Failed to count commits behind main'
 	return parseInt(result.stdout.toString().trim(), 10)
 }
 
-export async function mergeMain(sessionId: string, strategy: 'merge' | 'rebase'): Promise<{ success: boolean; error?: string }> {
+export async function mergeMain(
+	sessionId: string,
+	strategy: 'merge' | 'rebase',
+): Promise<{ success: boolean; error?: string }> {
 	const sessionsState = await loadSessions()
 	const session = sessionsState.sessions.find(s => s.id === sessionId)
 	if (!session) return { success: false, error: 'Session not found' }
@@ -230,18 +238,25 @@ export async function mergeMain(sessionId: string, strategy: 'merge' | 'rebase')
 	const repo = config.repos.find(r => r.id === session.repoId)
 	if (!repo) return { success: false, error: 'Repo not found' }
 
-	const mainBranch = await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
-		.quiet()
-		.nothrow()
-	const mainRef = mainBranch.exitCode === 0
-		? mainBranch.stdout.toString().trim().replace('refs/remotes/', '')
-		: 'origin/main'
+	const mainBranch =
+		await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
+			.quiet()
+			.nothrow()
+	const mainRef =
+		mainBranch.exitCode === 0
+			? mainBranch.stdout.toString().trim().replace('refs/remotes/', '')
+			: 'origin/main'
 
 	await Bun.$`git -C ${session.worktree} fetch origin`.quiet().nothrow()
 
-	const result = strategy === 'rebase'
-		? await Bun.$`git -C ${session.worktree} rebase ${mainRef}`.quiet().nothrow()
-		: await Bun.$`git -C ${session.worktree} merge ${mainRef}`.quiet().nothrow()
+	const result =
+		strategy === 'rebase'
+			? await Bun.$`git -C ${session.worktree} rebase ${mainRef}`
+					.quiet()
+					.nothrow()
+			: await Bun.$`git -C ${session.worktree} merge ${mainRef}`
+					.quiet()
+					.nothrow()
 
 	if (result.exitCode !== 0) {
 		const stderr = result.stderr.toString().trim()
@@ -256,7 +271,9 @@ export async function mergeMain(sessionId: string, strategy: 'merge' | 'rebase')
 	return { success: true }
 }
 
-export async function createPR(sessionId: string): Promise<{ success: boolean; url?: string; error?: string }> {
+export async function createPR(
+	sessionId: string,
+): Promise<{ success: boolean; url?: string; error?: string }> {
 	const sessionsState = await loadSessions()
 	const session = sessionsState.sessions.find(s => s.id === sessionId)
 	if (!session) return { success: false, error: 'Session not found' }
@@ -265,18 +282,27 @@ export async function createPR(sessionId: string): Promise<{ success: boolean; u
 	const repo = config.repos.find(r => r.id === session.repoId)
 	if (!repo) return { success: false, error: 'Repo not found' }
 
-	const push = await Bun.$`git -C ${session.worktree} push -u origin ${session.branch}`.quiet().nothrow()
+	const push =
+		await Bun.$`git -C ${session.worktree} push -u origin ${session.branch}`
+			.quiet()
+			.nothrow()
 	if (push.exitCode !== 0) {
 		return { success: false, error: push.stderr.toString().trim() }
 	}
 
-	const existingPR = await Bun.$`gh pr view ${session.branch} --json url`.cwd(session.worktree).quiet().nothrow()
+	const existingPR = await Bun.$`gh pr view ${session.branch} --json url`
+		.cwd(session.worktree)
+		.quiet()
+		.nothrow()
 	if (existingPR.exitCode === 0) {
 		const pr = JSON.parse(existingPR.stdout.toString().trim())
 		return { success: true, url: pr.url }
 	}
 
-	const remoteUrl = await Bun.$`git -C ${session.worktree} remote get-url origin`.quiet().nothrow()
+	const remoteUrl =
+		await Bun.$`git -C ${session.worktree} remote get-url origin`
+			.quiet()
+			.nothrow()
 	if (remoteUrl.exitCode !== 0) {
 		return { success: false, error: 'Could not determine remote URL' }
 	}
@@ -285,17 +311,28 @@ export async function createPR(sessionId: string): Promise<{ success: boolean; u
 	if (!match) return { success: false, error: 'Not a GitHub repository' }
 	const ownerRepo = match[1]
 
-	const mainBranch = await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
-		.quiet()
-		.nothrow()
-	const baseBranch = mainBranch.exitCode === 0
-		? mainBranch.stdout.toString().trim().replace('refs/remotes/origin/', '')
-		: 'main'
+	const mainBranch =
+		await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
+			.quiet()
+			.nothrow()
+	const baseBranch =
+		mainBranch.exitCode === 0
+			? mainBranch.stdout.toString().trim().replace('refs/remotes/origin/', '')
+			: 'main'
 
-	const logResult = await Bun.$`git -C ${session.worktree} log ${baseBranch}..${session.branch} --pretty=format:%s`.quiet().nothrow()
-	const commits = logResult.exitCode === 0 ? logResult.stdout.toString().trim().split('\n').filter(Boolean) : []
+	const logResult =
+		await Bun.$`git -C ${session.worktree} log ${baseBranch}..${session.branch} --pretty=format:%s`
+			.quiet()
+			.nothrow()
+	const commits =
+		logResult.exitCode === 0
+			? logResult.stdout.toString().trim().split('\n').filter(Boolean)
+			: []
 
-	const title = commits.length === 1 ? commits[0] : session.branch.replace(/[-_/]/g, ' ').replace(/^\w+ /, '')
+	const title =
+		commits.length === 1
+			? commits[0]
+			: session.branch.replace(/[-_/]/g, ' ').replace(/^\w+ /, '')
 	const body = commits.map(c => `- ${c}`).join('\n')
 
 	const params = new URLSearchParams({ expand: '1', title, body })

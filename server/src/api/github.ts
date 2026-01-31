@@ -92,7 +92,7 @@ export async function getOrgRepos(org: string): Promise<GitHubRepo[]> {
 
 export async function cloneRepo(
 	fullName: string,
-): Promise<import('../config').Repo | null> {
+): Promise<import('../config').Repo | string> {
 	log('github', 'cloning repo', { fullName })
 	const cloneDir = await getCloneDirectory()
 	const repoName = fullName.split('/').pop() ?? fullName
@@ -125,8 +125,9 @@ export async function cloneRepo(
 		.quiet()
 		.nothrow()
 	if (cloneResult.exitCode !== 0) {
+		const stderr = cloneResult.stderr.toString().trim()
 		log('github', 'clone failed', { fullName, exitCode: cloneResult.exitCode })
-		return null
+		return `Clone failed (exit ${cloneResult.exitCode}): ${stderr}`
 	}
 
 	log('github', 'clone successful', { fullName, targetPath })

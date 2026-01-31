@@ -116,18 +116,11 @@ async function copyUntrackedEnvFiles(
 	repoPath: string,
 	worktreePath: string,
 ): Promise<void> {
-	const result =
-		await Bun.$`git -C ${repoPath} ls-files --others --exclude-standard`
-			.quiet()
-			.nothrow()
-
-	if (result.exitCode !== 0) return
-
-	const files = result.stdout
-		.toString()
-		.trim()
-		.split('\n')
-		.filter(f => f.startsWith('.env') && !f.includes('/'))
+	const glob = new Bun.Glob('.env*')
+	const files: string[] = []
+	for await (const file of glob.scan({ cwd: repoPath, dot: true })) {
+		if (!file.includes('/')) files.push(file)
+	}
 
 	for (const file of files) {
 		const src = join(repoPath, file)

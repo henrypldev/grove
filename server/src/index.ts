@@ -116,10 +116,7 @@ export async function startServer(port: number) {
 					const body = await req.json()
 					const repo = await addRepo(body.path)
 					if (typeof repo === 'string') {
-						return Response.json(
-							{ error: repo },
-							{ status: 400, headers },
-						)
+						return Response.json({ error: repo }, { status: 400, headers })
 					}
 					return Response.json(repo, { headers })
 				}
@@ -128,10 +125,7 @@ export async function startServer(port: number) {
 				if (repoMatch && method === 'DELETE') {
 					const deleted = await deleteRepo(repoMatch.id)
 					if (typeof deleted === 'string') {
-						return Response.json(
-							{ error: deleted },
-							{ status: 404, headers },
-						)
+						return Response.json({ error: deleted }, { status: 404, headers })
 					}
 					return Response.json({ success: true }, { headers })
 				}
@@ -156,10 +150,7 @@ export async function startServer(port: number) {
 					const body = await req.json()
 					const repo = await cloneRepo(body.fullName)
 					if (typeof repo === 'string') {
-						return Response.json(
-							{ error: repo },
-							{ status: 400, headers },
-						)
+						return Response.json({ error: repo }, { status: 400, headers })
 					}
 					return Response.json(repo, { headers })
 				}
@@ -176,10 +167,7 @@ export async function startServer(port: number) {
 						body.skipPermissions,
 					)
 					if (typeof session === 'string') {
-						return Response.json(
-							{ error: session },
-							{ status: 400, headers },
-						)
+						return Response.json({ error: session }, { status: 400, headers })
 					}
 					return Response.json(session, { headers })
 				}
@@ -200,10 +188,7 @@ export async function startServer(port: number) {
 				if (behindMainMatch && method === 'GET') {
 					const behind = await getBehindMain(behindMainMatch.id)
 					if (typeof behind === 'string') {
-						return Response.json(
-							{ error: behind },
-							{ status: 404, headers },
-						)
+						return Response.json({ error: behind }, { status: 404, headers })
 					}
 					return Response.json({ behind }, { headers })
 				}
@@ -253,10 +238,7 @@ export async function startServer(port: number) {
 						body.baseBranch,
 					)
 					if (typeof worktree === 'string') {
-						return Response.json(
-							{ error: worktree },
-							{ status: 400, headers },
-						)
+						return Response.json({ error: worktree }, { status: 400, headers })
 					}
 					return Response.json(worktree, { headers })
 				}
@@ -269,10 +251,7 @@ export async function startServer(port: number) {
 						body.force,
 					)
 					if (typeof deleted === 'string') {
-						return Response.json(
-							{ error: deleted },
-							{ status: 400, headers },
-						)
+						return Response.json({ error: deleted }, { status: 400, headers })
 					}
 					return Response.json({ success: true }, { headers })
 				}
@@ -301,7 +280,8 @@ export async function startServer(port: number) {
 
 				return Response.json({ error: 'Not found' }, { status: 404, headers })
 			} catch (e) {
-				const err = e instanceof Error ? { message: e.message, stack: e.stack } : e
+				const err =
+					e instanceof Error ? { message: e.message, stack: e.stack } : e
 				log('http', 'error', err)
 				return Response.json(
 					{ error: 'Internal server error' },

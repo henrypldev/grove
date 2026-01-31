@@ -19,6 +19,7 @@ interface ParsedArgs {
 	daemon: boolean
 	stop: boolean
 	help: boolean
+	logs: boolean
 	run?: string
 }
 
@@ -33,6 +34,7 @@ function parseArgs(): ParsedArgs {
 	const daemon = args.includes('--_daemon')
 	const stop = args.includes('--stop') || args.includes('stop')
 	const help = args.includes('--help') || args.includes('-h')
+	const logs = args.includes('logs')
 
 	let run: string | undefined
 	const runIndex = args.indexOf('run')
@@ -40,7 +42,7 @@ function parseArgs(): ParsedArgs {
 		run = args.slice(runIndex + 1).join(' ')
 	}
 
-	return { port, background, daemon, stop, help, run }
+	return { port, background, daemon, stop, help, logs, run }
 }
 
 function printHelp() {

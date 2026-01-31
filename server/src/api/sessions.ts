@@ -204,12 +204,14 @@ export async function getBehindMain(sessionId: string): Promise<number | null> {
 	const repo = config.repos.find(r => r.id === session.repoId)
 	if (!repo) return null
 
+	await Bun.$`git -C ${repo.path} fetch origin`.quiet().nothrow()
+
 	const mainBranch = await Bun.$`git -C ${repo.path} symbolic-ref refs/remotes/origin/HEAD`
 		.quiet()
 		.nothrow()
 	const mainRef = mainBranch.exitCode === 0
-		? mainBranch.stdout.toString().trim().replace('refs/remotes/origin/', '')
-		: 'main'
+		? mainBranch.stdout.toString().trim().replace('refs/remotes/', '')
+		: 'origin/main'
 
 	const result = await Bun.$`git -C ${repo.path} rev-list ${session.branch}..${mainRef} --count`
 		.quiet()

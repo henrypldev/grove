@@ -236,6 +236,7 @@ export async function startServer(port: number) {
 						body.repoId,
 						body.branch,
 						body.baseBranch,
+						body.copyEnv,
 					)
 					if (typeof worktree === 'string') {
 						return Response.json({ error: worktree }, { status: 400, headers })

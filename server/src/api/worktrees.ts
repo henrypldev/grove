@@ -66,6 +66,7 @@ export async function createWorktree(
 	repoId: string,
 	branch: string,
 	baseBranch: string,
+	copyEnv = true,
 ): Promise<Worktree | string> {
 	log('worktrees', 'creating worktree', { repoId, branch, baseBranch })
 	const config = await loadConfig()
@@ -102,7 +103,9 @@ export async function createWorktree(
 		return `Failed to create worktree: ${stderr}`
 	}
 
-	await copyUntrackedEnvFiles(repo.path, worktreePath)
+	if (copyEnv) {
+		await copyUntrackedEnvFiles(repo.path, worktreePath)
+	}
 
 	log('worktrees', 'worktree created', { worktreePath, branch })
 	return {

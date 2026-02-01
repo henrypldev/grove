@@ -82,12 +82,17 @@ export async function createWorktree(
 	log('worktrees', 'creating directory', { worktreePath })
 	await Bun.$`mkdir -p ${WORKTREES_DIR}/${repo.name}`.quiet()
 
+	await Bun.$`git -C ${repo.path} fetch origin`.quiet().nothrow()
+
 	let result =
-		await Bun.$`git -C ${repo.path} worktree add -b ${branch} ${worktreePath} ${baseBranch}`
+		await Bun.$`git -C ${repo.path} worktree add -b ${branch} ${worktreePath} origin/${baseBranch}`
 			.quiet()
 			.nothrow()
 
 	if (result.exitCode !== 0) {
+		log('worktrees', 'new branch failed, trying existing branch', {
+			branch,
+		})
 		result =
 			await Bun.$`git -C ${repo.path} worktree add ${worktreePath} ${branch}`
 				.quiet()
@@ -120,10 +125,17 @@ async function copyUntrackedEnvFiles(
 	worktreePath: string,
 ): Promise<void> {
 	const glob = new Bun.Glob('.env*')
-	const files: string[] = []
+	const allFiles: string[] = []
 	for await (const file of glob.scan({ cwd: repoPath, dot: true })) {
-		if (!file.includes('/')) files.push(file)
+		if (!file.includes('/')) allFiles.push(file)
 	}
+
+	const trackedResult =
+		await Bun.$`git -C ${repoPath} ls-files ${allFiles}`.quiet().nothrow()
+	const trackedFiles = new Set(
+		trackedResult.stdout.toString().trim().split('\n').filter(Boolean),
+	)
+	const files = allFiles.filter(f => !trackedFiles.has(f))
 
 	for (const file of files) {
 		const src = join(repoPath, file)

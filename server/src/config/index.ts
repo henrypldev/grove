@@ -1,5 +1,5 @@
-import { appendFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { appendFileSync, readdirSync, statSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 
 const CONFIG_DIR = Bun.env.XDG_CONFIG_HOME
 	? join(Bun.env.XDG_CONFIG_HOME, 'grove')
@@ -140,6 +140,36 @@ export async function saveSessions(state: SessionsState) {
 export async function getCloneDirectory(): Promise<string> {
 	const config = await loadConfig()
 	return config.cloneDirectory ?? join(Bun.env.HOME ?? '', 'Developer')
+}
+
+export function listDirectories(path: string): string[] {
+	try {
+		let parentDir: string
+		let prefix: string
+
+		if (path.endsWith('/')) {
+			parentDir = path
+			prefix = ''
+		} else {
+			parentDir = dirname(path)
+			prefix = basename(path).toLowerCase()
+		}
+
+		const entries = readdirSync(parentDir, { withFileTypes: true })
+		const dirs = entries
+			.filter((e) => {
+				if (!e.isDirectory()) return false
+				if (e.name.startsWith('.')) return false
+				if (prefix && !e.name.toLowerCase().startsWith(prefix)) return false
+				return true
+			})
+			.map((e) => join(parentDir, e.name))
+			.slice(0, 50)
+
+		return dirs
+	} catch {
+		return []
+	}
 }
 
 export function generateId(): string {

@@ -1,5 +1,6 @@
 import { basename, join } from 'node:path'
 import { generateId, loadConfig, log, type Repo, saveConfig } from '../config'
+import { detectEnvVars } from './worktrees'
 
 export async function getRepos(): Promise<Repo[]> {
 	log('repos', 'getting repos')
@@ -16,10 +17,10 @@ export async function addRepo(path: string): Promise<Repo | string> {
 		return `Path does not exist or is not a directory: ${path}`
 	}
 
-	const gitDir = join(path, '.git')
-	const gitResult = await Bun.$`test -e ${gitDir}`.quiet().nothrow()
+	const gitResult =
+		await Bun.$`git -C ${path} rev-parse --git-dir`.quiet().nothrow()
 	if (gitResult.exitCode !== 0) {
-		log('repos', '.git not found', { gitDir })
+		log('repos', 'not a git repository', { path })
 		return `Path is not a git repository: ${path}`
 	}
 
@@ -31,10 +32,12 @@ export async function addRepo(path: string): Promise<Repo | string> {
 		return existing
 	}
 
+	const envVars = await detectEnvVars(path)
 	const repo: Repo = {
 		id: generateId(),
 		path,
 		name: basename(path),
+		envVars: envVars.length > 0 ? envVars : undefined,
 	}
 
 	config.repos.push(repo)

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { loadConfig, log, WORKTREES_DIR } from '../config'
+import { loadConfig, log, WORKTREES_DIR, type EnvVar } from '../config'
 
 export interface Worktree {
 	path: string
@@ -147,6 +147,45 @@ async function copyUntrackedEnvFiles(
 			log('worktrees', 'failed to copy env file', { file })
 		}
 	}
+}
+
+export async function detectEnvVars(repoPath: string): Promise<EnvVar[]> {
+	const glob = new Bun.Glob('.env*')
+	const allFiles: string[] = []
+	for await (const file of glob.scan({ cwd: repoPath, dot: true })) {
+		allFiles.push(file)
+	}
+
+	if (allFiles.length === 0) return []
+
+	const trackedResult =
+		await Bun.$`git -C ${repoPath} ls-files ${allFiles}`.quiet().nothrow()
+	const trackedFiles = new Set(
+		trackedResult.stdout.toString().trim().split('\n').filter(Boolean),
+	)
+	const untrackedFiles = allFiles.filter(f => !trackedFiles.has(f))
+
+	const envVars: EnvVar[] = []
+	for (const file of untrackedFiles) {
+		const content = await Bun.file(join(repoPath, file)).text()
+		for (const line of content.split('\n')) {
+			const trimmed = line.trim()
+			if (!trimmed || trimmed.startsWith('#')) continue
+			const eqIndex = trimmed.indexOf('=')
+			if (eqIndex === -1) continue
+			const key = trimmed.slice(0, eqIndex).trim()
+			const value = trimmed.slice(eqIndex + 1).trim()
+			if (key) {
+				envVars.push({ key, value, filePath: file })
+			}
+		}
+	}
+
+	log('worktrees', 'detected env vars', {
+		fileCount: untrackedFiles.length,
+		varCount: envVars.length,
+	})
+	return envVars
 }
 
 export async function deleteWorktree(

@@ -1,5 +1,6 @@
 import { basename, join } from 'node:path'
 import { generateId, loadConfig, log, type Repo, saveConfig } from '../config'
+import { detectEnvVars } from './worktrees'
 
 export async function getRepos(): Promise<Repo[]> {
 	log('repos', 'getting repos')
@@ -31,10 +32,12 @@ export async function addRepo(path: string): Promise<Repo | string> {
 		return existing
 	}
 
+	const envVars = await detectEnvVars(path)
 	const repo: Repo = {
 		id: generateId(),
 		path,
 		name: basename(path),
+		envVars: envVars.length > 0 ? envVars : undefined,
 	}
 
 	config.repos.push(repo)

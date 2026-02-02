@@ -19,7 +19,14 @@ import {
 	setWebhookUrl,
 } from './api/sessions'
 import { createWorktree, deleteWorktree, detectEnvVars, getWorktrees } from './api/worktrees'
-import { loadConfig, log, saveConfig, setLogsEnabled } from './config'
+import {
+	getCloneDirectory,
+	listDirectories,
+	loadConfig,
+	log,
+	saveConfig,
+	setLogsEnabled,
+} from './config'
 
 export { setLogsEnabled }
 
@@ -61,7 +68,7 @@ export async function startServer(port: number) {
 			const headers = {
 				'Content-Type': 'application/json',
 				'Access-Control-Allow-Origin': '*',
-				'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+				'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 				'Access-Control-Allow-Headers': 'Content-Type',
 			}
 
@@ -318,6 +325,34 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
+				if (path === '/config/list-directories' && method === 'GET') {
+					const queryPath = url.searchParams.get('path') ?? '/'
+					const dirs = listDirectories(queryPath)
+					return Response.json({ directories: dirs }, { headers })
+				}
+
+				if (path === '/config/clone-directory' && method === 'GET') {
+					const dir = await getCloneDirectory()
+					return Response.json({ cloneDirectory: dir }, { headers })
+				}
+
+				if (path === '/config/clone-directory' && method === 'PUT') {
+					const body = await req.json()
+					if (!body.cloneDirectory || typeof body.cloneDirectory !== 'string') {
+						return Response.json(
+							{ error: 'Missing cloneDirectory field' },
+							{ status: 400, headers },
+						)
+					}
+					const config = await loadConfig()
+					config.cloneDirectory = body.cloneDirectory
+					await saveConfig(config)
+					return Response.json(
+						{ cloneDirectory: body.cloneDirectory },
+						{ headers },
+					)
+				}
+
 				if (path === '/webhook' && method === 'GET') {
 					const url = await getWebhookUrl()
 					return Response.json({ webhookUrl: url ?? null }, { headers })
@@ -357,6 +392,6 @@ export async function startServer(port: number) {
 }
 
 if (import.meta.main) {
-	const port = Number(Bun.env.PORT) || 4001
+	const port = Number(Bun.env.PORT) || 4002
 	startServer(port)
 }

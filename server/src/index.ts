@@ -130,7 +130,7 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
-				const envDetectMatch = matchRoute(path, '/repos/:id/env/detect')
+				const envDetectMatch = matchRoute(path, '/repos/:id/env/scan')
 				if (envDetectMatch && method === 'POST') {
 					const config = await loadConfig()
 					const repo = config.repos.find(r => r.id === envDetectMatch.id)

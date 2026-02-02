@@ -17,10 +17,14 @@ export async function addRepo(path: string): Promise<Repo | string> {
 		return `Path does not exist or is not a directory: ${path}`
 	}
 
-	const gitDir = join(path, '.git')
-	const gitResult = await Bun.$`test -e ${gitDir}`.quiet().nothrow()
+	const gitResult =
+		await Bun.$`git -C ${path} rev-parse --git-dir`.nothrow()
 	if (gitResult.exitCode !== 0) {
-		log('repos', '.git not found', { gitDir })
+		log('repos', 'not a git repository', {
+			path,
+			exitCode: gitResult.exitCode,
+			stderr: gitResult.stderr.toString().trim(),
+		})
 		return `Path is not a git repository: ${path}`
 	}
 

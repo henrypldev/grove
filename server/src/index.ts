@@ -18,7 +18,12 @@ import {
 	removeWebhookUrl,
 	setWebhookUrl,
 } from './api/sessions'
-import { createWorktree, deleteWorktree, detectEnvVars, getWorktrees } from './api/worktrees'
+import {
+	createWorktree,
+	deleteWorktree,
+	detectEnvVars,
+	getWorktrees,
+} from './api/worktrees'
 import {
 	getCloneDirectory,
 	listDirectories,
@@ -142,7 +147,10 @@ export async function startServer(port: number) {
 					const config = await loadConfig()
 					const repo = config.repos.find(r => r.id === envDetectMatch.id)
 					if (!repo) {
-						return Response.json({ error: 'Repo not found' }, { status: 404, headers })
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
 					}
 					const envVars = await detectEnvVars(repo.path)
 					repo.envVars = envVars.length > 0 ? envVars : undefined
@@ -155,7 +163,10 @@ export async function startServer(port: number) {
 					const config = await loadConfig()
 					const repo = config.repos.find(r => r.id === envMatch.id)
 					if (!repo) {
-						return Response.json({ error: 'Repo not found' }, { status: 404, headers })
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
 					}
 					return Response.json(repo.envVars ?? [], { headers })
 				}
@@ -164,18 +175,30 @@ export async function startServer(port: number) {
 					const config = await loadConfig()
 					const repo = config.repos.find(r => r.id === envMatch.id)
 					if (!repo) {
-						return Response.json({ error: 'Repo not found' }, { status: 404, headers })
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
 					}
 					const body = await req.json()
 					if (!body.key || !body.filePath) {
-						return Response.json({ error: 'Missing key or filePath' }, { status: 400, headers })
+						return Response.json(
+							{ error: 'Missing key or filePath' },
+							{ status: 400, headers },
+						)
 					}
 					if (!repo.envVars) repo.envVars = []
-					const existing = repo.envVars.find(v => v.key === body.key && v.filePath === body.filePath)
+					const existing = repo.envVars.find(
+						v => v.key === body.key && v.filePath === body.filePath,
+					)
 					if (existing) {
 						existing.value = body.value ?? ''
 					} else {
-						repo.envVars.push({ key: body.key, value: body.value ?? '', filePath: body.filePath })
+						repo.envVars.push({
+							key: body.key,
+							value: body.value ?? '',
+							filePath: body.filePath,
+						})
 					}
 					await saveConfig(config)
 					return Response.json(repo.envVars, { headers })
@@ -185,14 +208,22 @@ export async function startServer(port: number) {
 					const config = await loadConfig()
 					const repo = config.repos.find(r => r.id === envMatch.id)
 					if (!repo) {
-						return Response.json({ error: 'Repo not found' }, { status: 404, headers })
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
 					}
 					const body = await req.json()
 					if (!body.key || !body.filePath) {
-						return Response.json({ error: 'Missing key or filePath' }, { status: 400, headers })
+						return Response.json(
+							{ error: 'Missing key or filePath' },
+							{ status: 400, headers },
+						)
 					}
 					if (repo.envVars) {
-						repo.envVars = repo.envVars.filter(v => !(v.key === body.key && v.filePath === body.filePath))
+						repo.envVars = repo.envVars.filter(
+							v => !(v.key === body.key && v.filePath === body.filePath),
+						)
 						if (repo.envVars.length === 0) repo.envVars = undefined
 					}
 					await saveConfig(config)

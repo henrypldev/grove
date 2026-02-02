@@ -1,4 +1,4 @@
-import { appendFileSync, readdirSync, statSync } from 'node:fs'
+import { appendFileSync, readdirSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 
 const CONFIG_DIR = Bun.env.XDG_CONFIG_HOME
@@ -164,13 +164,13 @@ export function listDirectories(path: string): string[] {
 
 		const entries = readdirSync(parentDir, { withFileTypes: true })
 		const dirs = entries
-			.filter((e) => {
+			.filter(e => {
 				if (!e.isDirectory()) return false
 				if (e.name.startsWith('.')) return false
 				if (prefix && !e.name.toLowerCase().startsWith(prefix)) return false
 				return true
 			})
-			.map((e) => join(parentDir, e.name))
+			.map(e => join(parentDir, e.name))
 			.slice(0, 50)
 
 		return dirs

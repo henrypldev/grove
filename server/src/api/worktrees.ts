@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { loadConfig, log, WORKTREES_DIR, type EnvVar } from '../config'
+import { type EnvVar, loadConfig, log, WORKTREES_DIR } from '../config'
 
 export interface Worktree {
 	path: string
@@ -131,7 +131,7 @@ async function writeEnvVarsToWorktree(
 	}
 
 	for (const [filePath, vars] of grouped) {
-		const content = vars.map(v => `${v.key}=${v.value}`).join('\n') + '\n'
+		const content = `${vars.map(v => `${v.key}=${v.value}`).join('\n')}\n`
 		const dest = join(worktreePath, filePath)
 		const dir = dest.substring(0, dest.lastIndexOf('/'))
 		if (dir !== worktreePath) {
@@ -155,8 +155,9 @@ export async function detectEnvVars(repoPath: string): Promise<EnvVar[]> {
 
 	if (allFiles.length === 0) return []
 
-	const trackedResult =
-		await Bun.$`git -C ${repoPath} ls-files ${allFiles}`.quiet().nothrow()
+	const trackedResult = await Bun.$`git -C ${repoPath} ls-files ${allFiles}`
+		.quiet()
+		.nothrow()
 	const trackedFiles = new Set(
 		trackedResult.stdout.toString().trim().split('\n').filter(Boolean),
 	)

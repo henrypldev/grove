@@ -18,13 +18,9 @@ export async function addRepo(path: string): Promise<Repo | string> {
 	}
 
 	const gitResult =
-		await Bun.$`git -C ${path} rev-parse --git-dir`.nothrow()
+		await Bun.$`git -C ${path} rev-parse --git-dir`.quiet().nothrow()
 	if (gitResult.exitCode !== 0) {
-		log('repos', 'not a git repository', {
-			path,
-			exitCode: gitResult.exitCode,
-			stderr: gitResult.stderr.toString().trim(),
-		})
+		log('repos', 'not a git repository', { path })
 		return `Path is not a git repository: ${path}`
 	}
 

@@ -18,8 +18,8 @@ import {
 	removeWebhookUrl,
 	setWebhookUrl,
 } from './api/sessions'
-import { createWorktree, deleteWorktree, getWorktrees } from './api/worktrees'
-import { log, setLogsEnabled } from './config'
+import { createWorktree, deleteWorktree, detectEnvVars, getWorktrees } from './api/worktrees'
+import { loadConfig, log, saveConfig, setLogsEnabled } from './config'
 
 export { setLogsEnabled }
 
@@ -130,6 +130,68 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
+				const envDetectMatch = matchRoute(path, '/repos/:id/env/detect')
+				if (envDetectMatch && method === 'POST') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === envDetectMatch.id)
+					if (!repo) {
+						return Response.json({ error: 'Repo not found' }, { status: 404, headers })
+					}
+					const envVars = await detectEnvVars(repo.path)
+					repo.envVars = envVars.length > 0 ? envVars : undefined
+					await saveConfig(config)
+					return Response.json(envVars, { headers })
+				}
+
+				const envMatch = matchRoute(path, '/repos/:id/env')
+				if (envMatch && method === 'GET') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === envMatch.id)
+					if (!repo) {
+						return Response.json({ error: 'Repo not found' }, { status: 404, headers })
+					}
+					return Response.json(repo.envVars ?? [], { headers })
+				}
+
+				if (envMatch && method === 'POST') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === envMatch.id)
+					if (!repo) {
+						return Response.json({ error: 'Repo not found' }, { status: 404, headers })
+					}
+					const body = await req.json()
+					if (!body.key || !body.filePath) {
+						return Response.json({ error: 'Missing key or filePath' }, { status: 400, headers })
+					}
+					if (!repo.envVars) repo.envVars = []
+					const existing = repo.envVars.find(v => v.key === body.key && v.filePath === body.filePath)
+					if (existing) {
+						existing.value = body.value ?? ''
+					} else {
+						repo.envVars.push({ key: body.key, value: body.value ?? '', filePath: body.filePath })
+					}
+					await saveConfig(config)
+					return Response.json(repo.envVars, { headers })
+				}
+
+				if (envMatch && method === 'DELETE') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === envMatch.id)
+					if (!repo) {
+						return Response.json({ error: 'Repo not found' }, { status: 404, headers })
+					}
+					const body = await req.json()
+					if (!body.key || !body.filePath) {
+						return Response.json({ error: 'Missing key or filePath' }, { status: 400, headers })
+					}
+					if (repo.envVars) {
+						repo.envVars = repo.envVars.filter(v => !(v.key === body.key && v.filePath === body.filePath))
+						if (repo.envVars.length === 0) repo.envVars = undefined
+					}
+					await saveConfig(config)
+					return Response.json(repo.envVars ?? [], { headers })
+				}
+
 				const orgReposMatch = matchRoute(path, '/github/repos/orgs/:org')
 				if (orgReposMatch && method === 'GET') {
 					return Response.json(
@@ -236,7 +298,6 @@ export async function startServer(port: number) {
 						body.repoId,
 						body.branch,
 						body.baseBranch,
-						body.copyEnv,
 					)
 					if (typeof worktree === 'string') {
 						return Response.json({ error: worktree }, { status: 400, headers })

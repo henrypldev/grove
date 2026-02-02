@@ -28,10 +28,17 @@ export function log(context: string, message: string, data?: unknown) {
 	} catch {}
 }
 
+export interface EnvVar {
+	key: string
+	value: string
+	filePath: string
+}
+
 export interface Repo {
 	id: string
 	path: string
 	name: string
+	envVars?: EnvVar[]
 }
 
 export interface SessionData {

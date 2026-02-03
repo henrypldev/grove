@@ -187,6 +187,7 @@ export async function getSessionState(
 		if (
 			line.includes('❯') ||
 			line.includes('? for shortcuts') ||
+			/✻ (Worked|Crunched) for/.test(line) ||
 			/\b(Allow|Deny|Yes|No|allow|deny)\b/.test(line)
 		) {
 			return 'waiting'

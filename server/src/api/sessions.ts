@@ -24,19 +24,38 @@ export type SessionWithStatus = Omit<SessionData, 'pid'> & {
 const sseClients = new Set<ReadableStreamDefaultController>()
 const previousStates = new Map<string, SessionState>()
 let stateInterval: ReturnType<typeof setInterval> | null = null
+let currentPollingInterval = 2000
+const FAST_POLL_MS = 500
+const SLOW_POLL_MS = 2000
 
 function startStatePolling() {
 	if (stateInterval) return
-	stateInterval = setInterval(() => {
-		if (sseClients.size > 0) {
-			broadcastSessions()
+	scheduleNextPoll()
+}
+
+function scheduleNextPoll() {
+	if (sseClients.size === 0) {
+		stateInterval = null
+		return
+	}
+	stateInterval = setTimeout(async () => {
+		await broadcastSessions()
+		const hasBusy = Array.from(previousStates.values()).some(s => s === 'busy')
+		const newInterval = hasBusy ? FAST_POLL_MS : SLOW_POLL_MS
+		if (newInterval !== currentPollingInterval) {
+			log('sessions', 'polling interval changed', {
+				from: currentPollingInterval,
+				to: newInterval,
+			})
+			currentPollingInterval = newInterval
 		}
-	}, 2000)
+		scheduleNextPoll()
+	}, currentPollingInterval)
 }
 
 function stopStatePolling() {
 	if (stateInterval) {
-		clearInterval(stateInterval)
+		clearTimeout(stateInterval)
 		stateInterval = null
 	}
 }

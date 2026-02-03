@@ -1,5 +1,6 @@
 import {
 	generateId,
+	getPushTokens,
 	getTerminalHost,
 	loadConfig,
 	loadSessions,
@@ -27,6 +28,95 @@ let stateInterval: ReturnType<typeof setInterval> | null = null
 let currentPollingInterval = 2000
 const FAST_POLL_MS = 500
 const SLOW_POLL_MS = 2000
+
+const waitingSince = new Map<string, number>()
+const notifiedSessions = new Set<string>()
+let pushCheckInterval: ReturnType<typeof setInterval> | null = null
+const PUSH_DELAY_MS = 15000
+
+function startPushCheckInterval() {
+	if (pushCheckInterval) return
+	pushCheckInterval = setInterval(checkAndSendPushNotifications, 5000)
+}
+
+function stopPushCheckInterval() {
+	if (pushCheckInterval) {
+		clearInterval(pushCheckInterval)
+		pushCheckInterval = null
+	}
+}
+
+async function checkAndSendPushNotifications() {
+	const now = Date.now()
+	for (const [sessionId, startTime] of waitingSince) {
+		if (now - startTime >= PUSH_DELAY_MS && !notifiedSessions.has(sessionId)) {
+			const sessions = await getSessions()
+			const session = sessions.find(s => s.id === sessionId)
+			if (session && session.state === 'waiting') {
+				await sendPushNotification(session)
+				notifiedSessions.add(sessionId)
+			}
+		}
+	}
+}
+
+async function sendPushNotification(session: SessionWithStatus) {
+	const tokens = await getPushTokens()
+	if (tokens.length === 0) return
+
+	log('push', 'sending notification', {
+		sessionId: session.id,
+		tokenCount: tokens.length,
+	})
+
+	try {
+		const response = await fetch('https://exp.host/--/api/v2/push/send', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Accept: 'application/json',
+			},
+			body: JSON.stringify(
+				tokens.map(t => ({
+					to: t.token,
+					title: 'Session ready',
+					body: `${session.repoName} (${session.branch}) is waiting for input`,
+					data: { sessionId: session.id },
+					sound: 'default',
+				})),
+			),
+		})
+
+		if (!response.ok) {
+			log('push', 'API error', { status: response.status })
+			return
+		}
+
+		const result = await response.json()
+		log('push', 'notification sent', { result })
+
+		if (result.data && Array.isArray(result.data)) {
+			const { removePushToken } = await import('../config')
+			for (let i = 0; i < result.data.length; i++) {
+				const ticket = result.data[i]
+				if (
+					ticket.status === 'error' &&
+					ticket.details?.error === 'DeviceNotRegistered'
+				) {
+					const invalidToken = tokens[i]?.token
+					if (invalidToken) {
+						log('push', 'removing invalid token', {
+							token: invalidToken.slice(0, 20),
+						})
+						await removePushToken(invalidToken)
+					}
+				}
+			}
+		}
+	} catch (err) {
+		log('push', 'failed to send', { error: String(err) })
+	}
+}
 
 function startStatePolling() {
 	if (stateInterval) return
@@ -116,9 +206,23 @@ export async function broadcastSessions() {
 			broadcastSSE(`data: ${JSON.stringify(payload)}\n\n`)
 			if (prev === 'busy' && session.state === 'waiting') {
 				fireWebhook(payload)
+				waitingSince.set(session.id, Date.now())
+				startPushCheckInterval()
 			}
 		}
 		previousStates.set(session.id, session.state)
+
+		if (session.state !== 'waiting') {
+			waitingSince.delete(session.id)
+			notifiedSessions.delete(session.id)
+		}
+	}
+
+	const activeWaiting = Array.from(waitingSince.keys()).some(id =>
+		sessions.find(s => s.id === id && s.state === 'waiting'),
+	)
+	if (!activeWaiting) {
+		stopPushCheckInterval()
 	}
 
 	broadcastSSE(`data: ${JSON.stringify({ type: 'sessions', sessions })}\n\n`)

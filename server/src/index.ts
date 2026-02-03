@@ -26,10 +26,12 @@ import {
 	getWorktrees,
 } from './api/worktrees'
 import {
+	addPushToken,
 	getCloneDirectory,
 	listDirectories,
 	loadConfig,
 	log,
+	removePushToken,
 	saveConfig,
 	setLogsEnabled,
 } from './config'
@@ -422,6 +424,44 @@ export async function startServer(port: number) {
 				if (path === '/webhook' && method === 'DELETE') {
 					await removeWebhookUrl()
 					return Response.json({ success: true }, { headers })
+				}
+
+				if (path === '/push-tokens' && method === 'POST') {
+					const body = await req.json()
+					if (!body.token || typeof body.token !== 'string') {
+						return Response.json(
+							{ error: 'Missing token field' },
+							{ status: 400, headers },
+						)
+					}
+					if (!body.token.startsWith('ExponentPushToken[')) {
+						return Response.json(
+							{ error: 'Invalid Expo push token format' },
+							{ status: 400, headers },
+						)
+					}
+					if (body.platform !== 'ios' && body.platform !== 'android') {
+						return Response.json(
+							{ error: 'Invalid platform, must be ios or android' },
+							{ status: 400, headers },
+						)
+					}
+					await addPushToken(body.token, body.platform)
+					log('push', 'registered token', { platform: body.platform })
+					return Response.json({ success: true }, { headers })
+				}
+
+				if (path === '/push-tokens' && method === 'DELETE') {
+					const body = await req.json()
+					if (!body.token || typeof body.token !== 'string') {
+						return Response.json(
+							{ error: 'Missing token field' },
+							{ status: 400, headers },
+						)
+					}
+					const removed = await removePushToken(body.token)
+					log('push', 'removed token', { removed })
+					return Response.json({ success: removed }, { headers })
 				}
 
 				return Response.json({ error: 'Not found' }, { status: 404, headers })

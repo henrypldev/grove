@@ -164,21 +164,34 @@ export type SessionState = 'waiting' | 'busy' | 'idle'
 export async function getSessionState(
 	sessionId: string,
 ): Promise<SessionState> {
-	const result = await Bun.$`tmux capture-pane -t grove-${sessionId} -p`
+	const result = await Bun.$`tmux capture-pane -t grove-${sessionId} -p -S -`
 		.quiet()
 		.nothrow()
 	if (result.exitCode !== 0) {
 		return 'idle'
 	}
-	const output = result.text()
-	if (
-		output.includes('✢') ||
-		/\w+\.\.\..*\((\d+(?:m \d+)?s|[Ee]sc to interrupt)\)/.test(output)
-	) {
-		return 'busy'
+	const lines = result
+		.text()
+		.split('\n')
+		.filter(l => l.trim() !== '')
+	const tail = lines.slice(-30)
+	for (let i = tail.length - 1; i >= 0; i--) {
+		const line = tail[i]
+		if (
+			line.includes('esc to interrupt') ||
+			/·\s+\S.*[.…]/.test(line) ||
+			line.includes('Running…')
+		) {
+			return 'busy'
+		}
+		if (
+			line.includes('❯') ||
+			line.includes('? for shortcuts') ||
+			/✻ (Worked|Crunched) for/.test(line) ||
+			/\b(Allow|Deny|Yes|No|allow|deny)\b/.test(line)
+		) {
+			return 'waiting'
+		}
 	}
-	if (output.includes('? for shortcuts')) {
-		return 'waiting'
-	}
-	return 'busy'
+	return 'waiting'
 }

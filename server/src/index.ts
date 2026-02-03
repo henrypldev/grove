@@ -17,6 +17,7 @@ import {
 	removeSSEClient,
 	removeWebhookUrl,
 	setWebhookUrl,
+	uploadFile,
 } from './api/sessions'
 import {
 	createWorktree,
@@ -322,6 +323,23 @@ export async function startServer(port: number) {
 						)
 					}
 					return Response.json({ url: result.url }, { headers })
+				}
+
+				const uploadMatch = matchRoute(path, '/sessions/:id/upload')
+				if (uploadMatch && method === 'POST') {
+					const formData = await req.formData()
+					const file = formData.get('file')
+					if (!file || !(file instanceof File)) {
+						return Response.json(
+							{ error: 'No file provided' },
+							{ status: 400, headers },
+						)
+					}
+					const result = await uploadFile(uploadMatch.id, file)
+					if (typeof result === 'string') {
+						return Response.json({ error: result }, { status: 404, headers })
+					}
+					return Response.json(result, { headers })
 				}
 
 				const worktreeMatch = matchRoute(path, '/worktrees/:repoId')

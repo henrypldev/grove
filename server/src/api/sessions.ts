@@ -83,7 +83,7 @@ export async function broadcastSessions() {
 
 	for (const session of sessions) {
 		const prev = previousStates.get(session.id)
-		if (prev === 'busy' && session.state === 'waiting') {
+		if (prev && prev !== session.state) {
 			const payload = {
 				type: 'state_change',
 				session: {
@@ -91,11 +91,13 @@ export async function broadcastSessions() {
 					repoName: session.repoName,
 					branch: session.branch,
 				},
-				from: 'busy',
-				to: 'waiting',
+				from: prev,
+				to: session.state,
 			}
 			broadcastSSE(`data: ${JSON.stringify(payload)}\n\n`)
-			fireWebhook(payload)
+			if (prev === 'busy' && session.state === 'waiting') {
+				fireWebhook(payload)
+			}
 		}
 		previousStates.set(session.id, session.state)
 	}

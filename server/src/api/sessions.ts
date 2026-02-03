@@ -340,3 +340,31 @@ export async function createPR(
 
 	return { success: true, url }
 }
+
+export async function uploadFile(
+	sessionId: string,
+	file: File,
+): Promise<{ path: string } | string> {
+	const sessionsState = await loadSessions()
+	const session = sessionsState.sessions.find(s => s.id === sessionId)
+	if (!session) return `Session not found: ${sessionId}`
+
+	const homeDir = process.env.HOME || '~'
+	const imagesDir = `${homeDir}/.config/grove/images`
+	await Bun.$`mkdir -p ${imagesDir}`.quiet()
+
+	let fileName = file.name
+	const ext = fileName.includes('.') ? '.' + fileName.split('.').pop() : ''
+	const base = ext ? fileName.slice(0, -ext.length) : fileName
+	let targetPath = `${imagesDir}/${fileName}`
+	let counter = 1
+	const fs = await import('fs')
+	while (fs.existsSync(targetPath)) {
+		fileName = `${base}-${counter}${ext}`
+		targetPath = `${imagesDir}/${fileName}`
+		counter++
+	}
+
+	await Bun.write(targetPath, file)
+	return { path: targetPath }
+}

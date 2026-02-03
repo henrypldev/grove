@@ -54,6 +54,12 @@ export interface SessionData {
 	skipPermissions?: boolean
 }
 
+export interface PushToken {
+	token: string
+	platform: 'ios' | 'android'
+	registeredAt: string
+}
+
 let cachedTerminalHost: string | null = null
 
 export async function getTerminalHost(): Promise<string> {
@@ -94,6 +100,7 @@ interface Config {
 	repos: Repo[]
 	webhookUrl?: string
 	cloneDirectory?: string
+	pushTokens?: PushToken[]
 }
 
 interface SessionsState {
@@ -124,6 +131,38 @@ export async function loadConfig(): Promise<Config> {
 export async function saveConfig(config: Config) {
 	await ensureConfigDir()
 	await Bun.write(CONFIG_FILE, JSON.stringify(config, null, 2))
+}
+
+export async function getPushTokens(): Promise<PushToken[]> {
+	const config = await loadConfig()
+	return config.pushTokens ?? []
+}
+
+export async function addPushToken(token: string, platform: 'ios' | 'android'): Promise<void> {
+	const config = await loadConfig()
+	if (!config.pushTokens) config.pushTokens = []
+	const existing = config.pushTokens.find(t => t.token === token)
+	if (existing) {
+		existing.platform = platform
+		existing.registeredAt = new Date().toISOString()
+	} else {
+		config.pushTokens.push({
+			token,
+			platform,
+			registeredAt: new Date().toISOString(),
+		})
+	}
+	await saveConfig(config)
+}
+
+export async function removePushToken(token: string): Promise<boolean> {
+	const config = await loadConfig()
+	if (!config.pushTokens) return false
+	const index = config.pushTokens.findIndex(t => t.token === token)
+	if (index === -1) return false
+	config.pushTokens.splice(index, 1)
+	await saveConfig(config)
+	return true
 }
 
 export async function loadSessions(): Promise<SessionsState> {

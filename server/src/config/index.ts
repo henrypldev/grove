@@ -138,7 +138,10 @@ export async function getPushTokens(): Promise<PushToken[]> {
 	return config.pushTokens ?? []
 }
 
-export async function addPushToken(token: string, platform: 'ios' | 'android'): Promise<void> {
+export async function addPushToken(
+	token: string,
+	platform: 'ios' | 'android',
+): Promise<void> {
 	const config = await loadConfig()
 	if (!config.pushTokens) config.pushTokens = []
 	const existing = config.pushTokens.find(t => t.token === token)

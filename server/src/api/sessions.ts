@@ -64,14 +64,17 @@ async function sendPushNotification(session: SessionWithStatus) {
 	const tokens = await getPushTokens()
 	if (tokens.length === 0) return
 
-	log('push', 'sending notification', { sessionId: session.id, tokenCount: tokens.length })
+	log('push', 'sending notification', {
+		sessionId: session.id,
+		tokenCount: tokens.length,
+	})
 
 	try {
 		const response = await fetch('https://exp.host/--/api/v2/push/send', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Accept': 'application/json',
+				Accept: 'application/json',
 			},
 			body: JSON.stringify(
 				tokens.map(t => ({
@@ -83,8 +86,33 @@ async function sendPushNotification(session: SessionWithStatus) {
 				})),
 			),
 		})
+
+		if (!response.ok) {
+			log('push', 'API error', { status: response.status })
+			return
+		}
+
 		const result = await response.json()
 		log('push', 'notification sent', { result })
+
+		if (result.data && Array.isArray(result.data)) {
+			const { removePushToken } = await import('../config')
+			for (let i = 0; i < result.data.length; i++) {
+				const ticket = result.data[i]
+				if (
+					ticket.status === 'error' &&
+					ticket.details?.error === 'DeviceNotRegistered'
+				) {
+					const invalidToken = tokens[i]?.token
+					if (invalidToken) {
+						log('push', 'removing invalid token', {
+							token: invalidToken.slice(0, 20),
+						})
+						await removePushToken(invalidToken)
+					}
+				}
+			}
+		}
 	} catch (err) {
 		log('push', 'failed to send', { error: String(err) })
 	}

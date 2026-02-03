@@ -434,6 +434,12 @@ export async function startServer(port: number) {
 							{ status: 400, headers },
 						)
 					}
+					if (!body.token.startsWith('ExponentPushToken[')) {
+						return Response.json(
+							{ error: 'Invalid Expo push token format' },
+							{ status: 400, headers },
+						)
+					}
 					if (body.platform !== 'ios' && body.platform !== 'android') {
 						return Response.json(
 							{ error: 'Invalid platform, must be ios or android' },

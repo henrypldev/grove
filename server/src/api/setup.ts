@@ -147,3 +147,13 @@ export function getSetupState(sessionId: string): SetupStepState[] | null {
 	if (!setup) return null
 	return setup.steps
 }
+
+export function broadcastAllSetupStates() {
+	for (const [sessionId, setup] of activeSetups) {
+		for (let i = 0; i < setup.steps.length; i++) {
+			const step = setup.steps[i]
+			if (step.status === 'pending') continue
+			broadcastStep(sessionId, i, step.name, step.status, step.output || undefined)
+		}
+	}
+}

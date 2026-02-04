@@ -15,7 +15,7 @@ import {
 	startSession,
 	stopSession,
 } from '../terminal/ttyd'
-import { cleanupSetup, startSetup } from './setup'
+import { broadcastAllSetupStates, cleanupSetup, startSetup } from './setup'
 import { getWorktrees } from './worktrees'
 
 export type SessionWithStatus = Omit<SessionData, 'pid'> & {
@@ -156,6 +156,7 @@ function stopStatePolling() {
 export function addSSEClient(controller: ReadableStreamDefaultController) {
 	sseClients.add(controller)
 	startStatePolling()
+	broadcastAllSetupStates()
 }
 
 export function removeSSEClient(controller: ReadableStreamDefaultController) {

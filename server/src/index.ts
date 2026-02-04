@@ -7,6 +7,7 @@ import {
 import { addRepo, deleteRepo, getRepos } from './api/repos'
 import {
 	addSSEClient,
+	clearSessionFocused,
 	createPR,
 	createSession,
 	deleteSession,
@@ -16,6 +17,8 @@ import {
 	mergeMain,
 	removeSSEClient,
 	removeWebhookUrl,
+	setAppFocused,
+	setSessionFocused,
 	setWebhookUrl,
 	uploadFile,
 } from './api/sessions'
@@ -287,6 +290,16 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
+					const focusMatch = matchRoute(path, '/sessions/:id/focus')
+				if (focusMatch && method === 'POST') {
+					setSessionFocused(focusMatch.id)
+					return Response.json({ success: true }, { headers })
+				}
+				if (focusMatch && method === 'DELETE') {
+					clearSessionFocused(focusMatch.id)
+					return Response.json({ success: true }, { headers })
+				}
+
 				const behindMainMatch = matchRoute(path, '/sessions/:id/behind-main')
 				if (behindMainMatch && method === 'GET') {
 					const behind = await getBehindMain(behindMainMatch.id)
@@ -423,6 +436,12 @@ export async function startServer(port: number) {
 
 				if (path === '/webhook' && method === 'DELETE') {
 					await removeWebhookUrl()
+					return Response.json({ success: true }, { headers })
+				}
+
+				if (path === '/app/focus' && method === 'POST') {
+					const body = await req.json()
+					setAppFocused(body.focused === true)
 					return Response.json({ success: true }, { headers })
 				}
 

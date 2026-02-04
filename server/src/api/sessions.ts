@@ -249,6 +249,8 @@ export async function getWebhookUrl(): Promise<string | undefined> {
 
 export function setSessionFocused(sessionId: string) {
 	focusedSessions.add(sessionId)
+	waitingSince.delete(sessionId)
+	notifiedSessions.delete(sessionId)
 }
 
 export function clearSessionFocused(sessionId: string) {
@@ -257,6 +259,10 @@ export function clearSessionFocused(sessionId: string) {
 
 export function setAppFocused(focused: boolean) {
 	appFocused = focused
+	if (focused) {
+		waitingSince.clear()
+		notifiedSessions.clear()
+	}
 }
 
 export async function getSessions(): Promise<SessionWithStatus[]> {

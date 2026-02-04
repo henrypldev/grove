@@ -33,6 +33,8 @@ const waitingSince = new Map<string, number>()
 const notifiedSessions = new Set<string>()
 let pushCheckInterval: ReturnType<typeof setInterval> | null = null
 const PUSH_DELAY_MS = 15000
+const focusedSessions = new Set<string>()
+let appFocused = false
 
 function startPushCheckInterval() {
 	if (pushCheckInterval) return
@@ -49,7 +51,7 @@ function stopPushCheckInterval() {
 async function checkAndSendPushNotifications() {
 	const now = Date.now()
 	for (const [sessionId, startTime] of waitingSince) {
-		if (now - startTime >= PUSH_DELAY_MS && !notifiedSessions.has(sessionId)) {
+		if (now - startTime >= PUSH_DELAY_MS && !notifiedSessions.has(sessionId) && !focusedSessions.has(sessionId) && !appFocused) {
 			notifiedSessions.add(sessionId)
 			const sessions = await getSessions()
 			const session = sessions.find(s => s.id === sessionId)
@@ -243,6 +245,18 @@ export async function removeWebhookUrl() {
 export async function getWebhookUrl(): Promise<string | undefined> {
 	const config = await loadConfig()
 	return config.webhookUrl
+}
+
+export function setSessionFocused(sessionId: string) {
+	focusedSessions.add(sessionId)
+}
+
+export function clearSessionFocused(sessionId: string) {
+	focusedSessions.delete(sessionId)
+}
+
+export function setAppFocused(focused: boolean) {
+	appFocused = focused
 }
 
 export async function getSessions(): Promise<SessionWithStatus[]> {

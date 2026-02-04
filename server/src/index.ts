@@ -93,6 +93,13 @@ export async function startServer(port: number) {
 				return Response.json({ status: 'ok' }, { headers })
 			}
 
+			if (path === '/version' && method === 'GET') {
+				const pkg = await Bun.file(
+					new URL('../package.json', import.meta.url),
+				).json()
+				return Response.json({ version: pkg.version }, { headers })
+			}
+
 			if (path === '/events' && method === 'GET') {
 				const stream = new ReadableStream({
 					start(controller) {
@@ -290,7 +297,7 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
-					const focusMatch = matchRoute(path, '/sessions/:id/focus')
+				const focusMatch = matchRoute(path, '/sessions/:id/focus')
 				if (focusMatch && method === 'POST') {
 					setSessionFocused(focusMatch.id)
 					return Response.json({ success: true }, { headers })

@@ -50,11 +50,11 @@ async function checkAndSendPushNotifications() {
 	const now = Date.now()
 	for (const [sessionId, startTime] of waitingSince) {
 		if (now - startTime >= PUSH_DELAY_MS && !notifiedSessions.has(sessionId)) {
+			notifiedSessions.add(sessionId)
 			const sessions = await getSessions()
 			const session = sessions.find(s => s.id === sessionId)
 			if (session && session.state === 'waiting') {
 				await sendPushNotification(session)
-				notifiedSessions.add(sessionId)
 			}
 		}
 	}

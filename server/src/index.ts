@@ -99,7 +99,7 @@ export async function startServer(port: number) {
 			}
 
 			if (path === '/update' && method === 'POST') {
-				const proc = Bun.spawn(['brew', 'upgrade', 'grove'], {
+				const proc = Bun.spawn(['sh', '-c', 'brew update && brew upgrade grove'], {
 					stdout: 'pipe',
 					stderr: 'pipe',
 				})

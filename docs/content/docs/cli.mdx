@@ -6,18 +6,17 @@ description: All Grove CLI commands and options.
 ## Usage
 
 ```bash
-grove [options]
-grove run <command>
+grove <command> [options]
 ```
 
 ## Commands
 
-### `grove`
+### `grove start`
 
 Start the Grove server. By default, runs interactively in the foreground.
 
 ```bash
-grove
+grove start
 ```
 
 On startup, Grove will:
@@ -51,8 +50,6 @@ Stop a background Grove server and kill all active sessions.
 
 ```bash
 grove stop
-# or
-grove --stop
 ```
 
 ## Options
@@ -61,17 +58,16 @@ grove --stop
 |--------|-------------|
 | `-b, --background` | Start the server in the background, freeing the terminal |
 | `--port <number>` | Set the server port (default: `3000`) |
-| `--stop` | Stop the background server and kill all sessions |
 | `-h, --help` | Show help message |
 
 ## Examples
 
 ```bash
 # Start server interactively
-grove
+grove start
 
 # Start server in background on custom port
-grove -b --port 4000
+grove start -b --port 4000
 
 # Run Claude Code with mobile access
 grove run claude

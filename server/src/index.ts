@@ -1,3 +1,4 @@
+import pkg from '../package.json'
 import {
 	cloneRepo,
 	getGitHubOrgs,
@@ -91,6 +92,26 @@ export async function startServer(port: number) {
 
 			if (path === '/health' && method === 'GET') {
 				return Response.json({ status: 'ok' }, { headers })
+			}
+
+			if (path === '/version' && method === 'GET') {
+				return Response.json({ version: pkg.version }, { headers })
+			}
+
+			if (path === '/update' && method === 'POST') {
+				const proc = Bun.spawn(['brew', 'upgrade', 'grove'], {
+					stdout: 'pipe',
+					stderr: 'pipe',
+				})
+				const exitCode = await proc.exited
+				if (exitCode !== 0) {
+					const stderr = await new Response(proc.stderr).text()
+					return Response.json(
+						{ error: stderr || 'Update failed' },
+						{ status: 500, headers },
+					)
+				}
+				return Response.json({ success: true }, { headers })
 			}
 
 			if (path === '/events' && method === 'GET') {
@@ -290,7 +311,7 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
-					const focusMatch = matchRoute(path, '/sessions/:id/focus')
+				const focusMatch = matchRoute(path, '/sessions/:id/focus')
 				if (focusMatch && method === 'POST') {
 					setSessionFocused(focusMatch.id)
 					return Response.json({ success: true }, { headers })

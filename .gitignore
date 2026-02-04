@@ -17,6 +17,9 @@ mobile/android/
 # Server
 server/dist/
 
+# Plans
+docs/plans/
+
 # Environment
 .env
 .env.local

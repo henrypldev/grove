@@ -20,6 +20,7 @@ interface ParsedArgs {
 	stop: boolean
 	help: boolean
 	logs: boolean
+	start: boolean
 	run?: string
 }
 
@@ -35,6 +36,7 @@ function parseArgs(): ParsedArgs {
 	const stop = args.includes('--stop') || args.includes('stop')
 	const help = args.includes('--help') || args.includes('-h')
 	const logs = args.includes('logs')
+	const start = args.includes('start')
 
 	let run: string | undefined
 	const runIndex = args.indexOf('run')
@@ -42,17 +44,18 @@ function parseArgs(): ParsedArgs {
 		run = args.slice(runIndex + 1).join(' ')
 	}
 
-	return { port, background, daemon, stop, help, logs, run }
+	return { port, background, daemon, stop, help, logs, start, run }
 }
 
 function printHelp() {
 	console.log(`
 grove - Mobile terminal server for Claude Code
 
-Usage: grove [options]
-       grove run <command>
+Usage: grove <command> [options]
 
 Commands:
+  start               Start the grove server
+  stop                Stop background server and kill all sessions
   run <command>       Run a CLI agent (e.g., grove run claude) with mobile access
   logs                Tail the server log file
 
@@ -60,7 +63,6 @@ Options:
   -b, --background    Start server in background and free terminal
   -h, --help          Show this help message
   --port <number>     Set server port (default: 3001)
-  --stop, stop        Stop background server and kill all sessions
 `)
 }
 
@@ -252,11 +254,11 @@ if (args.logs) {
 	const config = loadConfig()
 	const port = args.port ?? config.port
 	runDaemon(port)
-} else {
+} else if (args.start) {
 	if (isRunning()) {
 		const pid = loadPid()
 		console.log(`✗ grove is already running in background (PID: ${pid})`)
-		console.log('  Run "grove --stop" to stop it first')
+		console.log('  Run "grove stop" to stop it first')
 		process.exit(1)
 	}
 
@@ -264,4 +266,7 @@ if (args.logs) {
 	const port = args.port ?? config.port
 
 	render(<App background={args.background} port={port} />)
+} else {
+	printHelp()
+	process.exit(0)
 }

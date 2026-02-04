@@ -31,10 +31,10 @@ bun install
 ### Start the server
 
 ```bash
-grove                    # Start server (interactive)
-grove -b                 # Start in background
-grove --port 3001        # Custom port
-grove --stop             # Stop background server
+grove start              # Start server (interactive)
+grove start -b           # Start in background
+grove start --port 3001  # Custom port
+grove stop               # Stop background server
 ```
 
 ### Run a command with mobile access
@@ -51,7 +51,6 @@ This launches the command in the current directory, sets up a secure terminal se
 -b, --background    Start server in background
 -h, --help          Show help message
 --port <number>     Set server port (default: 3000)
---stop, stop        Stop background server and kill all sessions
 ```
 
 ## How it works

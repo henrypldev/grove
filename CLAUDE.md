@@ -12,7 +12,7 @@ Grove is a server and CLI for managing Git repositories and terminal sessions fr
 ```bash
 bun run dev          # Start server with watch mode
 bun run server       # Start server (production)
-bun run cli          # Run CLI in dev mode
+bun run cli          # Run CLI in dev mode (e.g., bun run cli start -b)
 ```
 
 ### Linting/Formatting

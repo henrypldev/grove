@@ -23,6 +23,7 @@ import {
 	setWebhookUrl,
 	uploadFile,
 } from './api/sessions'
+import { cancelSetup, retrySetup } from './api/setup'
 import {
 	createWorktree,
 	deleteWorktree,
@@ -318,6 +319,24 @@ export async function startServer(port: number) {
 				}
 				if (focusMatch && method === 'DELETE') {
 					clearSessionFocused(focusMatch.id)
+					return Response.json({ success: true }, { headers })
+				}
+
+				const setupRetryMatch = matchRoute(
+					path,
+					'/sessions/:id/setup/retry',
+				)
+				if (setupRetryMatch && method === 'POST') {
+					await retrySetup(setupRetryMatch.id)
+					return Response.json({ success: true }, { headers })
+				}
+
+				const setupCancelMatch = matchRoute(
+					path,
+					'/sessions/:id/setup/cancel',
+				)
+				if (setupCancelMatch && method === 'POST') {
+					cancelSetup(setupCancelMatch.id)
 					return Response.json({ success: true }, { headers })
 				}
 

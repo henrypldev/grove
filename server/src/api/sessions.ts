@@ -15,6 +15,7 @@ import {
 	startSession,
 	stopSession,
 } from '../terminal/ttyd'
+import { cleanupSetup, startSetup } from './setup'
 import { getWorktrees } from './worktrees'
 
 export type SessionWithStatus = Omit<SessionData, 'pid'> & {
@@ -164,7 +165,7 @@ export function removeSSEClient(controller: ReadableStreamDefaultController) {
 	}
 }
 
-function broadcastSSE(data: string) {
+export function broadcastSSE(data: string) {
 	const encoded = new TextEncoder().encode(data)
 	for (const controller of sseClients) {
 		try {
@@ -330,11 +331,13 @@ export async function createSession(
 	session.terminalUrl = `https://${terminalHost}:${session.port}`
 	log('sessions', 'session created', { id: session.id, port: session.port })
 	broadcastSessions()
+	startSetup(session.id, worktree.path)
 	return session
 }
 
 export async function deleteSession(id: string): Promise<boolean> {
 	log('sessions', 'deleting session', { id })
+	cleanupSetup(id)
 	const result = await stopSession(id)
 	if (result) broadcastSessions()
 	return result

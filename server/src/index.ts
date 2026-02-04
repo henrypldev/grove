@@ -1,3 +1,4 @@
+import pkg from '../package.json'
 import {
 	cloneRepo,
 	getGitHubOrgs,
@@ -94,10 +95,23 @@ export async function startServer(port: number) {
 			}
 
 			if (path === '/version' && method === 'GET') {
-				const pkg = await Bun.file(
-					new URL('../package.json', import.meta.url),
-				).json()
 				return Response.json({ version: pkg.version }, { headers })
+			}
+
+			if (path === '/update' && method === 'POST') {
+				const proc = Bun.spawn(['brew', 'upgrade', 'grove'], {
+					stdout: 'pipe',
+					stderr: 'pipe',
+				})
+				const exitCode = await proc.exited
+				if (exitCode !== 0) {
+					const stderr = await new Response(proc.stderr).text()
+					return Response.json(
+						{ error: stderr || 'Update failed' },
+						{ status: 500, headers },
+					)
+				}
+				return Response.json({ success: true }, { headers })
 			}
 
 			if (path === '/events' && method === 'GET') {

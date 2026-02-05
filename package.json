@@ -8,7 +8,7 @@
 	],
 	"scripts": {
 		"server": "bun run --cwd server start",
-		"dev": "bun run --cwd server dev",
+		"dev": "NODE_ENV=development bun run --cwd server dev",
 		"cli": "bun run --cwd cli dev",
 		"docs": "bun run --cwd docs dev",
 		"lint": "biome lint .",

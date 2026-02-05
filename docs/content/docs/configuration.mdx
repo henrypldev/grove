@@ -48,7 +48,7 @@ Each session entry contains:
 
 ## Environment Variables
 
-You can configure environment variables for each repository through the Mac app or by editing the Grove configuration file directly at `~/.config/grove/repos.json`.
+You can configure environment variables for each repository through the Mac app or by editing `~/.config/grove/config.json` directly.
 
 Environment variables are defined per repository:
 
@@ -87,11 +87,16 @@ When a worktree is created, Grove generates the environment files with the confi
 
 ## Setup Steps
 
-You can configure automatic setup steps that run when a session starts by creating a `.grove/setup.json` file in your repository root.
+Setup steps are commands that run automatically when a session starts. There are two ways to configure them:
 
-### Configuration
+1. **`.grove/setup.json`** — Committed to your repository. Shared with your team.
+2. **Config UI** — Managed through the Grove Mac app. Stored in `~/.config/grove/config.json`.
 
-Create `.grove/setup.json` in your project:
+If both are present, `.grove/setup.json` takes full priority — config.json steps are ignored.
+
+### `.grove/setup.json` (recommended)
+
+Create `.grove/setup.json` in your repository root:
 
 ```json
 {
@@ -108,6 +113,32 @@ Create `.grove/setup.json` in your project:
 }
 ```
 
+This file can be committed to version control so all team members get the same setup steps.
+
+### Config UI
+
+You can also manage setup steps per-repository through the Grove Mac app or by editing `~/.config/grove/config.json` directly. Steps are stored under each repo entry:
+
+```json
+{
+  "repos": [
+    {
+      "id": "abc12345",
+      "path": "/Users/you/Projects/my-app",
+      "name": "my-app",
+      "setupSteps": [
+        {
+          "name": "Install dependencies",
+          "run": "npm install"
+        }
+      ]
+    }
+  ]
+}
+```
+
+The Mac app provides a JSON view of your configured steps that you can copy and paste into a `.grove/setup.json` file when you're ready to commit them.
+
 ### Fields
 
 | Field | Type | Description |
@@ -119,10 +150,20 @@ Create `.grove/setup.json` in your project:
 ### Behavior
 
 - Steps run sequentially in the worktree directory
-- Each step shows real-time status (pending, running, done, failed)
+- Each step streams output in real-time to the UI
+- Each step shows status: pending, running, done, or failed
 - If a step fails, subsequent steps are skipped
 - You can cancel running steps or retry failed ones from the UI
-- Output from each step is captured and viewable in the setup inspector
+- Output from each step is viewable in the setup inspector
+
+### Priority
+
+| `.grove/setup.json` exists? | Config UI steps exist? | Result |
+|------------------------------|------------------------|--------|
+| Yes | No | `.grove/setup.json` is used |
+| Yes | Yes | `.grove/setup.json` is used |
+| No | Yes | Config UI steps are used |
+| No | No | No setup runs |
 
 ### Example for React Native / Expo
 

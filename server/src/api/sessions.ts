@@ -332,7 +332,7 @@ export async function createSession(
 	session.terminalUrl = `https://${terminalHost}:${session.port}`
 	log('sessions', 'session created', { id: session.id, port: session.port })
 	broadcastSessions()
-	startSetup(session.id, worktree.path)
+	startSetup(session.id, worktree.path, repo.setupSteps)
 	return session
 }
 

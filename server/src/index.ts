@@ -261,6 +261,104 @@ export async function startServer(port: number) {
 					return Response.json(repo.envVars ?? [], { headers })
 				}
 
+				const setupMatch = matchRoute(path, '/repos/:id/setup')
+				if (setupMatch && method === 'GET') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === setupMatch.id)
+					if (!repo) {
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
+					}
+					return Response.json(repo.setupSteps ?? [], { headers })
+				}
+
+				if (setupMatch && method === 'POST') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === setupMatch.id)
+					if (!repo) {
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
+					}
+					const body = await req.json()
+					if (!body.name || !body.run) {
+						return Response.json(
+							{ error: 'Missing name or run' },
+							{ status: 400, headers },
+						)
+					}
+					if (!repo.setupSteps) repo.setupSteps = []
+					repo.setupSteps.push({ name: body.name, run: body.run })
+					await saveConfig(config)
+					return Response.json(repo.setupSteps, { headers })
+				}
+
+				if (setupMatch && method === 'PUT') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === setupMatch.id)
+					if (!repo) {
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
+					}
+					const body = await req.json()
+					if (typeof body.index !== 'number' || !body.name || !body.run) {
+						return Response.json(
+							{ error: 'Missing index, name, or run' },
+							{ status: 400, headers },
+						)
+					}
+					if (
+						!repo.setupSteps ||
+						body.index < 0 ||
+						body.index >= repo.setupSteps.length
+					) {
+						return Response.json(
+							{ error: 'Invalid index' },
+							{ status: 400, headers },
+						)
+					}
+					repo.setupSteps[body.index] = { name: body.name, run: body.run }
+					await saveConfig(config)
+					return Response.json(repo.setupSteps, { headers })
+				}
+
+				if (setupMatch && method === 'DELETE') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === setupMatch.id)
+					if (!repo) {
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
+					}
+					const body = await req.json()
+					if (typeof body.index !== 'number') {
+						return Response.json(
+							{ error: 'Missing index' },
+							{ status: 400, headers },
+						)
+					}
+					if (
+						!repo.setupSteps ||
+						body.index < 0 ||
+						body.index >= repo.setupSteps.length
+					) {
+						return Response.json(
+							{ error: 'Invalid index' },
+							{ status: 400, headers },
+						)
+					}
+					repo.setupSteps.splice(body.index, 1)
+					if (repo.setupSteps.length === 0) repo.setupSteps = undefined
+					await saveConfig(config)
+					return Response.json(repo.setupSteps ?? [], { headers })
+				}
+
 				const orgReposMatch = matchRoute(path, '/github/repos/orgs/:org')
 				if (orgReposMatch && method === 'GET') {
 					return Response.json(
@@ -537,6 +635,7 @@ export async function startServer(port: number) {
 }
 
 if (import.meta.main) {
-	const port = Number(Bun.env.PORT) || 4001
+	const isDev = Bun.env.NODE_ENV === 'development'
+	const port = Number(Bun.env.PORT) || (isDev ? 4002 : 4001)
 	startServer(port)
 }

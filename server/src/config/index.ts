@@ -34,11 +34,17 @@ export interface EnvVar {
 	filePath: string
 }
 
+export interface SetupStep {
+	name: string
+	run: string
+}
+
 export interface Repo {
 	id: string
 	path: string
 	name: string
 	envVars?: EnvVar[]
+	setupSteps?: SetupStep[]
 }
 
 export interface SessionData {
@@ -70,7 +76,7 @@ export async function getTerminalHost(): Promise<string> {
 	}
 	const result = await Bun.$`tailscale status --json`.quiet()
 	const status = JSON.parse(result.text())
-	cachedTerminalHost = status.Self.DNSName.replace(/\.$/, '')
+	cachedTerminalHost = status.Self.DNSName.replace(/\.$/, '') as string
 	return cachedTerminalHost
 }
 

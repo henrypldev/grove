@@ -46,11 +46,44 @@ Each session entry contains:
 - ttyd process PID
 - The command being run (for `grove run` sessions)
 
-## Environment Files
+## Environment Variables
 
-When creating a new worktree, Grove automatically copies untracked `.env*` files (e.g. `.env.local`, `.env.development.local`) from the repository root into the new worktree. This ensures new worktrees have the same environment configuration as the main working directory without manual setup.
+You can configure environment variables for each repository through the Mac app or by editing the Grove configuration file directly at `~/.config/grove/repos.json`.
 
-Only files that are not tracked by Git are copied, so checked-in `.env` files that are already part of the worktree checkout are not duplicated.
+Environment variables are defined per repository:
+
+```json
+{
+  "repos": [
+    {
+      "id": "wanssqx5",
+      "path": "/Users/henry/Projects/mite",
+      "name": "mite",
+      "envVars": [
+        {
+          "key": "CONVEX_DEPLOYMENT",
+          "value": "dev:hallowed-armadillo-23",
+          "filePath": ".env.local"
+        },
+        {
+          "key": "API_KEY",
+          "value": "sk-1234567890"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `key` | Yes | The environment variable name |
+| `value` | Yes | The environment variable value |
+| `filePath` | No | Path where the env file will be saved (useful for monorepos). Defaults to `.env.local` at the repository root |
+
+When a worktree is created, Grove generates the environment files with the configured variables.
 
 ## Setup Steps
 

@@ -154,12 +154,13 @@ export function cancelSetup(sessionId: string) {
 		broadcastStep(sessionId, runningIndex, step.name, 'failed', 'Cancelled')
 	}
 
-	activeSetups.delete(sessionId)
+	setup.currentProcess = null
 	log('setup', 'cancelled setup', { sessionId })
 }
 
 export function cleanupSetup(sessionId: string) {
 	cancelSetup(sessionId)
+	activeSetups.delete(sessionId)
 }
 
 export function getSetupState(sessionId: string): SetupStepState[] | null {

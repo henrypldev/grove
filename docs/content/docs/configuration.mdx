@@ -46,11 +46,104 @@ Each session entry contains:
 - ttyd process PID
 - The command being run (for `grove run` sessions)
 
-## Environment Files
+## Environment Variables
 
-When creating a new worktree, Grove automatically copies untracked `.env*` files (e.g. `.env.local`, `.env.development.local`) from the repository root into the new worktree. This ensures new worktrees have the same environment configuration as the main working directory without manual setup.
+You can configure environment variables for each repository through the Mac app or by editing the Grove configuration file directly at `~/.config/grove/repos.json`.
 
-Only files that are not tracked by Git are copied, so checked-in `.env` files that are already part of the worktree checkout are not duplicated.
+Environment variables are defined per repository:
+
+```json
+{
+  "repos": [
+    {
+      "id": "abc12345",
+      "path": "/Users/you/Projects/my-app",
+      "name": "my-app",
+      "envVars": [
+        {
+          "key": "DATABASE_URL",
+          "value": "postgresql://localhost:5432/mydb",
+          "filePath": ".env.local"
+        },
+        {
+          "key": "API_KEY",
+          "value": "your-api-key-here"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `key` | Yes | The environment variable name |
+| `value` | Yes | The environment variable value |
+| `filePath` | No | Path where the env file will be saved (useful for monorepos). Defaults to `.env.local` at the repository root |
+
+When a worktree is created, Grove generates the environment files with the configured variables.
+
+## Setup Steps
+
+You can configure automatic setup steps that run when a session starts by creating a `.grove/setup.json` file in your repository root.
+
+### Configuration
+
+Create `.grove/setup.json` in your project:
+
+```json
+{
+  "setup": [
+    {
+      "name": "Install dependencies",
+      "run": "npm install"
+    },
+    {
+      "name": "Build project",
+      "run": "npm run build"
+    }
+  ]
+}
+```
+
+### Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `setup` | array | List of setup steps to run in order |
+| `setup[].name` | string | Display name shown in the UI |
+| `setup[].run` | string | Shell command to execute |
+
+### Behavior
+
+- Steps run sequentially in the worktree directory
+- Each step shows real-time status (pending, running, done, failed)
+- If a step fails, subsequent steps are skipped
+- You can cancel running steps or retry failed ones from the UI
+- Output from each step is captured and viewable in the setup inspector
+
+### Example for React Native / Expo
+
+```json
+{
+  "setup": [
+    {
+      "name": "Install dependencies",
+      "run": "npm install"
+    },
+    {
+      "name": "Install pods",
+      "run": "cd ios && pod install"
+    },
+    {
+      "name": "Build iOS",
+      "run": "npx expo run:ios"
+    }
+  ]
+}
+```
 
 ## TLS Certificates
 

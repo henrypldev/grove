@@ -1,0 +1,19 @@
+{
+	"hooks": {
+		"PostToolUse": [
+			{
+				"matcher": "Edit|Write",
+				"hooks": [
+					{
+						"type": "command",
+						"command": "biome format --write ."
+					},
+					{
+						"type": "command",
+						"command": "bunx tsc --noEmit 2>&1 | head -20"
+					}
+				]
+			}
+		]
+	}
+}

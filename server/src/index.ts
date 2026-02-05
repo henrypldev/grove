@@ -23,6 +23,7 @@ import {
 	setWebhookUrl,
 	uploadFile,
 } from './api/sessions'
+import { cancelSetup, retrySetup } from './api/setup'
 import {
 	createWorktree,
 	deleteWorktree,
@@ -99,10 +100,13 @@ export async function startServer(port: number) {
 			}
 
 			if (path === '/update' && method === 'POST') {
-				const proc = Bun.spawn(['sh', '-c', 'brew update && brew upgrade grove'], {
-					stdout: 'pipe',
-					stderr: 'pipe',
-				})
+				const proc = Bun.spawn(
+					['sh', '-c', 'brew update && brew upgrade grove'],
+					{
+						stdout: 'pipe',
+						stderr: 'pipe',
+					},
+				)
 				const exitCode = await proc.exited
 				if (exitCode !== 0) {
 					const stderr = await new Response(proc.stderr).text()
@@ -318,6 +322,18 @@ export async function startServer(port: number) {
 				}
 				if (focusMatch && method === 'DELETE') {
 					clearSessionFocused(focusMatch.id)
+					return Response.json({ success: true }, { headers })
+				}
+
+				const setupRetryMatch = matchRoute(path, '/sessions/:id/setup/retry')
+				if (setupRetryMatch && method === 'POST') {
+					await retrySetup(setupRetryMatch.id)
+					return Response.json({ success: true }, { headers })
+				}
+
+				const setupCancelMatch = matchRoute(path, '/sessions/:id/setup/cancel')
+				if (setupCancelMatch && method === 'POST') {
+					cancelSetup(setupCancelMatch.id)
 					return Response.json({ success: true }, { headers })
 				}
 

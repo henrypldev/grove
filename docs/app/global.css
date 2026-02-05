@@ -3,6 +3,10 @@
 @import "fumadocs-ui/css/preset.css";
 
 @theme {
+  --color-fd-background: hsl(0, 0%, 99%);
+  --color-fd-card: hsl(120, 4%, 94%);
+  --color-fd-muted: hsl(120, 4%, 94%);
+  --color-fd-secondary: hsl(120, 4%, 96%);
   --color-fd-primary: hsl(142, 71%, 45%);
   --color-fd-primary-foreground: hsl(0, 0%, 100%);
   --color-fd-ring: hsl(142, 71%, 45%);

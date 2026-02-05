@@ -42,6 +42,7 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 			cwd: setup.worktreePath,
 			stdout: 'pipe',
 			stderr: 'pipe',
+			detached: true,
 		})
 		setup.currentProcess = proc
 
@@ -127,13 +128,32 @@ export async function retrySetup(sessionId: string) {
 }
 
 export function cancelSetup(sessionId: string) {
+	log('setup', 'cancelSetup called', { sessionId, hasSetup: activeSetups.has(sessionId) })
 	const setup = activeSetups.get(sessionId)
 	if (!setup) return
 
 	setup.cancelled = true
 	if (setup.currentProcess) {
-		setup.currentProcess.kill()
+		const pid = setup.currentProcess.pid
+		log('setup', 'killing process group', { sessionId, pid })
+		try {
+			process.kill(-pid, 'SIGTERM')
+		} catch (err) {
+			log('setup', 'process group kill failed, falling back', { sessionId, pid, error: String(err) })
+			setup.currentProcess.kill()
+		}
+	} else {
+		log('setup', 'no currentProcess to kill', { sessionId })
 	}
+
+	const runningIndex = setup.steps.findIndex((s) => s.status === 'running')
+	if (runningIndex !== -1) {
+		const step = setup.steps[runningIndex]
+		step.status = 'failed'
+		step.output = 'Cancelled'
+		broadcastStep(sessionId, runningIndex, step.name, 'failed', 'Cancelled')
+	}
+
 	activeSetups.delete(sessionId)
 	log('setup', 'cancelled setup', { sessionId })
 }

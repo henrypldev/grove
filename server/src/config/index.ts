@@ -76,7 +76,7 @@ export async function getTerminalHost(): Promise<string> {
 	}
 	const result = await Bun.$`tailscale status --json`.quiet()
 	const status = JSON.parse(result.text())
-	cachedTerminalHost = status.Self.DNSName.replace(/\.$/, '')
+	cachedTerminalHost = status.Self.DNSName.replace(/\.$/, '') as string
 	return cachedTerminalHost
 }
 

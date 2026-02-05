@@ -1,9 +1,9 @@
 import { join } from 'node:path'
-import { log } from '../config'
+import { log, type SetupStep } from '../config'
 import { broadcastSSE } from './sessions'
 
 interface SetupConfig {
-	setup: { name: string; run: string }[]
+	setup: SetupStep[]
 }
 
 interface SetupStepState {
@@ -71,29 +71,35 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 	}
 }
 
-export async function startSetup(sessionId: string, worktreePath: string) {
+export async function startSetup(sessionId: string, worktreePath: string, repoSetupSteps?: SetupStep[]) {
 	const configPath = join(worktreePath, '.grove', 'setup.json')
 	const file = Bun.file(configPath)
 
-	if (!(await file.exists())) return
+	let steps: SetupStep[] | undefined
 
-	let config: SetupConfig
-	try {
-		config = await file.json()
-	} catch {
-		log('setup', 'invalid setup.json', { sessionId, path: configPath })
-		return
+	if (await file.exists()) {
+		try {
+			const config: SetupConfig = await file.json()
+			if (config.setup && Array.isArray(config.setup)) {
+				steps = config.setup
+				log('setup', 'using .grove/setup.json', { sessionId })
+			}
+		} catch {
+			log('setup', 'invalid setup.json', { sessionId, path: configPath })
+		}
 	}
 
-	if (!config.setup || !Array.isArray(config.setup)) {
-		log('setup', 'invalid setup config format', { sessionId })
-		return
+	if (!steps && repoSetupSteps && repoSetupSteps.length > 0) {
+		steps = repoSetupSteps
+		log('setup', 'using config.json setup steps', { sessionId })
 	}
+
+	if (!steps || steps.length === 0) return
 
 	const setup: ActiveSetup = {
 		sessionId,
 		worktreePath,
-		steps: config.setup.map(s => ({
+		steps: steps.map(s => ({
 			name: s.name,
 			run: s.run,
 			status: 'pending',

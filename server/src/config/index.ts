@@ -34,11 +34,17 @@ export interface EnvVar {
 	filePath: string
 }
 
+export interface SetupStep {
+	name: string
+	run: string
+}
+
 export interface Repo {
 	id: string
 	path: string
 	name: string
 	envVars?: EnvVar[]
+	setupSteps?: SetupStep[]
 }
 
 export interface SessionData {

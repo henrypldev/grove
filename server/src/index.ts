@@ -635,6 +635,7 @@ export async function startServer(port: number) {
 }
 
 if (import.meta.main) {
-	const port = Number(Bun.env.PORT) || 4002
+	const isDev = Bun.env.NODE_ENV === 'development'
+	const port = Number(Bun.env.PORT) || (isDev ? 4002 : 4001)
 	startServer(port)
 }

@@ -100,10 +100,13 @@ export async function startServer(port: number) {
 			}
 
 			if (path === '/update' && method === 'POST') {
-				const proc = Bun.spawn(['sh', '-c', 'brew update && brew upgrade grove'], {
-					stdout: 'pipe',
-					stderr: 'pipe',
-				})
+				const proc = Bun.spawn(
+					['sh', '-c', 'brew update && brew upgrade grove'],
+					{
+						stdout: 'pipe',
+						stderr: 'pipe',
+					},
+				)
 				const exitCode = await proc.exited
 				if (exitCode !== 0) {
 					const stderr = await new Response(proc.stderr).text()
@@ -322,19 +325,13 @@ export async function startServer(port: number) {
 					return Response.json({ success: true }, { headers })
 				}
 
-				const setupRetryMatch = matchRoute(
-					path,
-					'/sessions/:id/setup/retry',
-				)
+				const setupRetryMatch = matchRoute(path, '/sessions/:id/setup/retry')
 				if (setupRetryMatch && method === 'POST') {
 					await retrySetup(setupRetryMatch.id)
 					return Response.json({ success: true }, { headers })
 				}
 
-				const setupCancelMatch = matchRoute(
-					path,
-					'/sessions/:id/setup/cancel',
-				)
+				const setupCancelMatch = matchRoute(path, '/sessions/:id/setup/cancel')
 				if (setupCancelMatch && method === 'POST') {
 					cancelSetup(setupCancelMatch.id)
 					return Response.json({ success: true }, { headers })
@@ -540,6 +537,6 @@ export async function startServer(port: number) {
 }
 
 if (import.meta.main) {
-	const port = Number(Bun.env.PORT) || 4001
+	const port = Number(Bun.env.PORT) || 4002
 	startServer(port)
 }

@@ -29,12 +29,39 @@ function broadcastStep(sessionId: string, step: number, name: string, status: st
 	broadcastSSE(`data: ${JSON.stringify(event)}\n\n`)
 }
 
+function broadcastOutput(sessionId: string, step: number, chunk: string) {
+	const event = { type: 'setup_output', sessionId, step, chunk }
+	broadcastSSE(`data: ${JSON.stringify(event)}\n\n`)
+}
+
+async function streamOutput(
+	stream: ReadableStream<Uint8Array>,
+	sessionId: string,
+	stepIndex: number,
+	onChunk: (text: string) => void
+) {
+	const reader = stream.getReader()
+	const decoder = new TextDecoder()
+	try {
+		while (true) {
+			const { done, value } = await reader.read()
+			if (done) break
+			const text = decoder.decode(value, { stream: true })
+			onChunk(text)
+			broadcastOutput(sessionId, stepIndex, text)
+		}
+	} finally {
+		reader.releaseLock()
+	}
+}
+
 async function runSteps(setup: ActiveSetup, fromIndex: number) {
 	for (let i = fromIndex; i < setup.steps.length; i++) {
 		if (setup.cancelled) return
 
 		const step = setup.steps[i]
 		step.status = 'running'
+		step.output = ''
 		log('setup', `step ${i} running: ${step.name}`, { sessionId: setup.sessionId })
 		broadcastStep(setup.sessionId, i, step.name, 'running')
 
@@ -46,24 +73,28 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 		})
 		setup.currentProcess = proc
 
-		await proc.exited
+		const appendOutput = (text: string) => {
+			step.output += text
+		}
+
+		await Promise.all([
+			streamOutput(proc.stdout, setup.sessionId, i, appendOutput),
+			streamOutput(proc.stderr, setup.sessionId, i, appendOutput),
+			proc.exited,
+		])
 
 		if (setup.cancelled) return
 
-		const stdout = await new Response(proc.stdout).text()
-		const stderr = await new Response(proc.stderr).text()
-		const output = (stdout + stderr).trim()
-
 		setup.currentProcess = null
+		const output = step.output.trim()
+		step.output = output
 
 		if (proc.exitCode === 0) {
 			step.status = 'done'
-			step.output = output
 			log('setup', `step ${i} done: ${step.name}`, { sessionId: setup.sessionId })
 			broadcastStep(setup.sessionId, i, step.name, 'done', output)
 		} else {
 			step.status = 'failed'
-			step.output = output
 			log('setup', `step ${i} failed: ${step.name}`, { sessionId: setup.sessionId, exitCode: proc.exitCode })
 			broadcastStep(setup.sessionId, i, step.name, 'failed', output)
 			return

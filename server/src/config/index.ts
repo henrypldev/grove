@@ -37,6 +37,7 @@ export interface EnvVar {
 export interface SetupStep {
 	name: string
 	run: string
+	background?: boolean
 }
 
 export interface Repo {

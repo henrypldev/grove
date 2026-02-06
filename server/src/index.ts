@@ -23,7 +23,7 @@ import {
 	setWebhookUrl,
 	uploadFile,
 } from './api/sessions'
-import { cancelSetup, retrySetup } from './api/setup'
+import { cancelSetup, retrySetup, startStep, stopStep } from './api/setup'
 import {
 	createWorktree,
 	deleteWorktree,
@@ -291,7 +291,11 @@ export async function startServer(port: number) {
 						)
 					}
 					if (!repo.setupSteps) repo.setupSteps = []
-					repo.setupSteps.push({ name: body.name, run: body.run })
+					repo.setupSteps.push({
+						name: body.name,
+						run: body.run,
+						background: body.background || undefined,
+					})
 					await saveConfig(config)
 					return Response.json(repo.setupSteps, { headers })
 				}
@@ -322,7 +326,11 @@ export async function startServer(port: number) {
 							{ status: 400, headers },
 						)
 					}
-					repo.setupSteps[body.index] = { name: body.name, run: body.run }
+					repo.setupSteps[body.index] = {
+						name: body.name,
+						run: body.run,
+						background: body.background || undefined,
+					}
 					await saveConfig(config)
 					return Response.json(repo.setupSteps, { headers })
 				}
@@ -432,6 +440,38 @@ export async function startServer(port: number) {
 				const setupCancelMatch = matchRoute(path, '/sessions/:id/setup/cancel')
 				if (setupCancelMatch && method === 'POST') {
 					cancelSetup(setupCancelMatch.id)
+					return Response.json({ success: true }, { headers })
+				}
+
+				const setupStopMatch = matchRoute(path, '/sessions/:id/setup/stop')
+				if (setupStopMatch && method === 'POST') {
+					const body = await req.json()
+					if (typeof body.step !== 'number') {
+						return Response.json(
+							{ error: 'Missing step index' },
+							{ status: 400, headers },
+						)
+					}
+					const error = stopStep(setupStopMatch.id, body.step)
+					if (error) {
+						return Response.json({ error }, { status: 400, headers })
+					}
+					return Response.json({ success: true }, { headers })
+				}
+
+				const setupStartMatch = matchRoute(path, '/sessions/:id/setup/start')
+				if (setupStartMatch && method === 'POST') {
+					const body = await req.json()
+					if (typeof body.step !== 'number') {
+						return Response.json(
+							{ error: 'Missing step index' },
+							{ status: 400, headers },
+						)
+					}
+					const error = startStep(setupStartMatch.id, body.step)
+					if (error) {
+						return Response.json({ error }, { status: 400, headers })
+					}
 					return Response.json({ success: true }, { headers })
 				}
 

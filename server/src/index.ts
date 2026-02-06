@@ -5,7 +5,7 @@ import {
 	getGitHubRepos,
 	getOrgRepos,
 } from './api/github'
-import { addRepo, deleteRepo, getRepos } from './api/repos'
+import { addRepo, deleteRepo, getRepos, withSetupFile } from './api/repos'
 import {
 	addSSEClient,
 	clearSessionFocused,
@@ -161,7 +161,7 @@ export async function startServer(port: number) {
 					if (typeof repo === 'string') {
 						return Response.json({ error: repo }, { status: 400, headers })
 					}
-					return Response.json(repo, { headers })
+					return Response.json(withSetupFile(repo), { headers })
 				}
 
 				const repoMatch = matchRoute(path, '/repos/:id')
@@ -425,7 +425,7 @@ export async function startServer(port: number) {
 					if (typeof repo === 'string') {
 						return Response.json({ error: repo }, { status: 400, headers })
 					}
-					return Response.json(repo, { headers })
+					return Response.json(withSetupFile(repo), { headers })
 				}
 
 				if (path === '/sessions' && method === 'GET') {

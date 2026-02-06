@@ -1,12 +1,24 @@
+import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { generateId, loadConfig, log, type Repo, saveConfig } from '../config'
 import { detectEnvVars } from './worktrees'
 
-export async function getRepos(): Promise<Repo[]> {
+export function withSetupFile<T extends Repo>(
+	repo: T,
+): T & { hasSetupFile: boolean } {
+	return {
+		...repo,
+		hasSetupFile: existsSync(join(repo.path, '.grove', 'setup.json')),
+	}
+}
+
+export async function getRepos(): Promise<
+	(Repo & { hasSetupFile: boolean })[]
+> {
 	log('repos', 'getting repos')
 	const config = await loadConfig()
 	log('repos', 'found repos', { count: config.repos.length })
-	return config.repos
+	return config.repos.map(withSetupFile)
 }
 
 export async function addRepo(path: string): Promise<Repo | string> {

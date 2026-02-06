@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import pkg from '../package.json'
 import {
 	cloneRepo,
@@ -5,7 +7,7 @@ import {
 	getGitHubRepos,
 	getOrgRepos,
 } from './api/github'
-import { addRepo, deleteRepo, getRepos } from './api/repos'
+import { addRepo, deleteRepo, getRepos, withSetupFile } from './api/repos'
 import {
 	addSSEClient,
 	clearSessionFocused,
@@ -161,7 +163,7 @@ export async function startServer(port: number) {
 					if (typeof repo === 'string') {
 						return Response.json({ error: repo }, { status: 400, headers })
 					}
-					return Response.json(repo, { headers })
+					return Response.json(withSetupFile(repo), { headers })
 				}
 
 				const repoMatch = matchRoute(path, '/repos/:id')
@@ -270,6 +272,11 @@ export async function startServer(port: number) {
 							{ error: 'Repo not found' },
 							{ status: 404, headers },
 						)
+					}
+					const setupFile = join(repo.path, '.grove', 'setup.json')
+					if (existsSync(setupFile)) {
+						const data = await Bun.file(setupFile).json()
+						return Response.json(data.setup ?? [], { headers })
 					}
 					return Response.json(repo.setupSteps ?? [], { headers })
 				}
@@ -425,7 +432,7 @@ export async function startServer(port: number) {
 					if (typeof repo === 'string') {
 						return Response.json({ error: repo }, { status: 400, headers })
 					}
-					return Response.json(repo, { headers })
+					return Response.json(withSetupFile(repo), { headers })
 				}
 
 				if (path === '/sessions' && method === 'GET') {

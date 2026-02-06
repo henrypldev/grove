@@ -146,15 +146,17 @@ The Mac app provides a JSON view of your configured steps that you can copy and 
 | `setup` | array | List of setup steps to run in order |
 | `setup[].name` | string | Display name shown in the UI |
 | `setup[].run` | string | Shell command to execute |
+| `setup[].background` | boolean | If `true`, the step starts but doesn't block — the next step begins immediately |
 
 ### Behavior
 
 - Steps run sequentially in the worktree directory
 - Each step streams output in real-time to the UI
-- Each step shows status: pending, running, done, or failed
+- Each step shows status: pending, running, done, failed, or stopped
 - If a step fails, subsequent steps are skipped
 - You can cancel running steps or retry failed ones from the UI
 - Output from each step is viewable in the setup inspector
+- **Background steps** start but don't block — the runner immediately moves to the next step. This is useful for long-running processes like dev servers that never exit on their own. Background steps can be individually stopped and restarted from the UI.
 
 ### Priority
 
@@ -181,6 +183,31 @@ The Mac app provides a JSON view of your configured steps that you can copy and 
     {
       "name": "Build iOS",
       "run": "npx expo run:ios"
+    }
+  ]
+}
+```
+
+### Example with background steps
+
+For monorepo setups where you need multiple dev servers running concurrently:
+
+```json
+{
+  "setup": [
+    {
+      "name": "Install dependencies",
+      "run": "bun install"
+    },
+    {
+      "name": "Web server",
+      "run": "bun run web",
+      "background": true
+    },
+    {
+      "name": "React Native server",
+      "run": "bun run native",
+      "background": true
     }
   ]
 }

@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import pkg from '../package.json'
 import {
 	cloneRepo,
@@ -270,6 +272,11 @@ export async function startServer(port: number) {
 							{ error: 'Repo not found' },
 							{ status: 404, headers },
 						)
+					}
+					const setupFile = join(repo.path, '.grove', 'setup.json')
+					if (existsSync(setupFile)) {
+						const data = await Bun.file(setupFile).json()
+						return Response.json(data.setup ?? [], { headers })
 					}
 					return Response.json(repo.setupSteps ?? [], { headers })
 				}

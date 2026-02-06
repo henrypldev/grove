@@ -1,3 +1,10 @@
 {
-	"setup": [{ "name": "Install dependencies", "run": "bun install" }]
+	"setup": [
+		{ "name": "Install dependencies", "run": "bun install" },
+		{ "name": "Dev server", "run": "bun dev" },
+		{
+			"name": "Tailscale funnel 4002",
+			"run": "tailscale funnel --bg --set-path grove 4002"
+		}
+	]
 }

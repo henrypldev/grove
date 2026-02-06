@@ -367,6 +367,42 @@ export async function startServer(port: number) {
 					return Response.json(repo.setupSteps ?? [], { headers })
 				}
 
+				const setupReorderMatch = matchRoute(path, '/repos/:id/setup/reorder')
+				if (setupReorderMatch && method === 'PATCH') {
+					const config = await loadConfig()
+					const repo = config.repos.find(r => r.id === setupReorderMatch.id)
+					if (!repo) {
+						return Response.json(
+							{ error: 'Repo not found' },
+							{ status: 404, headers },
+						)
+					}
+					const body = await req.json()
+					if (!Array.isArray(body.order)) {
+						return Response.json(
+							{ error: 'Missing order array' },
+							{ status: 400, headers },
+						)
+					}
+					const steps = repo.setupSteps ?? []
+					if (
+						body.order.length !== steps.length ||
+						![...body.order]
+							.sort((a: number, b: number) => a - b)
+							.every((v: number, i: number) => v === i)
+					) {
+						return Response.json(
+							{
+								error: 'order must be a permutation of current indices',
+							},
+							{ status: 400, headers },
+						)
+					}
+					repo.setupSteps = body.order.map((i: number) => steps[i])
+					await saveConfig(config)
+					return Response.json(repo.setupSteps, { headers })
+				}
+
 				const orgReposMatch = matchRoute(path, '/github/repos/orgs/:org')
 				if (orgReposMatch && method === 'GET') {
 					return Response.json(

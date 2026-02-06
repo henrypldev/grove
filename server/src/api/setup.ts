@@ -30,6 +30,7 @@ function broadcastStep(
 	name: string,
 	status: string,
 	output?: string,
+	background?: boolean,
 ) {
 	const event: Record<string, unknown> = {
 		type: 'setup_progress',
@@ -39,6 +40,7 @@ function broadcastStep(
 		status,
 	}
 	if (output !== undefined) event.output = output
+	if (background) event.background = true
 	broadcastSSE(`data: ${JSON.stringify(event)}\n\n`)
 }
 
@@ -115,6 +117,7 @@ function monitorBackground(
 				step.name,
 				'done',
 				step.output || undefined,
+				step.background,
 			)
 		} else {
 			step.status = 'failed'
@@ -128,6 +131,7 @@ function monitorBackground(
 				step.name,
 				'failed',
 				step.output || undefined,
+				step.background,
 			)
 		}
 	})
@@ -143,7 +147,14 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 		log('setup', `step ${i} running: ${step.name}`, {
 			sessionId: setup.sessionId,
 		})
-		broadcastStep(setup.sessionId, i, step.name, 'running')
+		broadcastStep(
+			setup.sessionId,
+			i,
+			step.name,
+			'running',
+			undefined,
+			step.background,
+		)
 
 		const proc = spawnStep(setup, i)
 
@@ -165,14 +176,28 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 			log('setup', `step ${i} done: ${step.name}`, {
 				sessionId: setup.sessionId,
 			})
-			broadcastStep(setup.sessionId, i, step.name, 'done', output)
+			broadcastStep(
+				setup.sessionId,
+				i,
+				step.name,
+				'done',
+				output,
+				step.background,
+			)
 		} else {
 			step.status = 'failed'
 			log('setup', `step ${i} failed: ${step.name}`, {
 				sessionId: setup.sessionId,
 				exitCode: proc.exitCode,
 			})
-			broadcastStep(setup.sessionId, i, step.name, 'failed', output)
+			broadcastStep(
+				setup.sessionId,
+				i,
+				step.name,
+				'failed',
+				output,
+				step.background,
+			)
 			return
 		}
 	}
@@ -282,6 +307,7 @@ export function cancelSetup(sessionId: string) {
 				step.name,
 				'stopped',
 				step.output || undefined,
+				step.background,
 			)
 		}
 	}
@@ -322,6 +348,7 @@ export function stopStep(sessionId: string, stepIndex: number): string | null {
 		step.name,
 		'stopped',
 		step.output || undefined,
+		step.background,
 	)
 	return null
 }
@@ -338,7 +365,14 @@ export function startStep(sessionId: string, stepIndex: number): string | null {
 	step.status = 'running'
 	step.output = ''
 	log('setup', `step ${stepIndex} restarting: ${step.name}`, { sessionId })
-	broadcastStep(sessionId, stepIndex, step.name, 'running')
+	broadcastStep(
+		sessionId,
+		stepIndex,
+		step.name,
+		'running',
+		undefined,
+		step.background,
+	)
 
 	const proc = spawnStep(setup, stepIndex)
 	monitorBackground(setup, stepIndex, proc)
@@ -356,6 +390,7 @@ export function broadcastAllSetupStates() {
 				step.name,
 				step.status,
 				step.output || undefined,
+				step.background,
 			)
 		}
 	}

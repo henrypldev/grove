@@ -4,6 +4,7 @@ Server and CLI for managing Git repositories and terminal sessions from your pho
 
 ## Requirements
 
+- macOS
 - [Bun](https://bun.sh)
 - [Tailscale](https://tailscale.com) with Funnel enabled
 - [ttyd](https://github.com/tsl0922/ttyd) - `brew install ttyd`
@@ -26,6 +27,66 @@ cd grove
 bun install
 ```
 
+## Tailscale Setup
+
+Grove uses [Tailscale](https://tailscale.com) to securely connect your phone to your dev machine. Both devices must be on the same Tailscale network (tailnet). Only devices in your tailnet can access Grove — no ports are exposed to the public internet.
+
+### 1. Create a Tailscale account
+
+Sign up at [login.tailscale.com](https://login.tailscale.com) if you don't have an account.
+
+### 2. Install Tailscale on your Mac (server machine)
+
+```bash
+brew install --cask tailscale
+```
+
+Open the Tailscale app and sign in. Verify it's running:
+
+```bash
+tailscale status
+```
+
+You should see your machine listed with a `100.x.x.x` IP address.
+
+### 3. Install Tailscale on your phone
+
+Download [Tailscale from the App Store](https://apps.apple.com/app/tailscale/id1470499037) and sign in with the **same account** you used on your Mac. Both devices must be on the same tailnet.
+
+### 4. Enable HTTPS Certificates
+
+Go to the [DNS page](https://login.tailscale.com/admin/dns) in the admin console. Enable **MagicDNS** if it isn't already on, then under **HTTPS Certificates**, click **Enable HTTPS**. Grove uses these certificates to serve terminal sessions over secure HTTPS connections.
+
+### 5. Enable Funnel
+
+The first time you run `grove start`, it runs `tailscale funnel` which will prompt you to approve Funnel for your tailnet. You can also enable it manually in the [Access controls page](https://login.tailscale.com/admin/acls) — expand the **Funnel** section and click **Add Funnel to policy**. Grove uses Funnel to expose its API endpoint so the mobile app can reach your server.
+
+### 6. Verify the connection
+
+On your phone, open the Tailscale app and confirm it shows **Connected**. You should see your Mac listed as a peer. On your Mac, run:
+
+```bash
+tailscale status
+```
+
+Both your Mac and phone should appear in the output.
+
+### How Grove uses Tailscale
+
+- **API access**: Grove sets up a Tailscale Funnel at `https://<your-machine>.tail-net.ts.net/grove` so the mobile app can reach the server.
+- **Terminal sessions**: Each session runs on its own HTTPS port using Tailscale certificates, accessible at `https://<your-machine>.tail-net.ts.net:<port>`.
+- **Authentication**: Only devices on your tailnet can connect. No passwords or API keys needed — Tailscale handles identity.
+
+### Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `grove start` says Tailscale isn't running | Open the Tailscale app on your Mac, or run `open -a Tailscale` |
+| Can't see sessions from phone | Make sure Tailscale is **connected** on your phone (not just installed) and you're signed into the **same account** |
+| Funnel setup fails | Check that Funnel is enabled in the [Access controls page](https://login.tailscale.com/admin/acls) under the Funnel section |
+| Certificate errors | Ensure MagicDNS and HTTPS are both enabled on the [DNS page](https://login.tailscale.com/admin/dns). Test with `tailscale cert <your-hostname>` |
+| Phone shows "unable to connect" | Verify both devices appear in `tailscale status`. Try toggling Tailscale off/on on your phone |
+
 ## Usage
 
 ### Start the server
@@ -43,7 +104,7 @@ grove stop               # Stop background server
 grove run claude     # Run Claude Code in a tmux+ttyd session accessible over Tailscale
 ```
 
-This launches the command in the current directory, sets up a secure terminal session, and prints the HTTPS URL you can open from your phone.
+This launches the command in the current directory, sets up a secure terminal session, and prints the HTTPS URL you can open from your phone (both devices must be on the same tailnet).
 
 ### CLI Options
 
@@ -55,10 +116,10 @@ This launches the command in the current directory, sets up a secure terminal se
 
 ## How it works
 
-1. **grove CLI** starts the server and sets up a Tailscale Funnel for external access
+1. **grove CLI** starts the server and sets up a Tailscale Funnel for API access
 2. **grove server** exposes a REST API for managing repos, worktrees, and terminal sessions
-3. **Terminal sessions** are tmux sessions running Claude Code, served via ttyd over HTTPS
-4. **Grove mobile app** (separate repo) connects to the server to create and manage sessions
+3. **Terminal sessions** are tmux sessions running Claude Code, served via ttyd over HTTPS using Tailscale certificates
+4. **Grove mobile app** connects to the server over your tailnet to create and manage sessions
 
 ## API Endpoints
 

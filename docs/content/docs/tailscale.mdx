@@ -1,0 +1,128 @@
+---
+title: Tailscale Setup
+description: Set up Tailscale so your phone can securely connect to Grove on your Mac.
+---
+
+Grove uses [Tailscale](https://tailscale.com) to securely connect your phone to your dev machine. Both devices must be on the same Tailscale network (tailnet). Only devices in your tailnet can access Grove — no ports are exposed to the public internet.
+
+## 1. Create a Tailscale account
+
+Sign up at [login.tailscale.com](https://login.tailscale.com) if you don't have an account. The free plan (Personal) works fine for Grove.
+
+## 2. Install Tailscale on your Mac
+
+```bash
+brew install --cask tailscale
+```
+
+Open the Tailscale app and sign in. Verify it's running:
+
+```bash
+tailscale status
+```
+
+You should see your machine listed with a `100.x.x.x` IP address and a hostname like `your-machine.tail-net.ts.net`.
+
+## 3. Install Tailscale on your phone
+
+Download [Tailscale from the App Store](https://apps.apple.com/app/tailscale/id1470499037) and sign in with the **same account** you used on your Mac.
+
+<Callout type="warn">
+Both your Mac and phone must be signed into the same Tailscale account. If they're on different accounts, they're on different tailnets and can't see each other.
+</Callout>
+
+## 4. Enable HTTPS Certificates
+
+1. Go to the [DNS page](https://login.tailscale.com/admin/dns) in the Tailscale admin console
+2. Enable **MagicDNS** if it isn't already on
+3. Under **HTTPS Certificates**, click **Enable HTTPS**
+4. Acknowledge that your machine names will appear on a public certificate transparency ledger
+
+Grove uses these certificates to serve terminal sessions over secure HTTPS connections.
+
+## 5. Enable Funnel
+
+The first time you run `grove start`, it runs `tailscale funnel` which will prompt you to approve Funnel for your tailnet. Approve it and you're done.
+
+If you want to enable Funnel manually ahead of time:
+
+1. Go to the [Access controls page](https://login.tailscale.com/admin/acls) in the admin console
+2. Expand the **Funnel** section
+3. Click **Add Funnel to policy**
+
+Grove uses Funnel to expose its API endpoint so the mobile app can reach your server.
+
+## 6. Verify the connection
+
+On your phone, open the Tailscale app and confirm it shows **Connected**. You should see your Mac listed as a peer.
+
+On your Mac, run:
+
+```bash
+tailscale status
+```
+
+Both your Mac and phone should appear in the output. If they do, you're ready to run `grove start`.
+
+## How Grove uses Tailscale
+
+Grove uses two Tailscale features:
+
+| Feature | What it does | Used for |
+|---------|-------------|----------|
+| **Funnel** | Exposes a path on your Tailscale hostname over HTTPS | The Grove API at `https://<your-machine>.tail-net.ts.net/grove` |
+| **TLS Certificates** | Auto-generated certs for your Tailscale hostname | Terminal sessions at `https://<your-machine>.tail-net.ts.net:<port>` |
+
+When you run `grove start`, it automatically:
+1. Gets your Tailscale hostname and IP
+2. Sets up a Funnel at the `/grove` path for the API
+3. Generates TLS certificates (cached in `~/.config/grove/certs/`)
+
+When a terminal session starts, it launches ttyd on its own HTTPS port using those certificates.
+
+**Authentication** is handled by Tailscale itself — only devices on your tailnet can connect. No passwords or API keys needed.
+
+## Troubleshooting
+
+### "Tailscale is not running"
+
+Open the Tailscale app on your Mac:
+
+```bash
+open -a Tailscale
+```
+
+Then verify with `tailscale status`.
+
+### Can't see sessions from phone
+
+This is the most common issue. Check all of these:
+
+1. **Tailscale is connected on your phone** — open the Tailscale app and make sure it says Connected, not Disconnected
+2. **Same account** — both devices must be on the same Tailscale account
+3. **Both devices appear in `tailscale status`** — run this on your Mac and confirm your phone is listed
+
+### Funnel setup fails
+
+Make sure Funnel is enabled in your tailnet policy. Go to the [Access controls page](https://login.tailscale.com/admin/acls), expand the **Funnel** section, and click **Add Funnel to policy** if it hasn't been added. Then restart Grove:
+
+```bash
+grove stop
+grove start
+```
+
+### Certificate errors
+
+Verify that MagicDNS and HTTPS certificates are both enabled on the [DNS page](https://login.tailscale.com/admin/dns). You can test cert generation manually:
+
+```bash
+tailscale cert your-machine.tail-net.ts.net
+```
+
+Replace `your-machine.tail-net.ts.net` with your actual Tailscale hostname (shown in `tailscale status`).
+
+### Phone shows "unable to connect"
+
+1. Toggle Tailscale off and on again on your phone
+2. Make sure your Mac isn't asleep — terminal sessions run on your Mac and it needs to be awake
+3. Check that the Grove server is still running (`grove start` in a terminal, or check the background process)

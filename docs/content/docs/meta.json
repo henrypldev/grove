@@ -1,4 +1,4 @@
 {
 	"title": "Grove",
-	"pages": ["---Getting Started---", "index", "---Reference---", "cli", "configuration"]
+	"pages": ["---Getting Started---", "index", "tailscale", "---Reference---", "cli", "configuration"]
 }

@@ -34,14 +34,7 @@ if (initial.passed) {
 	process.exit(0)
 }
 
-console.log('Starting agent loop...\n')
-
-let iteration = 0
-const maxIterations = 5
-
-try {
-	for await (const message of query({
-	prompt: `You are an engineering orchestrator. Your goal is to make all tests in \`agent-test/\` pass.
+const prompt = `You are an engineering orchestrator. Your goal is to make all tests in \`agent-test/\` pass.
 
 Failing tests:
 ${initial.output}
@@ -60,8 +53,18 @@ Use the Task tool to delegate work through this hierarchy:
 4. Team Lead spawns a Reviewer agent — reads diffs and confirms correctness
 5. Team Lead spawns a QA agent — runs \`bun test agent-test/\` and reports results
 
-Working directory: ${serverDir}`,
-	options: {
+Working directory: ${serverDir}`
+
+console.log('Starting agent loop...\n')
+console.log('[prompt]', prompt, '\n')
+
+let iteration = 0
+const maxIterations = 5
+
+try {
+	for await (const message of query({
+		prompt,
+		options: {
 		cwd: serverDir,
 		permissionMode: 'bypassPermissions',
 		maxBudgetUsd: 20,

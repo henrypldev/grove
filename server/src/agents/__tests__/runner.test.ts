@@ -1,13 +1,12 @@
-import { beforeEach, describe, expect, spyOn, test } from 'bun:test'
+import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import { makeTestDb } from '../../db/__tests__/helpers'
 import { dbGetAgent, dbInsertAgent } from '../../db/agents'
 import { dbInsertRepo } from '../../db/repos'
 import { dbInsertTeam } from '../../db/teams'
 
-spyOn(Bun, 'spawn').mockReturnValue({
-	stdout: (async function* () {})(),
-	exited: Promise.resolve(0),
-} as unknown as ReturnType<typeof Bun.spawn>)
+mock.module('@anthropic-ai/claude-agent-sdk', () => ({
+	query: async function* () {},
+}))
 
 const { spawnAgent, respawnAgent } = await import('../runner')
 

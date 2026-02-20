@@ -39,7 +39,8 @@ console.log('Starting agent loop...\n')
 let iteration = 0
 const maxIterations = 5
 
-try { for await (const message of query({
+try {
+	for await (const message of query({
 	prompt: `You are an engineering orchestrator. Your goal is to make all tests in \`agent-test/\` pass.
 
 Failing tests:
@@ -142,6 +143,7 @@ Working directory: ${serverDir}`,
 		default:
 			break
 	}
-}) } finally {
+	}
+} finally {
 	await resetTestEnv()
 }

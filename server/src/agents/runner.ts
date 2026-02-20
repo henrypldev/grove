@@ -57,7 +57,12 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 				permissionMode: 'bypassPermissions',
 			},
 		})) {
-			dbInsertEvent(agent.teamId, agent.id, `sdk:${message.type}`, message as Record<string, unknown>)
+			dbInsertEvent(
+				agent.teamId,
+				agent.id,
+				`sdk:${message.type}`,
+				message as Record<string, unknown>,
+			)
 
 			if (message.type === 'system' && message.subtype === 'init') {
 				dbUpdateAgentSessionId(agent.id, message.session_id)

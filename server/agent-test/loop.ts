@@ -6,15 +6,15 @@ const projectRoot = path.resolve(serverDir, '..')
 
 async function resetTestEnv() {
 	const proc = Bun.spawn(
-		['git', 'restore', 'server/test-env/buggy/', 'server/test-env/feature/'],
+		['git', 'restore', 'server/agent-test/buggy/', 'server/agent-test/feature/'],
 		{ cwd: projectRoot, stdout: 'inherit', stderr: 'inherit' },
 	)
 	await proc.exited
-	console.log('[reset] test-env source files restored')
+	console.log('[reset] agent-test source files restored')
 }
 
 async function runTests(): Promise<{ passed: boolean; output: string }> {
-	const proc = Bun.spawn(['bun', 'test', 'test-env/'], {
+	const proc = Bun.spawn(['bun', 'test', 'agent-test/'], {
 		cwd: serverDir,
 		stdout: 'pipe',
 		stderr: 'pipe',
@@ -40,24 +40,24 @@ let iteration = 0
 const maxIterations = 5
 
 try { for await (const message of query({
-	prompt: `You are an engineering orchestrator. Your goal is to make all tests in \`test-env/\` pass.
+	prompt: `You are an engineering orchestrator. Your goal is to make all tests in \`agent-test/\` pass.
 
 Failing tests:
 ${initial.output}
 
 Source files to fix (do NOT modify *.test.ts files):
-- test-env/buggy/stats.ts
-- test-env/buggy/cache.ts
-- test-env/buggy/queue.ts
-- test-env/buggy/client.ts
-- test-env/feature/rate-limiter.ts
+- agent-test/buggy/stats.ts
+- agent-test/buggy/cache.ts
+- agent-test/buggy/queue.ts
+- agent-test/buggy/client.ts
+- agent-test/feature/rate-limiter.ts
 
 Use the Task tool to delegate work through this hierarchy:
 1. Spawn a PM agent — reads all failing tests and source files, produces a fix plan per file
 2. PM spawns a Team Lead — assigns one developer agent per file to implement the fixes
 3. Each developer agent fixes exactly one file based on the plan
 4. Team Lead spawns a Reviewer agent — reads diffs and confirms correctness
-5. Team Lead spawns a QA agent — runs \`bun test test-env/\` and reports results
+5. Team Lead spawns a QA agent — runs \`bun test agent-test/\` and reports results
 
 Working directory: ${serverDir}`,
 	options: {

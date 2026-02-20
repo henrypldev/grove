@@ -11,9 +11,34 @@ import { dbInsertRepo } from '../repos'
 import { dbInsertTeam } from '../teams'
 import { makeTestDb } from './helpers'
 
-const REPO = { id: 'r1', name: 'repo', path: '/tmp/repo', envVars: undefined, setupSteps: undefined }
-const TEAM = { id: 't1', repoId: 'r1', worktreePath: '/tmp/wt', task: 'task', status: 'planning' as const, pmSummary: null, createdAt: 1000, updatedAt: 1000 }
-const AGENT = { id: 'a1', teamId: 't1', role: 'dev' as const, status: 'working' as const, currentTask: 'coding', sessionId: null, retryCount: 0, spawnedAt: 1000, updatedAt: 1000 }
+const REPO = {
+	id: 'r1',
+	name: 'repo',
+	path: '/tmp/repo',
+	envVars: undefined,
+	setupSteps: undefined,
+}
+const TEAM = {
+	id: 't1',
+	repoId: 'r1',
+	worktreePath: '/tmp/wt',
+	task: 'task',
+	status: 'planning' as const,
+	pmSummary: null,
+	createdAt: 1000,
+	updatedAt: 1000,
+}
+const AGENT = {
+	id: 'a1',
+	teamId: 't1',
+	role: 'dev' as const,
+	status: 'working' as const,
+	currentTask: 'coding',
+	sessionId: null,
+	retryCount: 0,
+	spawnedAt: 1000,
+	updatedAt: 1000,
+}
 
 describe('db/agents', () => {
 	beforeEach(() => {

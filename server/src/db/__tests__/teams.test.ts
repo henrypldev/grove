@@ -10,7 +10,13 @@ import {
 } from '../teams'
 import { makeTestDb } from './helpers'
 
-const REPO = { id: 'r1', name: 'repo', path: '/tmp/repo', envVars: undefined, setupSteps: undefined }
+const REPO = {
+	id: 'r1',
+	name: 'repo',
+	path: '/tmp/repo',
+	envVars: undefined,
+	setupSteps: undefined,
+}
 const TEAM = {
 	id: 't1',
 	repoId: 'r1',
@@ -47,7 +53,13 @@ describe('db/teams', () => {
 	})
 
 	test('listByRepo filters correctly', () => {
-		dbInsertRepo({ id: 'r2', name: 'r2', path: '/tmp/r2', envVars: undefined, setupSteps: undefined })
+		dbInsertRepo({
+			id: 'r2',
+			name: 'r2',
+			path: '/tmp/r2',
+			envVars: undefined,
+			setupSteps: undefined,
+		})
 		dbInsertTeam(TEAM)
 		dbInsertTeam({ ...TEAM, id: 't2', repoId: 'r2' })
 		expect(dbListTeamsByRepo('r1')).toHaveLength(1)

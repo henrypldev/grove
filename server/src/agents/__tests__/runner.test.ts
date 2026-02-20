@@ -11,8 +11,23 @@ spyOn(Bun, 'spawn').mockReturnValue({
 
 const { spawnAgent, respawnAgent } = await import('../runner')
 
-const REPO = { id: 'r1', name: 'repo', path: '/p', envVars: undefined, setupSteps: undefined }
-const TEAM = { id: 't1', repoId: 'r1', worktreePath: '/wt', task: 'x', status: 'planning' as const, pmSummary: null, createdAt: 1000, updatedAt: 1000 }
+const REPO = {
+	id: 'r1',
+	name: 'repo',
+	path: '/p',
+	envVars: undefined,
+	setupSteps: undefined,
+}
+const TEAM = {
+	id: 't1',
+	repoId: 'r1',
+	worktreePath: '/wt',
+	task: 'x',
+	status: 'planning' as const,
+	pmSummary: null,
+	createdAt: 1000,
+	updatedAt: 1000,
+}
 
 describe('agent/runner', () => {
 	beforeEach(() => {
@@ -41,13 +56,33 @@ describe('agent/runner', () => {
 	})
 
 	test('respawnAgent returns false after max retries', async () => {
-		dbInsertAgent({ id: 'a1', teamId: 't1', role: 'dev', status: 'error', currentTask: null, sessionId: null, retryCount: 3, spawnedAt: 1000, updatedAt: 1000 })
+		dbInsertAgent({
+			id: 'a1',
+			teamId: 't1',
+			role: 'dev',
+			status: 'error',
+			currentTask: null,
+			sessionId: null,
+			retryCount: 3,
+			spawnedAt: 1000,
+			updatedAt: 1000,
+		})
 		const result = await respawnAgent('a1', 'retry', '/wt')
 		expect(result).toBe(false)
 	})
 
 	test('respawnAgent returns true and increments retry for valid agent', async () => {
-		dbInsertAgent({ id: 'a2', teamId: 't1', role: 'dev', status: 'error', currentTask: null, sessionId: null, retryCount: 0, spawnedAt: 1000, updatedAt: 1000 })
+		dbInsertAgent({
+			id: 'a2',
+			teamId: 't1',
+			role: 'dev',
+			status: 'error',
+			currentTask: null,
+			sessionId: null,
+			retryCount: 0,
+			spawnedAt: 1000,
+			updatedAt: 1000,
+		})
 		const result = await respawnAgent('a2', 'retry', '/wt')
 		expect(result).toBe(true)
 		expect(dbGetAgent('a2')?.retryCount).toBe(1)

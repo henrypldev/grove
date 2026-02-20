@@ -10,9 +10,34 @@ import { dbInsertRepo } from '../repos'
 import { dbInsertTeam } from '../teams'
 import { makeTestDb } from './helpers'
 
-const REPO = { id: 'r1', name: 'repo', path: '/tmp/repo', envVars: undefined, setupSteps: undefined }
-const TEAM = { id: 't1', repoId: 'r1', worktreePath: '/tmp/wt', task: 'task', status: 'planning' as const, pmSummary: null, createdAt: 1000, updatedAt: 1000 }
-const AGENT = { id: 'a1', teamId: 't1', role: 'dev' as const, status: 'working' as const, currentTask: null, sessionId: null, retryCount: 0, spawnedAt: 1000, updatedAt: 1000 }
+const REPO = {
+	id: 'r1',
+	name: 'repo',
+	path: '/tmp/repo',
+	envVars: undefined,
+	setupSteps: undefined,
+}
+const TEAM = {
+	id: 't1',
+	repoId: 'r1',
+	worktreePath: '/tmp/wt',
+	task: 'task',
+	status: 'planning' as const,
+	pmSummary: null,
+	createdAt: 1000,
+	updatedAt: 1000,
+}
+const AGENT = {
+	id: 'a1',
+	teamId: 't1',
+	role: 'dev' as const,
+	status: 'working' as const,
+	currentTask: null,
+	sessionId: null,
+	retryCount: 0,
+	spawnedAt: 1000,
+	updatedAt: 1000,
+}
 
 describe('db/events', () => {
 	beforeEach(() => {
@@ -60,9 +85,34 @@ describe('db/events', () => {
 	})
 
 	test('listEventsSince filters by team', () => {
-		dbInsertRepo({ id: 'r2', name: 'r2', path: '/r2', envVars: undefined, setupSteps: undefined })
-		dbInsertTeam({ id: 't2', repoId: 'r2', worktreePath: '/wt2', task: 't', status: 'planning', pmSummary: null, createdAt: 1000, updatedAt: 1000 })
-		dbInsertAgent({ id: 'a2', teamId: 't2', role: 'dev', status: 'working', currentTask: null, sessionId: null, retryCount: 0, spawnedAt: 1000, updatedAt: 1000 })
+		dbInsertRepo({
+			id: 'r2',
+			name: 'r2',
+			path: '/r2',
+			envVars: undefined,
+			setupSteps: undefined,
+		})
+		dbInsertTeam({
+			id: 't2',
+			repoId: 'r2',
+			worktreePath: '/wt2',
+			task: 't',
+			status: 'planning',
+			pmSummary: null,
+			createdAt: 1000,
+			updatedAt: 1000,
+		})
+		dbInsertAgent({
+			id: 'a2',
+			teamId: 't2',
+			role: 'dev',
+			status: 'working',
+			currentTask: null,
+			sessionId: null,
+			retryCount: 0,
+			spawnedAt: 1000,
+			updatedAt: 1000,
+		})
 		dbInsertEvent('t1', 'a1', 'for-t1', {})
 		dbInsertEvent('t2', 'a2', 'for-t2', {})
 		expect(dbListEventsSince('t1', 0)).toHaveLength(1)

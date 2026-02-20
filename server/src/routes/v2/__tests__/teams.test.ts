@@ -25,7 +25,13 @@ function makeUrl(path: string, search = ''): URL {
 
 const headers = {}
 
-const REPO = { id: 'r1', name: 'repo', path: '/p', envVars: undefined, setupSteps: undefined }
+const REPO = {
+	id: 'r1',
+	name: 'repo',
+	path: '/p',
+	envVars: undefined,
+	setupSteps: undefined,
+}
 
 describe('handleV2Teams', () => {
 	beforeEach(() => {
@@ -35,7 +41,11 @@ describe('handleV2Teams', () => {
 	})
 
 	test('GET /v2/teams returns empty', async () => {
-		const res = await handleV2Teams(makeReq('GET'), makeUrl('/v2/teams'), headers)
+		const res = await handleV2Teams(
+			makeReq('GET'),
+			makeUrl('/v2/teams'),
+			headers,
+		)
 		expect(await res?.json()).toEqual([])
 	})
 
@@ -71,40 +81,104 @@ describe('handleV2Teams', () => {
 	})
 
 	test('GET /v2/teams/:id returns team with agents', async () => {
-		dbInsertTeam({ id: 't1', repoId: 'r1', worktreePath: '/wt', task: 'x', status: 'planning', pmSummary: null, createdAt: 1000, updatedAt: 1000 })
-		const res = await handleV2Teams(makeReq('GET'), makeUrl('/v2/teams/t1'), headers)
+		dbInsertTeam({
+			id: 't1',
+			repoId: 'r1',
+			worktreePath: '/wt',
+			task: 'x',
+			status: 'planning',
+			pmSummary: null,
+			createdAt: 1000,
+			updatedAt: 1000,
+		})
+		const res = await handleV2Teams(
+			makeReq('GET'),
+			makeUrl('/v2/teams/t1'),
+			headers,
+		)
 		const body = await res?.json()
 		expect(body.id).toBe('t1')
 		expect(Array.isArray(body.agents)).toBe(true)
 	})
 
 	test('GET /v2/teams/:id non-existent returns 404', async () => {
-		const res = await handleV2Teams(makeReq('GET'), makeUrl('/v2/teams/nope'), headers)
+		const res = await handleV2Teams(
+			makeReq('GET'),
+			makeUrl('/v2/teams/nope'),
+			headers,
+		)
 		expect(res?.status).toBe(404)
 	})
 
 	test('DELETE /v2/teams/:id archives team', async () => {
-		dbInsertTeam({ id: 't1', repoId: 'r1', worktreePath: '/wt', task: 'x', status: 'planning', pmSummary: null, createdAt: 1000, updatedAt: 1000 })
-		const res = await handleV2Teams(makeReq('DELETE'), makeUrl('/v2/teams/t1'), headers)
-		expect((await res?.json()).success).toBe(true)
+		dbInsertTeam({
+			id: 't1',
+			repoId: 'r1',
+			worktreePath: '/wt',
+			task: 'x',
+			status: 'planning',
+			pmSummary: null,
+			createdAt: 1000,
+			updatedAt: 1000,
+		})
+		const res = await handleV2Teams(
+			makeReq('DELETE'),
+			makeUrl('/v2/teams/t1'),
+			headers,
+		)
+		const body = await res?.json()
+		expect(body.success).toBe(true)
 	})
 
 	test('GET /v2/teams/:id/agents lists agents', async () => {
-		dbInsertTeam({ id: 't1', repoId: 'r1', worktreePath: '/wt', task: 'x', status: 'planning', pmSummary: null, createdAt: 1000, updatedAt: 1000 })
-		dbInsertAgent({ id: 'a1', teamId: 't1', role: 'dev', status: 'working', currentTask: null, sessionId: null, retryCount: 0, spawnedAt: 1000, updatedAt: 1000 })
-		const res = await handleV2Teams(makeReq('GET'), makeUrl('/v2/teams/t1/agents'), headers)
-		expect((await res?.json())).toHaveLength(1)
+		dbInsertTeam({
+			id: 't1',
+			repoId: 'r1',
+			worktreePath: '/wt',
+			task: 'x',
+			status: 'planning',
+			pmSummary: null,
+			createdAt: 1000,
+			updatedAt: 1000,
+		})
+		dbInsertAgent({
+			id: 'a1',
+			teamId: 't1',
+			role: 'dev',
+			status: 'working',
+			currentTask: null,
+			sessionId: null,
+			retryCount: 0,
+			spawnedAt: 1000,
+			updatedAt: 1000,
+		})
+		const res = await handleV2Teams(
+			makeReq('GET'),
+			makeUrl('/v2/teams/t1/agents'),
+			headers,
+		)
+		expect(await res?.json()).toHaveLength(1)
 	})
 
 	test('GET /v2/teams/:id/events filters by since', async () => {
-		const res = await handleV2Teams(makeReq('GET'), makeUrl('/v2/teams/t1/events', '?since=0'), headers)
+		const res = await handleV2Teams(
+			makeReq('GET'),
+			makeUrl('/v2/teams/t1/events', '?since=0'),
+			headers,
+		)
 		expect(await res?.json()).toEqual([])
 	})
 
 	test('onTeamCreated hook fires on POST', async () => {
 		let fired = false
-		setTeamCreatedHook(async () => { fired = true })
-		await handleV2Teams(makeReq('POST', { repoId: 'r1', task: 'x' }), makeUrl('/v2/teams'), headers)
+		setTeamCreatedHook(async () => {
+			fired = true
+		})
+		await handleV2Teams(
+			makeReq('POST', { repoId: 'r1', task: 'x' }),
+			makeUrl('/v2/teams'),
+			headers,
+		)
 		expect(fired).toBe(true)
 	})
 })

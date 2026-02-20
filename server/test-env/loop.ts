@@ -2,6 +2,16 @@ import { query } from '@anthropic-ai/claude-agent-sdk'
 import path from 'path'
 
 const serverDir = path.resolve(import.meta.dir, '..')
+const projectRoot = path.resolve(serverDir, '..')
+
+async function resetTestEnv() {
+	const proc = Bun.spawn(
+		['git', 'restore', 'server/test-env/buggy/', 'server/test-env/feature/'],
+		{ cwd: projectRoot, stdout: 'inherit', stderr: 'inherit' },
+	)
+	await proc.exited
+	console.log('[reset] test-env source files restored')
+}
 
 async function runTests(): Promise<{ passed: boolean; output: string }> {
 	const proc = Bun.spawn(['bun', 'test', 'test-env/'], {
@@ -29,7 +39,7 @@ console.log('Starting agent loop...\n')
 let iteration = 0
 const maxIterations = 5
 
-for await (const message of query({
+try { for await (const message of query({
 	prompt: `You are an engineering orchestrator. Your goal is to make all tests in \`test-env/\` pass.
 
 Failing tests:
@@ -132,4 +142,6 @@ Working directory: ${serverDir}`,
 		default:
 			break
 	}
+}) } finally {
+	await resetTestEnv()
 }

@@ -85,7 +85,7 @@ Working directory: ${serverDir}`,
 	},
 })) {
 	if (message.type === 'assistant') {
-		for (const block of message.content) {
+		for (const block of message.message.content) {
 			if (block.type === 'text') process.stdout.write(block.text)
 		}
 	}

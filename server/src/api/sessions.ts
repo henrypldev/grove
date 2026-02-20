@@ -52,7 +52,12 @@ function stopPushCheckInterval() {
 async function checkAndSendPushNotifications() {
 	const now = Date.now()
 	for (const [sessionId, startTime] of waitingSince) {
-		if (now - startTime >= PUSH_DELAY_MS && !notifiedSessions.has(sessionId) && !focusedSessions.has(sessionId) && !appFocused) {
+		if (
+			now - startTime >= PUSH_DELAY_MS &&
+			!notifiedSessions.has(sessionId) &&
+			!focusedSessions.has(sessionId) &&
+			!appFocused
+		) {
 			notifiedSessions.add(sessionId)
 			const sessions = await getSessions()
 			const session = sessions.find(s => s.id === sessionId)

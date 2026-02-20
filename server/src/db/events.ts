@@ -22,21 +22,31 @@ export function dbInsertEvent(
 	}
 }
 
-export function dbListEventsSince(teamId: string, since: number, limit = 200): TeamEvent[] {
-	return getDb().query<TeamEvent, [string, number, number]>(
-		'SELECT * FROM events WHERE team_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT ?',
-	).all(teamId, since, limit)
+export function dbListEventsSince(
+	teamId: string,
+	since: number,
+	limit = 200,
+): TeamEvent[] {
+	return getDb()
+		.query<TeamEvent, [string, number, number]>(
+			'SELECT * FROM events WHERE team_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT ?',
+		)
+		.all(teamId, since, limit)
 }
 
 export function dbGetLatestEventId(): number {
-	const row = getDb().query<{ id: number | null }, []>('SELECT MAX(id) as id FROM events').get()
+	const row = getDb()
+		.query<{ id: number | null }, []>('SELECT MAX(id) as id FROM events')
+		.get()
 	return row?.id ?? 0
 }
 
 export function dbGetEventsSinceId(sinceId: number): TeamEvent[] {
-	return getDb().query<TeamEvent, [number]>(
-		'SELECT * FROM events WHERE id > ? ORDER BY id ASC LIMIT 500',
-	).all(sinceId)
+	return getDb()
+		.query<TeamEvent, [number]>(
+			'SELECT * FROM events WHERE id > ? ORDER BY id ASC LIMIT 500',
+		)
+		.all(sinceId)
 }
 
 export function dbInsertPmReport(teamId: string, summary: string): void {

@@ -37,9 +37,27 @@ export interface PushToken {
 	registeredAt: string
 }
 
-export type TeamStatus = 'planning' | 'active' | 'blocked' | 'review' | 'done' | 'archived'
-export type AgentRole = 'orchestrator' | 'pm' | 'team-lead' | 'dev' | 'qa' | 'reviewer'
-export type AgentStatus = 'idle' | 'planning' | 'working' | 'blocked' | 'done' | 'error'
+export type TeamStatus =
+	| 'planning'
+	| 'active'
+	| 'blocked'
+	| 'review'
+	| 'done'
+	| 'archived'
+export type AgentRole =
+	| 'orchestrator'
+	| 'pm'
+	| 'team-lead'
+	| 'dev'
+	| 'qa'
+	| 'reviewer'
+export type AgentStatus =
+	| 'idle'
+	| 'planning'
+	| 'working'
+	| 'blocked'
+	| 'done'
+	| 'error'
 
 export interface Team {
 	id: string
@@ -86,8 +104,19 @@ export type WsClientMessage =
 	| { type: 'replay'; payload: { teamId: string; since: number } }
 
 export type WsServerMessage =
-	| { type: 'agent:event'; teamId: string; agentId: string; role: AgentRole; event: Record<string, unknown> }
-	| { type: 'agent:status'; teamId: string; agentId: string; status: AgentStatus }
+	| {
+			type: 'agent:event'
+			teamId: string
+			agentId: string
+			role: AgentRole
+			event: Record<string, unknown>
+	  }
+	| {
+			type: 'agent:status'
+			teamId: string
+			agentId: string
+			status: AgentStatus
+	  }
 	| { type: 'pm:report'; teamId: string; summary: string }
 	| { type: 'team:status'; teamId: string; status: TeamStatus }
 	| { type: 'team:spawned'; team: Team }

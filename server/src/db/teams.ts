@@ -26,21 +26,27 @@ function toTeam(row: DbTeam): Team {
 }
 
 export function dbListTeams(): Team[] {
-	const rows = getDb().query<DbTeam, []>(
-		"SELECT * FROM teams WHERE status != 'archived' ORDER BY created_at DESC",
-	).all()
+	const rows = getDb()
+		.query<DbTeam, []>(
+			"SELECT * FROM teams WHERE status != 'archived' ORDER BY created_at DESC",
+		)
+		.all()
 	return rows.map(toTeam)
 }
 
 export function dbListTeamsByRepo(repoId: string): Team[] {
-	const rows = getDb().query<DbTeam, [string]>(
-		"SELECT * FROM teams WHERE repo_id = ? AND status != 'archived' ORDER BY created_at DESC",
-	).all(repoId)
+	const rows = getDb()
+		.query<DbTeam, [string]>(
+			"SELECT * FROM teams WHERE repo_id = ? AND status != 'archived' ORDER BY created_at DESC",
+		)
+		.all(repoId)
 	return rows.map(toTeam)
 }
 
 export function dbGetTeam(id: string): Team | null {
-	const row = getDb().query<DbTeam, [string]>('SELECT * FROM teams WHERE id = ?').get(id)
+	const row = getDb()
+		.query<DbTeam, [string]>('SELECT * FROM teams WHERE id = ?')
+		.get(id)
 	return row ? toTeam(row) : null
 }
 
@@ -48,11 +54,24 @@ export function dbInsertTeam(team: Team): void {
 	getDb().run(
 		`INSERT INTO teams (id, repo_id, worktree_path, task, status, pm_summary, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		[team.id, team.repoId, team.worktreePath, team.task, team.status, team.pmSummary, team.createdAt, team.updatedAt],
+		[
+			team.id,
+			team.repoId,
+			team.worktreePath,
+			team.task,
+			team.status,
+			team.pmSummary,
+			team.createdAt,
+			team.updatedAt,
+		],
 	)
 }
 
-export function dbUpdateTeamStatus(id: string, status: TeamStatus, pmSummary?: string): void {
+export function dbUpdateTeamStatus(
+	id: string,
+	status: TeamStatus,
+	pmSummary?: string,
+): void {
 	const now = Date.now()
 	if (pmSummary !== undefined) {
 		getDb().run(
@@ -60,10 +79,11 @@ export function dbUpdateTeamStatus(id: string, status: TeamStatus, pmSummary?: s
 			[status, pmSummary, now, id],
 		)
 	} else {
-		getDb().run(
-			'UPDATE teams SET status = ?, updated_at = ? WHERE id = ?',
-			[status, now, id],
-		)
+		getDb().run('UPDATE teams SET status = ?, updated_at = ? WHERE id = ?', [
+			status,
+			now,
+			id,
+		])
 	}
 }
 

@@ -22,12 +22,16 @@ function toRepo(row: DbRepo): Repo {
 }
 
 export function dbListRepos(): Repo[] {
-	const rows = getDb().query<DbRepo, []>('SELECT * FROM repos ORDER BY added_at ASC').all()
+	const rows = getDb()
+		.query<DbRepo, []>('SELECT * FROM repos ORDER BY added_at ASC')
+		.all()
 	return rows.map(toRepo)
 }
 
 export function dbGetRepo(id: string): Repo | null {
-	const row = getDb().query<DbRepo, [string]>('SELECT * FROM repos WHERE id = ?').get(id)
+	const row = getDb()
+		.query<DbRepo, [string]>('SELECT * FROM repos WHERE id = ?')
+		.get(id)
 	return row ? toRepo(row) : null
 }
 

@@ -19,7 +19,11 @@ export function getDb(): Database {
 	return _db
 }
 
-function initSchema(db: Database) {
+export function _injectDb(db: Database): void {
+	_db = db
+}
+
+export function initSchema(db: Database) {
 	db.run(`
     CREATE TABLE IF NOT EXISTS repos (
       id TEXT PRIMARY KEY,

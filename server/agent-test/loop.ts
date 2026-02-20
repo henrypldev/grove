@@ -98,53 +98,15 @@ try {
 		},
 	},
 })) {
-	switch (message.type) {
-		case 'assistant':
-			for (const block of message.message.content) {
-				if (block.type === 'text' && block.text.trim()) {
-					console.log(`\n[agent] ${block.text.trim()}`)
-				} else if (block.type === 'tool_use') {
-					const hint =
-						'command' in block.input
-							? (block.input as { command: string }).command.slice(0, 80)
-							: 'file_path' in block.input
-								? (block.input as { file_path: string }).file_path
-								: 'prompt' in block.input
-									? (block.input as { prompt: string }).prompt.slice(0, 80)
-									: ''
-					console.log(`[tool:${block.name}] ${hint}`)
-				}
+	if (message.type === 'assistant') {
+		for (const block of message.message.content) {
+			if (block.type === 'text' && block.text.trim()) {
+				console.log(block.text.trim())
+			} else if (block.type === 'tool_use' && block.name === 'Task') {
+				const subprompt = (block.input as { prompt?: string }).prompt ?? ''
+				console.log(`\n[spawning agent] ${subprompt.split('\n')[0].slice(0, 100)}`)
 			}
-			break
-		case 'user': {
-			const content = message.message.content
-			if (Array.isArray(content)) {
-				for (const block of content) {
-					if (
-						typeof block === 'object' &&
-						block !== null &&
-						'type' in block &&
-						block.type === 'tool_result' &&
-						'content' in block
-					) {
-						const text =
-							typeof block.content === 'string'
-								? block.content
-								: JSON.stringify(block.content)
-						if (text.trim()) console.log(`[result] ${text.trim().slice(0, 200)}`)
-					}
-				}
-			}
-			break
 		}
-		case 'result':
-			console.log(`\n[done] subtype=${message.subtype}`)
-			break
-		case 'system':
-			if (message.subtype === 'init') console.log(`[system] session started`)
-			break
-		default:
-			break
 	}
 	}
 } finally {

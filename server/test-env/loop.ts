@@ -84,9 +84,20 @@ Working directory: ${serverDir}`,
 		},
 	},
 })) {
-	if (message.type === 'assistant') {
-		for (const block of message.message.content) {
-			if (block.type === 'text') process.stdout.write(block.text)
-		}
+	switch (message.type) {
+		case 'assistant':
+			for (const block of message.message.content) {
+				if (block.type === 'text') process.stdout.write(block.text)
+				else if (block.type === 'tool_use') console.log(`\n[tool] ${block.name}`)
+			}
+			break
+		case 'result':
+			console.log(`\n[result] subtype=${message.subtype}`)
+			break
+		case 'system':
+			console.log(`[system] subtype=${message.subtype}`)
+			break
+		default:
+			console.log(`[${message.type}]`)
 	}
 }

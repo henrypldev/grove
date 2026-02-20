@@ -87,17 +87,49 @@ Working directory: ${serverDir}`,
 	switch (message.type) {
 		case 'assistant':
 			for (const block of message.message.content) {
-				if (block.type === 'text') process.stdout.write(block.text)
-				else if (block.type === 'tool_use') console.log(`\n[tool] ${block.name}`)
+				if (block.type === 'text' && block.text.trim()) {
+					console.log(`\n[agent] ${block.text.trim()}`)
+				} else if (block.type === 'tool_use') {
+					const hint =
+						'command' in block.input
+							? (block.input as { command: string }).command.slice(0, 80)
+							: 'file_path' in block.input
+								? (block.input as { file_path: string }).file_path
+								: 'prompt' in block.input
+									? (block.input as { prompt: string }).prompt.slice(0, 80)
+									: ''
+					console.log(`[tool:${block.name}] ${hint}`)
+				}
 			}
 			break
+		case 'user': {
+			const content = message.message.content
+			if (Array.isArray(content)) {
+				for (const block of content) {
+					if (
+						typeof block === 'object' &&
+						block !== null &&
+						'type' in block &&
+						block.type === 'tool_result' &&
+						'content' in block
+					) {
+						const text =
+							typeof block.content === 'string'
+								? block.content
+								: JSON.stringify(block.content)
+						if (text.trim()) console.log(`[result] ${text.trim().slice(0, 200)}`)
+					}
+				}
+			}
+			break
+		}
 		case 'result':
-			console.log(`\n[result] subtype=${message.subtype}`)
+			console.log(`\n[done] subtype=${message.subtype}`)
 			break
 		case 'system':
-			console.log(`[system] subtype=${message.subtype}`)
+			if (message.subtype === 'init') console.log(`[system] session started`)
 			break
 		default:
-			console.log(`[${message.type}]`)
+			break
 	}
 }

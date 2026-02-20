@@ -1,3 +1,4 @@
+import { query } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
 import {
 	dbGetAgent,
@@ -47,54 +48,31 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 	dbUpdateAgentStatus(agent.id, 'working')
 
-	const args = [
-		'claude',
-		'--print',
-		'--output-format',
-		'stream-json',
-		'--dangerously-skip-permissions',
-		'--max-budget-usd',
-		String(opts.maxBudgetUsd ?? 5),
-		opts.prompt,
-	]
-
-	const proc = Bun.spawn(args, {
-		cwd: opts.cwd,
-		stdout: 'pipe',
-		stderr: 'pipe',
-	})
-
 	try {
-		const decoder = new TextDecoder()
-		let buf = ''
+		for await (const message of query({
+			prompt: opts.prompt,
+			options: {
+				cwd: opts.cwd,
+				maxBudgetUsd: opts.maxBudgetUsd ?? 5,
+				permissionMode: 'bypassPermissions',
+			},
+		})) {
+			dbInsertEvent(agent.teamId, agent.id, `sdk:${message.type}`, message as Record<string, unknown>)
 
-		for await (const chunk of proc.stdout) {
-			buf += decoder.decode(chunk, { stream: true })
-			const lines = buf.split('\n')
-			buf = lines.pop() ?? ''
+			if (message.type === 'system' && message.subtype === 'init') {
+				dbUpdateAgentSessionId(agent.id, message.session_id)
+			}
 
-			for (const line of lines) {
-				const trimmed = line.trim()
-				if (!trimmed) continue
-				try {
-					const msg = JSON.parse(trimmed) as Record<string, unknown>
-					const msgType = (msg.type as string) ?? 'unknown'
-
-					dbInsertEvent(agent.teamId, agent.id, `sdk:${msgType}`, msg)
-
-					if (msgType === 'result') {
-						const sessionId = msg.session_id as string | undefined
-						if (sessionId) dbUpdateAgentSessionId(agent.id, sessionId)
-					}
-				} catch {
-					// skip non-JSON lines
+			if (message.type === 'result') {
+				if (message.subtype === 'success') {
+					dbUpdateAgentStatus(agent.id, 'done')
+					opts.onDone?.(agent.id)
+				} else {
+					dbUpdateAgentStatus(agent.id, 'error')
+					opts.onError?.(agent.id, new Error(message.subtype))
 				}
 			}
 		}
-
-		await proc.exited
-		dbUpdateAgentStatus(agent.id, 'done')
-		opts.onDone?.(agent.id)
 	} catch (err) {
 		dbUpdateAgentStatus(agent.id, 'error')
 		opts.onError?.(agent.id, err)

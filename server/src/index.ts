@@ -1,10 +1,11 @@
 import pkg from '../package.json'
+import { onNewTeam, startOrchestrator } from './agents/orchestrator'
 import { log, setLogsEnabled } from './config'
 import { getDb } from './db'
 import { handleV1 } from './routes/v1'
 import { handleV2Events } from './routes/v2/events'
 import { handleV2Repos } from './routes/v2/repos'
-import { handleV2Teams } from './routes/v2/teams'
+import { handleV2Teams, setTeamCreatedHook } from './routes/v2/teams'
 import { cleanupStaleSessions } from './terminal/ttyd'
 import { startEventPoller, wsHandlers } from './websocket'
 
@@ -12,6 +13,8 @@ export { setLogsEnabled }
 
 export async function startServer(port: number) {
 	getDb()
+	await startOrchestrator()
+	setTeamCreatedHook(onNewTeam)
 	log('server', 'starting up')
 	await cleanupStaleSessions()
 	startEventPoller()

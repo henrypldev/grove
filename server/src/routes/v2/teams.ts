@@ -1,6 +1,6 @@
 import { createWorktree } from '../../api/worktrees'
 import { generateId } from '../../config'
-import { dbListAgentsByTeam } from '../../db/agents'
+import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
 import { dbListEventsSince } from '../../db/events'
 import { dbGetRepo } from '../../db/repos'
 import {
@@ -126,7 +126,26 @@ export async function handleV2Teams(
 		'/v2/teams/:teamId/agents/:agentId/respawn',
 	)
 	if (respawnMatch && method === 'POST') {
-		return Response.json({ success: true }, { headers })
+		const team = dbGetTeam(respawnMatch.teamId)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const agent = dbGetAgent(respawnMatch.agentId)
+		if (!agent)
+			return Response.json(
+				{ error: 'Agent not found' },
+				{ status: 404, headers },
+			)
+		const body = (await req.json()) as { prompt?: string }
+		const { respawnAgent } = await import('../../agents/runner')
+		const success = await respawnAgent(
+			respawnMatch.agentId,
+			body.prompt ?? agent.currentTask ?? '',
+			team.worktreePath,
+		)
+		return Response.json({ success }, { headers })
 	}
 
 	const eventsMatch = matchRoute(path, '/v2/teams/:id/events')

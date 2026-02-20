@@ -55,6 +55,24 @@ Use the Task tool to delegate work through this hierarchy:
 
 Working directory: ${serverDir}`
 
+const roles = ['Orchestrator', 'PM', 'Team Lead', 'Dev-1', 'Dev-2', 'Dev-3', 'Reviewer', 'QA']
+const sessionNames = new Map<string, string>()
+
+function nameFor(sessionId: string): string {
+	if (!sessionNames.has(sessionId)) {
+		const name = roles[sessionNames.size] ?? `Agent-${sessionNames.size + 1}`
+		sessionNames.set(sessionId, name)
+	}
+	return sessionNames.get(sessionId)!
+}
+
+function say(sessionId: string, text: string) {
+	const name = nameFor(sessionId)
+	const lines = text.trim().split('\n')
+	console.log(`\n[${name}] ${lines[0]}`)
+	for (const line of lines.slice(1)) console.log(`${''.padEnd(name.length + 3)}${line}`)
+}
+
 console.log('Starting agent loop...\n')
 console.log('[prompt]', prompt, '\n')
 
@@ -65,49 +83,46 @@ try {
 	for await (const message of query({
 		prompt,
 		options: {
-		cwd: serverDir,
-		permissionMode: 'bypassPermissions',
-		maxBudgetUsd: 20,
-		hooks: {
-			Stop: [
-				{
-					hooks: [
-						async () => {
-							iteration++
-							if (iteration >= maxIterations) {
-								console.log(`\nMax iterations (${maxIterations}) reached.`)
-								return { continue: false }
-							}
+			cwd: serverDir,
+			permissionMode: 'bypassPermissions',
+			maxBudgetUsd: 20,
+			hooks: {
+				Stop: [
+					{
+						hooks: [
+							async () => {
+								iteration++
+								if (iteration >= maxIterations) {
+									console.log(`\nMax iterations (${maxIterations}) reached.`)
+									return { continue: false }
+								}
 
-							const result = await runTests()
+								const result = await runTests()
 
-							if (result.passed) {
-								console.log('\nAll tests passing!')
-								return { continue: false }
-							}
+								if (result.passed) {
+									console.log('\nAll tests passing!')
+									return { continue: false }
+								}
 
-							console.log(`\nIteration ${iteration}/${maxIterations} — tests still failing, continuing...\n`)
-							return {
-								continue: true,
-								systemMessage: `Tests still failing (iteration ${iteration}/${maxIterations}):\n\n${result.output}\n\nContinue fixing the source files.`,
-							}
-						},
-					],
-				},
-			],
+								console.log(`\nIteration ${iteration}/${maxIterations} — tests still failing, continuing...\n`)
+								return {
+									continue: true,
+									systemMessage: `Tests still failing (iteration ${iteration}/${maxIterations}):\n\n${result.output}\n\nContinue fixing the source files.`,
+								}
+							},
+						],
+					},
+				],
+			},
 		},
-	},
-})) {
-	if (message.type === 'assistant') {
-		for (const block of message.message.content) {
-			if (block.type === 'text' && block.text.trim()) {
-				console.log(block.text.trim())
-			} else if (block.type === 'tool_use' && block.name === 'Task') {
-				const subprompt = (block.input as { prompt?: string }).prompt ?? ''
-				console.log(`\n[spawning agent] ${subprompt.split('\n')[0].slice(0, 100)}`)
+	})) {
+		if (message.type === 'assistant') {
+			for (const block of message.message.content) {
+				if (block.type === 'text' && block.text.trim()) {
+					say(message.session_id, block.text)
+				}
 			}
 		}
-	}
 	}
 } finally {
 	await resetTestEnv()

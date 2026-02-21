@@ -36,6 +36,15 @@ export function dbListAgentsByTeam(teamId: string): Agent[] {
 	return rows.map(toAgent)
 }
 
+export function dbGetAgentByTeamAndRole(teamId: string, role: AgentRole): Agent | null {
+	const row = getDb()
+		.query<DbAgent, [string, string]>(
+			'SELECT * FROM agents WHERE team_id = ? AND role = ? ORDER BY spawned_at ASC LIMIT 1',
+		)
+		.get(teamId, role)
+	return row ? toAgent(row) : null
+}
+
 export function dbGetAgent(id: string): Agent | null {
 	const row = getDb()
 		.query<DbAgent, [string]>('SELECT * FROM agents WHERE id = ?')

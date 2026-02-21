@@ -1,51 +1,75 @@
-import { log } from '../config'
-import { dbUpdateTeamStatus } from '../db/teams'
+import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
 import { spawnAgent } from './runner'
 
-const PM_SYSTEM_PROMPT = (team: Team) => `
-You are the PM agent for team ${team.id}.
+const PM_PROMPT = (team: Team, agentId: string) => `
+You are the PM for team ${team.id}. You persist until the task is fully complete.
+Your agent ID: ${agentId}
 Task: ${team.task}
-Working directory: ${team.worktreePath}
+Worktree: ${team.worktreePath}
+API: http://localhost:4002
 
-Your responsibilities:
-1. Create a technical plan and assign it to the Team Lead
-2. Coordinate the task lifecycle: Dev → QA → Review → PR
-3. Monitor agent health and respawn on failure (max 3 retries)
-4. Report status updates via agent:message events
-5. Signal task completion when PR is created
+PHASE 1 — PLAN
+Write a coordination plan and post it (this signals the Team Lead to start):
+curl -s -X POST http://localhost:4002/v2/events \\
+  -H "Content-Type: application/json" \\
+  -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:plan","payload":{"plan":"YOUR_PLAN"}}'
 
-Write events to the server via: POST http://localhost:4002/v2/events
-Your team ID: ${team.id}
+PHASE 2 — MONITOR (poll loop)
+Poll for new events every 20 seconds:
+  curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=LAST_TIMESTAMP"
 
-TeamState transitions:
-- planning → active (when Team Lead has a plan)
-- active → review (when QA passes)
-- review → done (when PR created)
-- any → blocked (if retries exhausted)
+Track which events you've already acted on. React as follows:
 
-Communicate ONLY through structured events. Use curl to write events.
+  team-lead:plan received
+    → Technical plan is ready. Dev will self-trigger. No action needed.
+
+  dev:complete received (and no pending rework)
+    → QA will self-trigger. No action needed.
+
+  qa:result received with passed=false (track iteration count, max 3)
+    → Post pm:rework with the QA feedback so Dev can fix it:
+      {"type":"pm:rework","payload":{"iteration":N,"feedback":"FEEDBACK"}}
+
+  qa:result received with passed=true
+    → Reviewer will self-trigger. No action needed.
+
+  reviewer:result received with approved=false (track iteration count, max 3)
+    → Post pm:rework with the reviewer feedback:
+      {"type":"pm:rework","payload":{"iteration":N,"feedback":"FEEDBACK"}}
+
+  reviewer:result received with approved=true
+    → Signal Dev to commit and open a PR:
+      {"type":"pm:assign-pr","payload":{}}
+
+  dev:pr-created received
+    → Proceed to PHASE 3
+
+  If max retries (3) exceeded for QA or review:
+    → Post {"type":"pm:blocked","payload":{"reason":"..."}} and exit
+
+PHASE 3 — SUMMARISE AND EXIT
+1. Fetch all team events: curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
+2. Write a concise summary of what was built, decisions made, issues encountered, and the PR URL
+3. Post pm:summary (this signals all agents to exit):
+   {"type":"pm:summary","payload":{"summary":"YOUR_SUMMARY"}}
+4. Exit
 `
 
-export async function spawnPm(team: Team): Promise<Agent> {
-	log('pm', 'spawning PM agent', { teamId: team.id })
+type Callbacks = { onDone: () => void; onError: () => void }
 
-	const pmAgent = await spawnAgent({
+export async function spawnPm(team: Team, callbacks: Callbacks): Promise<Agent> {
+	log('pm', 'spawning PM', { teamId: team.id })
+	const agentId = generateId()
+	return spawnAgent({
+		agentId,
 		teamId: team.id,
 		role: 'pm',
-		prompt: PM_SYSTEM_PROMPT(team),
+		prompt: PM_PROMPT(team, agentId),
 		cwd: team.worktreePath,
-		maxBudgetUsd: 20,
-		onDone: agentId => {
-			log('pm', 'PM agent completed', { agentId, teamId: team.id })
-			dbUpdateTeamStatus(team.id, 'done')
-		},
-		onError: (agentId, err) => {
-			log('pm', 'PM agent error', { agentId, teamId: team.id, err })
-			dbUpdateTeamStatus(team.id, 'blocked')
-		},
+		maxBudgetUsd: 10,
+		allowedTools: ['Bash'],
+		onDone: callbacks.onDone,
+		onError: callbacks.onError,
 	})
-
-	dbUpdateTeamStatus(team.id, 'active')
-	return pmAgent
 }

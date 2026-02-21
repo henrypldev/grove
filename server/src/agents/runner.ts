@@ -11,17 +11,19 @@ import { dbInsertEvent } from '../db/events'
 import type { Agent, AgentRole } from '../types'
 
 export interface AgentRunOptions {
+	agentId?: string
 	teamId: string
 	role: AgentRole
 	prompt: string
 	cwd: string
 	maxBudgetUsd?: number
+	allowedTools?: string[]
 	onDone?: (agentId: string) => void
 	onError?: (agentId: string, error: unknown) => void
 }
 
 export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
-	const agentId = generateId()
+	const agentId = opts.agentId ?? generateId()
 	const now = Date.now()
 	const agent: Agent = {
 		id: agentId,
@@ -55,6 +57,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 				cwd: opts.cwd,
 				maxBudgetUsd: opts.maxBudgetUsd ?? 5,
 				permissionMode: 'bypassPermissions',
+				...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
 			},
 		})) {
 			dbInsertEvent(
@@ -89,6 +92,8 @@ export async function respawnAgent(
 	agentId: string,
 	prompt: string,
 	cwd: string,
+	onDone?: (agentId: string) => void,
+	onError?: (agentId: string, err: unknown) => void,
 ): Promise<boolean> {
 	const agent = dbGetAgent(agentId)
 	if (!agent) return false
@@ -103,6 +108,8 @@ export async function respawnAgent(
 		role: agent.role,
 		prompt,
 		cwd,
+		onDone,
+		onError,
 	}).catch(() => {})
 	return true
 }

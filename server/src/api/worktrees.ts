@@ -89,9 +89,18 @@ export async function createWorktree(
 			.nothrow()
 
 	if (result.exitCode !== 0) {
-		log('worktrees', 'new branch failed, trying existing branch', {
+		log('worktrees', 'origin branch failed, trying local base branch', {
 			branch,
+			baseBranch,
 		})
+		result =
+			await Bun.$`git -C ${repo.path} worktree add -b ${branch} ${worktreePath} ${baseBranch}`
+				.quiet()
+				.nothrow()
+	}
+
+	if (result.exitCode !== 0) {
+		log('worktrees', 'new branch failed, trying existing branch', { branch })
 		result =
 			await Bun.$`git -C ${repo.path} worktree add ${worktreePath} ${branch}`
 				.quiet()

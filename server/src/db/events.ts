@@ -49,6 +49,19 @@ export function dbGetEventsSinceId(sinceId: number): TeamEvent[] {
 		.all(sinceId)
 }
 
+export function dbGetLatestEventByType(
+	teamId: string,
+	type: string,
+): TeamEvent | null {
+	return (
+		getDb()
+			.query<TeamEvent, [string, string]>(
+				'SELECT * FROM events WHERE team_id = ? AND type = ? ORDER BY created_at DESC LIMIT 1',
+			)
+			.get(teamId, type) ?? null
+	)
+}
+
 export function dbInsertPmReport(teamId: string, summary: string): void {
 	getDb().run(
 		'INSERT INTO pm_reports (team_id, summary, created_at) VALUES (?, ?, ?)',

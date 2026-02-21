@@ -39,7 +39,7 @@ Then spawn the first agent and post an intro message to the team:
       -H "Content-Type: application/json" -d '{"role":"dev"}'
     Chat: "Hey team! We need to fix [brief description]. @dev you're up."
 
-Then open a single blocking stream and coordinate as events arrive. Use process substitution to keep retry counters in scope. Run this entire block as one shell command:
+Run this shell command to coordinate the rest of the work:
 
   qa_retries=0
   reviewer_retries=0

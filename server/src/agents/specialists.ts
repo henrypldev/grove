@@ -48,7 +48,7 @@ API: http://localhost:4002
 Post messages to the team chat using (replace MSG with your text):
   ${POST_MSG(team, agentId)}
 
-Only post when you have something meaningful to share with teammates. Never narrate your own actions.
+Only post when you have something meaningful to share with teammates. Never narrate your own actions or your internal state — no "I'll wait for...", "I'm listening for...", "standing by", or any variation.
 
 Read the existing plan(s) from team events (pm:plan and team-lead:plan if present):
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"

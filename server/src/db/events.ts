@@ -80,6 +80,23 @@ export function dbGetLatestEventByType(
 	)
 }
 
+export function emitEphemeralEvent(
+	teamId: string,
+	agentId: string,
+	type: string,
+	payload: Record<string, unknown>,
+): void {
+	const event: TeamEvent = {
+		id: -1,
+		teamId,
+		agentId,
+		type,
+		payload: JSON.stringify(payload),
+		createdAt: Date.now(),
+	}
+	listeners.get(teamId)?.forEach((fn) => fn(event))
+}
+
 export function dbInsertPmReport(teamId: string, summary: string): void {
 	getDb().run(
 		'INSERT INTO pm_reports (team_id, summary, created_at) VALUES (?, ?, ?)',

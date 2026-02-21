@@ -5,6 +5,8 @@ import {
 	dbGetLatestEventId,
 	dbInsertEvent,
 	dbListEventsSince,
+	emitEphemeralEvent,
+	subscribeToTeamEvents,
 } from '../events'
 import { dbInsertRepo } from '../repos'
 import { dbInsertTeam } from '../teams'
@@ -83,6 +85,20 @@ describe('db/events', () => {
 		const events = dbGetEventsSinceId(e1.id)
 		expect(events).toHaveLength(1)
 		expect(events[0].type).toBe('e2')
+	})
+
+	test('emitEphemeralEvent fires listeners without persisting', () => {
+		const received: unknown[] = []
+		const unsub = subscribeToTeamEvents('t1', (ev) => received.push(ev))
+
+		emitEphemeralEvent('t1', 'a1', 'agent:status_change', { status: 'working', activity: 'reading files' })
+
+		expect(received).toHaveLength(1)
+		const ev = received[0] as { type: string; id: number }
+		expect(ev.type).toBe('agent:status_change')
+		expect(ev.id).toBe(-1)
+		expect(dbListEventsSince('t1', 0)).toHaveLength(0)
+		unsub()
 	})
 
 	test('listEventsSince filters by team', () => {

@@ -124,12 +124,14 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 				},
 			},
 		})) {
-			dbInsertEvent(
-				agent.teamId,
-				agent.id,
-				`sdk:${message.type}`,
-				message as Record<string, unknown>,
-			)
+			if (message.type !== 'user') {
+				dbInsertEvent(
+					agent.teamId,
+					agent.id,
+					`sdk:${message.type}`,
+					message as Record<string, unknown>,
+				)
+			}
 
 			if (message.type === 'system' && message.subtype === 'init') {
 				dbUpdateAgentSessionId(agent.id, message.session_id)

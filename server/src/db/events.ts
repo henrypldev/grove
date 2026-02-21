@@ -1,6 +1,22 @@
 import type { TeamEvent } from '../types'
 import { getDb } from './index'
 
+type EventListener = (event: TeamEvent) => void
+const listeners = new Map<string, Set<EventListener>>()
+
+export function subscribeToTeamEvents(
+	teamId: string,
+	fn: EventListener,
+): () => void {
+	const set = listeners.get(teamId) ?? new Set()
+	set.add(fn)
+	listeners.set(teamId, set)
+	return () => {
+		set.delete(fn)
+		if (set.size === 0) listeners.delete(teamId)
+	}
+}
+
 export function dbInsertEvent(
 	teamId: string,
 	agentId: string,
@@ -12,7 +28,7 @@ export function dbInsertEvent(
 		'INSERT INTO events (team_id, agent_id, type, payload, created_at) VALUES (?, ?, ?, ?, ?)',
 		[teamId, agentId, type, JSON.stringify(payload), now],
 	)
-	return {
+	const event: TeamEvent = {
 		id: Number(result.lastInsertRowid),
 		teamId,
 		agentId,
@@ -20,6 +36,8 @@ export function dbInsertEvent(
 		payload: JSON.stringify(payload),
 		createdAt: now,
 	}
+	listeners.get(teamId)?.forEach((fn) => fn(event))
+	return event
 }
 
 export function dbListEventsSince(

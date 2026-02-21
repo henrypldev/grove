@@ -111,14 +111,48 @@ export async function handleV2Teams(
 	}
 
 	const agentsMatch = matchRoute(path, '/v2/teams/:id/agents')
-	if (agentsMatch && method === 'GET') {
+	if (agentsMatch) {
 		const team = dbGetTeam(agentsMatch.id)
 		if (!team)
 			return Response.json(
 				{ error: 'Team not found' },
 				{ status: 404, headers },
 			)
-		return Response.json(dbListAgentsByTeam(agentsMatch.id), { headers })
+		if (method === 'GET') {
+			return Response.json(dbListAgentsByTeam(agentsMatch.id), { headers })
+		}
+		if (method === 'POST') {
+			const body = (await req.json()) as {
+				role: 'team-lead' | 'dev' | 'qa' | 'reviewer'
+			}
+			const {
+				spawnTeamLead,
+				spawnDeveloper,
+				spawnQaAgent,
+				spawnReviewerAgent,
+			} = await import('../../agents/specialists')
+			let agent
+			switch (body.role) {
+				case 'team-lead':
+					agent = await spawnTeamLead(team)
+					break
+				case 'dev':
+					agent = await spawnDeveloper(team)
+					break
+				case 'qa':
+					agent = await spawnQaAgent(team)
+					break
+				case 'reviewer':
+					agent = await spawnReviewerAgent(team)
+					break
+				default:
+					return Response.json(
+						{ error: 'Invalid role' },
+						{ status: 400, headers },
+					)
+			}
+			return Response.json(agent, { headers })
+		}
 	}
 
 	const respawnMatch = matchRoute(

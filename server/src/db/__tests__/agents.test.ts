@@ -4,6 +4,7 @@ import {
 	dbIncrementAgentRetry,
 	dbInsertAgent,
 	dbListAgentsByTeam,
+	dbUpdateAgentActivity,
 	dbUpdateAgentSessionId,
 	dbUpdateAgentStatus,
 } from '../agents'
@@ -33,6 +34,7 @@ const AGENT = {
 	teamId: 't1',
 	role: 'dev' as const,
 	status: 'working' as const,
+	activity: null,
 	currentTask: 'coding',
 	sessionId: null,
 	retryCount: 0,
@@ -82,6 +84,14 @@ describe('db/agents', () => {
 		expect(dbIncrementAgentRetry('a1')).toBe(1)
 		expect(dbIncrementAgentRetry('a1')).toBe(2)
 		expect(dbGetAgent('a1')?.retryCount).toBe(2)
+	})
+
+	test('updateActivity sets and clears activity', () => {
+		dbInsertAgent({ ...AGENT, activity: null })
+		dbUpdateAgentActivity('a1', 'writing code')
+		expect(dbGetAgent('a1')?.activity).toBe('writing code')
+		dbUpdateAgentActivity('a1', null)
+		expect(dbGetAgent('a1')?.activity).toBeNull()
 	})
 
 	test('get non-existent returns null', () => {

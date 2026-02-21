@@ -6,6 +6,7 @@ interface DbAgent {
 	team_id: string
 	role: string
 	status: string
+	activity: string | null
 	current_task: string | null
 	session_id: string | null
 	retry_count: number
@@ -19,6 +20,7 @@ function toAgent(row: DbAgent): Agent {
 		teamId: row.team_id,
 		role: row.role as AgentRole,
 		status: row.status as AgentStatus,
+		activity: row.activity,
 		currentTask: row.current_task,
 		sessionId: row.session_id,
 		retryCount: row.retry_count,
@@ -54,13 +56,14 @@ export function dbGetAgent(id: string): Agent | null {
 
 export function dbInsertAgent(agent: Agent): void {
 	getDb().run(
-		`INSERT INTO agents (id, team_id, role, status, current_task, session_id, retry_count, spawned_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO agents (id, team_id, role, status, activity, current_task, session_id, retry_count, spawned_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			agent.id,
 			agent.teamId,
 			agent.role,
 			agent.status,
+			agent.activity,
 			agent.currentTask,
 			agent.sessionId,
 			agent.retryCount,
@@ -68,6 +71,13 @@ export function dbInsertAgent(agent: Agent): void {
 			agent.updatedAt,
 		],
 	)
+}
+
+export function dbUpdateAgentActivity(id: string, activity: string | null): void {
+  getDb().run(
+    'UPDATE agents SET activity = ?, updated_at = ? WHERE id = ?',
+    [activity, Date.now(), id],
+  )
 }
 
 export function dbUpdateAgentStatus(

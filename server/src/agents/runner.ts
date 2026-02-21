@@ -43,6 +43,7 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 		teamId: opts.teamId,
 		role: opts.role,
 		status: 'planning',
+		activity: null,
 		currentTask: opts.prompt.slice(0, 200),
 		sessionId: null,
 		retryCount: 0,

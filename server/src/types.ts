@@ -75,6 +75,7 @@ export interface Agent {
 	teamId: string
 	role: AgentRole
 	status: AgentStatus
+	activity: string | null
 	currentTask: string | null
 	sessionId: string | null
 	retryCount: number

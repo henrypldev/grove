@@ -146,6 +146,7 @@ describe('handleV2Teams', () => {
 			teamId: 't1',
 			role: 'dev',
 			status: 'working',
+			activity: null,
 			currentTask: null,
 			sessionId: null,
 			retryCount: 0,

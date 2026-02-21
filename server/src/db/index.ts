@@ -63,6 +63,10 @@ export function initSchema(db: Database) {
     )
   `)
 
+	try {
+		db.run('ALTER TABLE agents ADD COLUMN activity TEXT')
+	} catch {}
+
 	db.run(`
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

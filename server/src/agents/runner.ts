@@ -9,10 +9,11 @@ import {
 	dbGetAgent,
 	dbIncrementAgentRetry,
 	dbInsertAgent,
+	dbUpdateAgentActivity,
 	dbUpdateAgentSessionId,
 	dbUpdateAgentStatus,
 } from '../db/agents'
-import { dbInsertEvent } from '../db/events'
+import { dbInsertEvent, emitEphemeralEvent } from '../db/events'
 import type { Agent, AgentRole, ToolCall } from '../types'
 
 const agentToolAccumulator = new Map<string, ToolCall[]>()
@@ -33,6 +34,16 @@ export interface AgentRunOptions {
 	allowedTools?: string[]
 	onDone?: (agentId: string) => void
 	onError?: (agentId: string, error: unknown) => void
+}
+
+export function activityFromToolName(toolName: string): string {
+	if (['Bash', 'BashOutput', 'KillShell'].includes(toolName)) return 'running commands'
+	if (['Read', 'Glob', 'Grep'].includes(toolName)) return 'reading files'
+	if (['Edit', 'Write', 'NotebookEdit'].includes(toolName)) return 'writing code'
+	if (['WebFetch', 'WebSearch'].includes(toolName)) return 'researching'
+	if (toolName === 'Task') return 'spawning agents'
+	if (toolName === 'SendMessage') return 'communicating'
+	return 'working'
 }
 
 export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
@@ -81,6 +92,12 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 								async (input) => {
 									const h = input as PreToolUseHookInput
 									pending.set(h.tool_use_id, { name: h.tool_name, input: h.tool_input })
+									const activity = activityFromToolName(h.tool_name)
+									dbUpdateAgentActivity(agent.id, activity)
+									emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
+										status: 'working',
+										activity,
+									})
 									return {}
 								},
 							],
@@ -99,6 +116,11 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 										agentToolAccumulator.set(agent.id, arr)
 										pending.delete(h.tool_use_id)
 									}
+									dbUpdateAgentActivity(agent.id, null)
+									emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
+										status: 'working',
+										activity: null,
+									})
 									return {}
 								},
 							],
@@ -117,6 +139,11 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 										agentToolAccumulator.set(agent.id, arr)
 										pending.delete(h.tool_use_id)
 									}
+									dbUpdateAgentActivity(agent.id, null)
+									emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
+										status: 'working',
+										activity: null,
+									})
 									return {}
 								},
 							],

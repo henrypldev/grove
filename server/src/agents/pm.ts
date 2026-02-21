@@ -2,6 +2,9 @@ import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
 import { spawnAgent } from './runner'
 
+const POST_CHAT = (team: Team, agentId: string) =>
+	`jq -n --arg t "MSG" '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-`
+
 const PM_PROMPT = (team: Team, agentId: string) => `
 You are the PM for team ${team.id}. You persist until the task is fully complete.
 Your agent ID: ${agentId}
@@ -9,37 +12,31 @@ Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
-TEAM CHAT
-Post messages to the team chat using:
-  jq -n --arg t "MESSAGE" '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
-    | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
+DO NOT read files, explore the codebase, or investigate any code. You spawn agents and route events.
 
-Chat rules:
-- Address teammates directly (@team-lead, @dev, @qa, @reviewer) when assigning work or giving feedback
-- Only post when you have something meaningful to say to the team — not to narrate your own actions or internal state
-- Never mention technical internals (streams, APIs, loops, spawning, waiting, listening, monitoring). Talk about the work.
+CHAT RULE: Post ONLY the two messages described below (intro and closing). The shell loop handles all other messages automatically. Do not post anything else.
 
-DO NOT read files, explore the codebase, or investigate any code. Ever. You spawn agents and route events. The engineers do the technical work.
+Post chat using:
+  ${POST_CHAT(team, agentId)}
 
-Based on the task description alone, decide if this is a FEATURE (new functionality) or BUG FIX (something broken).
+---
 
-Post your coordination plan:
+Based on the task description alone, decide if this is a FEATURE or BUG FIX.
+
+1. Post the pm:plan event:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:plan","payload":{"plan":"YOUR_PLAN"}}'
 
-Then spawn the first agent and post an intro message to the team:
-  FEATURE → spawn team-lead:
-    curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents \\
-      -H "Content-Type: application/json" -d '{"role":"team-lead"}'
-    Chat: "Hey team! We're building [brief description]. @team-lead please kick us off with a technical plan."
+2. Spawn the first agent:
+  FEATURE → curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents -H "Content-Type: application/json" -d '{"role":"team-lead"}'
+  BUG FIX → curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents -H "Content-Type: application/json" -d '{"role":"dev"}'
 
-  BUG FIX → spawn dev directly:
-    curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents \\
-      -H "Content-Type: application/json" -d '{"role":"dev"}'
-    Chat: "Hey team! We need to fix [brief description]. @dev you're up."
+3. Post the INTRO chat message (the only free-form message you write):
+  FEATURE → "Hey team! We're building [brief description]. @team-lead please kick us off with a technical plan."
+  BUG FIX → "Hey team! We need to fix [brief description]. @dev you're up."
 
-Run this shell command to coordinate the rest of the work:
+4. Run this coordination loop (do not post any chat before running it):
 
   qa_retries=0
   reviewer_retries=0
@@ -119,11 +116,12 @@ Run this shell command to coordinate the rest of the work:
     esac
   done < <(curl -sN "http://localhost:4002/v2/teams/${team.id}/stream")
 
-Fetch all events, post a pm:summary, post a brief closing message to the team, then exit.
+5. Fetch all events, post pm:summary, post the CLOSING chat message, then exit:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:summary","payload":{"summary":"YOUR_SUMMARY"}}'
+  # closing chat: "Great work team! Here's what we shipped: [summary]."
 `
 
 type Callbacks = { onDone: () => void; onError: () => void }

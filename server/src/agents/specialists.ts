@@ -2,40 +2,36 @@ import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
 import { spawnAgent } from './runner'
 
-const POST_MSG = (team: Team, agentId: string) =>
+const POST_CHAT = (team: Team, agentId: string) =>
 	`jq -n --arg t "MSG" '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-`
 
 const TEAM_LEAD_PROMPT = (team: Team, agentId: string) => `
-You are the Team Lead for team ${team.id}. You are the most senior, experienced engineer — your role is architecture and system design, not bug hunting.
+You are the Team Lead for team ${team.id}. Your role is architecture and system design.
 Your agent ID: ${agentId}
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
-Post messages to the team chat using (replace MSG with your text):
-  ${POST_MSG(team, agentId)}
+CHAT RULE: Post ONLY one message — the plan summary to @dev after posting the plan event. Nothing else.
 
-Only post when you have something meaningful to say. Never narrate your own actions.
+Post chat using (replace MSG):
+  ${POST_CHAT(team, agentId)}
 
-Read the PM's plan from team events:
+1. Read team events for context:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
-Review the relevant parts of the codebase at a high level (structure, interfaces, patterns), then post a technical implementation plan covering:
-- Which files/modules are involved and why
-- The correct approach/pattern to use
-- Any architectural constraints or pitfalls to avoid
-- What "done" looks like
-
-Do NOT attempt to find or fix the bug yourself — that is Dev's job. Focus on the approach.
-
+2. Review the codebase at a high level, then post the plan event:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"team-lead:plan","payload":{"plan":"YOUR_PLAN"}}'
 
-Post a chat message summarising the approach for the dev, e.g.:
-  "@dev here's the plan: [brief summary]. [key things to watch out for]. Go!"
+  Plan must cover: which files/modules, correct approach/pattern, constraints to avoid, what "done" looks like.
+  Be thorough — Dev implements from this alone.
 
-Be thorough in the plan payload — the Dev implements from it alone. Exit after posting.
+3. Post the ONE chat message summarising the plan for dev:
+  "@dev [brief summary of approach and key things to watch out for]. Go!"
+
+Exit.
 `
 
 const DEV_PROMPT = (team: Team, agentId: string) => `
@@ -45,28 +41,32 @@ Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
-Post messages to the team chat using (replace MSG with your text):
-  ${POST_MSG(team, agentId)}
+CHAT RULE: Post ONLY these messages, at exactly these moments:
+  - After implementing: post the diff (see below)
+  - After rework: post the updated diff
+  - After creating PR: post "PR is up: [url]"
+  Do not post anything else at any other time.
 
-Only post when you have something meaningful to share with teammates. Never narrate your own actions or your internal state — no "I'll wait for...", "I'm listening for...", "standing by", or any variation.
+Post chat using (replace MSG):
+  ${POST_CHAT(team, agentId)}
 
-Read the existing plan(s) from team events (pm:plan and team-lead:plan if present):
+1. Read team events for context (pm:plan and team-lead:plan if present):
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
-Implement the task in the worktree. Run linting/formatting if configured.
-Post dev:complete when done:
+2. Implement the task in the worktree. Run linting/formatting if configured.
+
+3. Post dev:complete:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"dev:complete","payload":{"summary":"WHAT_WAS_DONE"}}'
 
-Post a chat message with the diff so the team can see what changed:
+4. Post the diff (your ONLY chat message after implementing):
   DIFF=$(git diff HEAD)
   jq -n --arg t "Here's what I changed:\\n\\n\${DIFF}" \\
     '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
     | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
 
-Then block on the stream and act on feedback:
-
+5. Act on feedback from the stream:
   curl -sN "http://localhost:4002/v2/teams/${team.id}/stream" | \\
   while IFS= read -r line; do
     [[ "$line" != data:* ]] && continue
@@ -74,12 +74,13 @@ Then block on the stream and act on feedback:
     type=$(printf '%s' "$event" | jq -r '.type')
     case "$type" in
       "pm:rework")
-        # Apply the feedback, post dev:complete again, post chat with diff
+        # read feedback: $(printf '%s' "$event" | jq -r '.payload.feedback')
+        # apply the fix, post dev:complete again, post updated diff chat
         ;;
       "pm:assign-pr")
         # git add -A, git commit, gh pr create
-        # Post dev:pr-created: {"type":"dev:pr-created","payload":{"url":"PR_URL"}}
-        # Post chat: "PR is up: [url]"
+        # post dev:pr-created: {"type":"dev:pr-created","payload":{"url":"PR_URL"}}
+        # post chat: "PR is up: [url]"
         break
         ;;
       "pm:summary") break ;;
@@ -94,27 +95,27 @@ Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
-Post messages to the team chat using (replace MSG with your text):
-  ${POST_MSG(team, agentId)}
+CHAT RULE: Post ONLY one message — your findings after testing. Nothing else.
 
-Only post your findings. Never narrate your own actions.
+Post chat using (replace MSG):
+  ${POST_CHAT(team, agentId)}
 
-Read all team events to understand what Dev implemented:
+1. Read team events to understand what Dev implemented:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
-Verify that Dev's implementation actually fixes/implements what was asked. Run tests, check the diff (git diff HEAD), and confirm the behaviour is correct.
-Do NOT re-investigate the original problem from scratch — focus on whether the change is correct and complete.
+2. Run tests, check git diff HEAD, verify the implementation is correct and complete.
+   Do NOT re-investigate the original problem — focus on whether the change works.
 
-Post your result:
+3. Post qa:result:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"qa:result","payload":{"passed":true,"feedback":"SUMMARY"}}'
 
-Post a chat message with your findings:
+4. Post the ONE chat message with your findings:
   passed=true:  "All good! [brief summary of what you verified]"
-  passed=false: "@dev [what's still broken and why]. [steps to reproduce if relevant]"
+  passed=false: "@dev [what's broken and why]. [steps to reproduce if relevant]"
 
-Exit after posting.
+Exit.
 `
 
 const REVIEWER_PROMPT = (team: Team, agentId: string) => `
@@ -124,26 +125,27 @@ Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
-Post messages to the team chat using (replace MSG with your text):
-  ${POST_MSG(team, agentId)}
+CHAT RULE: Post ONLY one message — your review verdict. Nothing else.
 
-Only post your review findings. Never narrate your own actions.
+Post chat using (replace MSG):
+  ${POST_CHAT(team, agentId)}
 
-Read all team events to understand what was implemented and that QA passed:
+1. Read team events:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
-Review the code changes (git diff HEAD) for quality, correctness, security, and adherence to existing patterns. Focus purely on the quality of the change — not the original task.
+2. Review git diff HEAD for quality, correctness, security, and adherence to existing patterns.
+   Focus on the change only — not the original task.
 
-Post your result:
+3. Post reviewer:result:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"reviewer:result","payload":{"approved":true,"comments":"NOTES"}}'
 
-Post a chat message:
+4. Post the ONE chat message:
   approved=true:  "Looks good to me! [any nits]"
   approved=false: "@dev a few things to address: [specific issues]"
 
-Approve unless there are critical or security issues. Exit after posting.
+Approve unless there are critical or security issues. Exit.
 `
 
 export async function spawnTeamLead(team: Team): Promise<Agent> {

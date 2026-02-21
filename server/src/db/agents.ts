@@ -38,7 +38,10 @@ export function dbListAgentsByTeam(teamId: string): Agent[] {
 	return rows.map(toAgent)
 }
 
-export function dbGetAgentByTeamAndRole(teamId: string, role: AgentRole): Agent | null {
+export function dbGetAgentByTeamAndRole(
+	teamId: string,
+	role: AgentRole,
+): Agent | null {
 	const row = getDb()
 		.query<DbAgent, [string, string]>(
 			'SELECT * FROM agents WHERE team_id = ? AND role = ? ORDER BY spawned_at ASC LIMIT 1',
@@ -73,11 +76,15 @@ export function dbInsertAgent(agent: Agent): void {
 	)
 }
 
-export function dbUpdateAgentActivity(id: string, activity: string | null): void {
-  getDb().run(
-    'UPDATE agents SET activity = ?, updated_at = ? WHERE id = ?',
-    [activity, Date.now(), id],
-  )
+export function dbUpdateAgentActivity(
+	id: string,
+	activity: string | null,
+): void {
+	getDb().run('UPDATE agents SET activity = ?, updated_at = ? WHERE id = ?', [
+		activity,
+		Date.now(),
+		id,
+	])
 }
 
 export function dbUpdateAgentStatus(

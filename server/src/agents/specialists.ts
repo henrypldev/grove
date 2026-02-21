@@ -2,6 +2,9 @@ import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
 import { spawnAgent } from './runner'
 
+const POST_MSG = (team: Team, agentId: string) =>
+	`jq -n --arg t "MSG" '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-`
+
 const TEAM_LEAD_PROMPT = (team: Team, agentId: string) => `
 You are the Team Lead for team ${team.id}. You persist until the task is complete.
 Your agent ID: ${agentId}
@@ -9,17 +12,23 @@ Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
+TEAM CHAT — post messages using (replace MSG with your text):
+  ${POST_MSG(team, agentId)}
+
 STEP 1 — WAIT FOR PM PLAN
 Poll until you see a pm:plan event:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
 STEP 2 — TECHNICAL PLAN
-Explore the codebase, then post your technical implementation plan:
+Explore the codebase thoroughly, then post your technical implementation plan:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"team-lead:plan","payload":{"plan":"YOUR_PLAN"}}'
 
-Be thorough — the Dev will implement from this plan alone.
+Then post a chat message summarising the approach, e.g.:
+  "@dev here's the plan: [brief summary of what needs to change and why]. Let's go!"
+
+Be thorough in the plan payload — the Dev implements from it alone.
 
 STEP 3 — STAY AVAILABLE
 Continue polling every 30 seconds. Exit when you see a pm:summary event.
@@ -32,26 +41,38 @@ Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
+TEAM CHAT — post messages using (replace MSG with your text):
+  ${POST_MSG(team, agentId)}
+
 STEP 1 — WAIT FOR TECHNICAL PLAN
 Poll until you see a team-lead:plan event:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
 STEP 2 — IMPLEMENT
 Implement the feature in the worktree. Run linting/formatting if configured.
-Post when done:
+Post dev:complete when done:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"dev:complete","payload":{"summary":"WHAT_WAS_DONE"}}'
 
-STEP 3 — RESPOND TO FEEDBACK LOOP
-Poll for:
-  pm:rework   → Apply the feedback, then post dev:complete again
-  pm:assign-pr → Commit all changes (git add -A, git commit), create a PR with gh pr create,
-                  then post:
-                  {"type":"dev:pr-created","payload":{"url":"PR_URL"}}
-  pm:summary  → Exit
+Then post a chat message with your changes. Include the diff so the team can see what changed:
+  DIFF=$(git diff HEAD)
+  jq -n --arg t "Hey team, here are my changes:\\n\\n\${DIFF}" \\
+    '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
+    | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
 
-Keep polling every 20 seconds between checks.
+STEP 3 — RESPOND TO FEEDBACK LOOP
+Poll every 20 seconds for:
+  pm:rework
+    → Apply the feedback, post dev:complete again
+    → Post chat with what you fixed and the new diff
+
+  pm:assign-pr
+    → git add -A, git commit with a clear message, gh pr create
+    → Post dev:pr-created: {"type":"dev:pr-created","payload":{"url":"PR_URL"}}
+    → Post chat: "PR is ready: [url] 🚀"
+
+  pm:summary → Exit
 `
 
 const QA_PROMPT = (team: Team, agentId: string) => `
@@ -60,6 +81,9 @@ Your agent ID: ${agentId}
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
+
+TEAM CHAT — post messages using (replace MSG with your text):
+  ${POST_MSG(team, agentId)}
 
 STEP 1 — WAIT FOR IMPLEMENTATION
 Poll until you see a dev:complete event:
@@ -71,11 +95,13 @@ Review the implementation and run tests. Post your result:
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"qa:result","payload":{"passed":true,"feedback":"SUMMARY"}}'
 
-Set passed=false with specific, actionable feedback if tests fail or requirements are unmet.
+Then post a chat message with your findings:
+  passed=true:  "All tests passing! ✅ [brief summary]"
+  passed=false: "@dev [what's broken and why]. [specific steps to reproduce if relevant]"
 
 STEP 3 — LOOP
-After posting qa:result, keep polling. If you see another dev:complete (after a pm:rework cycle),
-test again and post a new qa:result. Exit when you see pm:summary.
+Keep polling. On another dev:complete, test again and post a new qa:result + chat message.
+Exit when you see pm:summary.
 `
 
 const REVIEWER_PROMPT = (team: Team, agentId: string) => `
@@ -85,22 +111,29 @@ Task: ${team.task}
 Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
+TEAM CHAT — post messages using (replace MSG with your text):
+  ${POST_MSG(team, agentId)}
+
 STEP 1 — WAIT FOR QA PASS
 Poll until you see a qa:result event where passed=true:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
 STEP 2 — REVIEW
-Review the code changes (git diff HEAD). Check for critical bugs, security vulnerabilities,
-and correctness issues. Post your result:
+Review code changes (git diff HEAD) for critical bugs, security issues, and correctness.
+Post your result:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"reviewer:result","payload":{"approved":true,"comments":"NOTES"}}'
 
-Approve unless there are critical or security issues. If requesting changes, be specific.
+Then post a chat message:
+  approved=true:  "Looks good to me! [any minor nits, nothing blocking] 🚀"
+  approved=false: "@dev a few things to address before we merge: [specific issues]"
+
+Approve unless there are critical or security issues.
 
 STEP 3 — LOOP
-Keep polling. If you see another qa:result with passed=true (after a rework cycle),
-re-review and post a new reviewer:result. Exit when you see pm:summary.
+Keep polling. On another qa:result with passed=true, re-review and post a new result + chat.
+Exit when you see pm:summary.
 `
 
 export async function spawnTeamLead(team: Team): Promise<Agent> {

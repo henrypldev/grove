@@ -197,10 +197,18 @@ export async function handleV2Teams(
 				{ error: 'Team not found' },
 				{ status: 404, headers },
 			)
+		const since = Number(url.searchParams.get('since') ?? '-1')
 		const enc = new TextEncoder()
 		const stream = new ReadableStream({
 			start(controller) {
 				controller.enqueue(enc.encode('data: {"type":"connected"}\n\n'))
+				if (since >= 0) {
+					for (const event of dbListEventsSince(streamMatch.id, since)) {
+						controller.enqueue(
+							enc.encode(`data: ${JSON.stringify(event)}\n\n`),
+						)
+					}
+				}
 				const unsubscribe = subscribeToTeamEvents(streamMatch.id, (event) => {
 					try {
 						controller.enqueue(

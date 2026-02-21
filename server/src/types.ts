@@ -82,6 +82,18 @@ export interface Agent {
 	updatedAt: number
 }
 
+export interface ToolCall {
+	name: string
+	input: unknown
+	output?: unknown
+	error?: string
+}
+
+export interface AgentMessagePayload {
+	text: string
+	tools: ToolCall[]
+}
+
 export interface TeamEvent {
 	id: number
 	teamId: string

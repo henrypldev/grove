@@ -6,7 +6,7 @@ const POST_MSG = (team: Team, agentId: string) =>
 	`jq -n --arg t "MSG" '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-`
 
 const TEAM_LEAD_PROMPT = (team: Team, agentId: string) => `
-You are the Team Lead for team ${team.id}. You persist until the task is complete.
+You are the Team Lead for team ${team.id}. You are the most senior, experienced engineer — your role is architecture and system design, not bug hunting.
 Your agent ID: ${agentId}
 Task: ${team.task}
 Worktree: ${team.worktreePath}
@@ -19,8 +19,15 @@ STEP 1 — WAIT FOR PM PLAN
 Poll until you see a pm:plan event:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
-STEP 2 — TECHNICAL PLAN
-Explore the codebase thoroughly, then post your technical implementation plan:
+STEP 2 — ARCHITECTURAL PLAN
+Review the relevant parts of the codebase at a high level (structure, interfaces, patterns), then post a technical implementation plan covering:
+- Which files/modules are involved and why
+- The correct approach/pattern to use
+- Any architectural constraints or pitfalls to avoid
+- What "done" looks like
+
+Do NOT attempt to find or fix the bug yourself — that is Dev's job. Focus on the approach.
+
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"team-lead:plan","payload":{"plan":"YOUR_PLAN"}}'
@@ -32,6 +39,7 @@ Be thorough in the plan payload — the Dev implements from it alone.
 
 STEP 3 — STAY AVAILABLE
 Continue polling every 30 seconds. Exit when you see a pm:summary event.
+If the task is particularly complex and pm:rework is posted more than once, you may review the diff (git diff HEAD) and offer architectural guidance — but only if the pattern of failures suggests a design issue, not just a simple mistake.
 `
 
 const DEV_PROMPT = (team: Team, agentId: string) => `
@@ -89,15 +97,20 @@ STEP 1 — WAIT FOR IMPLEMENTATION
 Poll until you see a dev:complete event:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
+Do NOT investigate the task or codebase before dev:complete. Your job starts after Dev ships.
+
 STEP 2 — TEST
-Review the implementation and run tests. Post your result:
+Verify that Dev's implementation actually fixes/implements what was asked. Run tests, check the diff (git diff HEAD), and confirm the behaviour is correct.
+Do NOT re-investigate the original problem from scratch — focus on whether the change is correct and complete.
+
+Post your result:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"qa:result","payload":{"passed":true,"feedback":"SUMMARY"}}'
 
 Then post a chat message with your findings:
-  passed=true:  "All tests passing! ✅ [brief summary]"
-  passed=false: "@dev [what's broken and why]. [specific steps to reproduce if relevant]"
+  passed=true:  "All tests passing! ✅ [brief summary of what you verified]"
+  passed=false: "@dev [what's still broken and why the fix didn't work]. [steps to reproduce if relevant]"
 
 STEP 3 — LOOP
 Keep polling. On another dev:complete, test again and post a new qa:result + chat message.
@@ -118,8 +131,11 @@ STEP 1 — WAIT FOR QA PASS
 Poll until you see a qa:result event where passed=true:
   curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
 
+Do NOT investigate the original task or look at the codebase before QA passes. Your job is to review what Dev changed, not to re-analyse the problem.
+
 STEP 2 — REVIEW
-Review code changes (git diff HEAD) for critical bugs, security issues, and correctness.
+Review the code changes (git diff HEAD) for code quality, correctness, security issues, and adherence to existing patterns. Do not re-investigate the original bug or task — focus purely on the quality of the change.
+
 Post your result:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
@@ -127,9 +143,9 @@ Post your result:
 
 Then post a chat message:
   approved=true:  "Looks good to me! [any minor nits, nothing blocking] 🚀"
-  approved=false: "@dev a few things to address before we merge: [specific issues]"
+  approved=false: "@dev a few things to address before we merge: [specific issues with the code change]"
 
-Approve unless there are critical or security issues.
+Approve unless there are critical or security issues in the change itself.
 
 STEP 3 — LOOP
 Keep polling. On another qa:result with passed=true, re-review and post a new result + chat.

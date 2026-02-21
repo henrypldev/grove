@@ -1,3 +1,8 @@
+import type {
+	PostToolUseFailureHookInput,
+	PostToolUseHookInput,
+	PreToolUseHookInput,
+} from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
 import {
@@ -8,7 +13,15 @@ import {
 	dbUpdateAgentStatus,
 } from '../db/agents'
 import { dbInsertEvent } from '../db/events'
-import type { Agent, AgentRole } from '../types'
+import type { Agent, AgentRole, ToolCall } from '../types'
+
+const agentToolAccumulator = new Map<string, ToolCall[]>()
+
+export function popAgentTools(agentId: string): ToolCall[] {
+	const tools = agentToolAccumulator.get(agentId) ?? []
+	agentToolAccumulator.delete(agentId)
+	return tools
+}
 
 export interface AgentRunOptions {
 	agentId?: string
@@ -50,6 +63,8 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 	dbUpdateAgentStatus(agent.id, 'working')
 
+	const pending = new Map<string, ToolCall>()
+
 	try {
 		for await (const message of query({
 			prompt: opts.prompt,
@@ -58,6 +73,55 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 				maxBudgetUsd: opts.maxBudgetUsd ?? 5,
 				permissionMode: 'bypassPermissions',
 				...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+				hooks: {
+					PreToolUse: [
+						{
+							hooks: [
+								async (input) => {
+									const h = input as PreToolUseHookInput
+									pending.set(h.tool_use_id, { name: h.tool_name, input: h.tool_input })
+									return {}
+								},
+							],
+						},
+					],
+					PostToolUse: [
+						{
+							hooks: [
+								async (input) => {
+									const h = input as PostToolUseHookInput
+									const call = pending.get(h.tool_use_id)
+									if (call) {
+										call.output = h.tool_response
+										const arr = agentToolAccumulator.get(agent.id) ?? []
+										arr.push(call)
+										agentToolAccumulator.set(agent.id, arr)
+										pending.delete(h.tool_use_id)
+									}
+									return {}
+								},
+							],
+						},
+					],
+					PostToolUseFailure: [
+						{
+							hooks: [
+								async (input) => {
+									const h = input as PostToolUseFailureHookInput
+									const call = pending.get(h.tool_use_id)
+									if (call) {
+										call.error = h.error
+										const arr = agentToolAccumulator.get(agent.id) ?? []
+										arr.push(call)
+										agentToolAccumulator.set(agent.id, arr)
+										pending.delete(h.tool_use_id)
+									}
+									return {}
+								},
+							],
+						},
+					],
+				},
 			},
 		})) {
 			dbInsertEvent(

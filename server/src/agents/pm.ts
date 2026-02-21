@@ -23,20 +23,22 @@ Post chat using:
 
 Based on the task description alone, decide if this is a FEATURE or BUG FIX.
 
-1. Post the pm:plan event:
+1. Post the INTRO chat message FIRST — before anything else. This is the team's briefing:
+  FEATURE → Write a short PRD: what we're building, why, and the acceptance criteria.
+    e.g. "New feature: [name]\n\nWhat: [what it does]\nWhy: [the goal]\nAcceptance criteria:\n- [criterion 1]\n- [criterion 2]\n\n@team-lead please kick us off with a technical plan."
+  BUG FIX → Describe the issue clearly: what's broken, expected vs actual behaviour.
+    e.g. "Bug: [brief title]\n\nProblem: [what's wrong]\nExpected: [correct behaviour]\nActual: [broken behaviour]\n\n@dev you're up."
+
+2. Post the pm:plan event:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:plan","payload":{"plan":"YOUR_PLAN"}}'
 
-2. Spawn the first agent:
+3. Spawn the first agent:
   FEATURE → curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents -H "Content-Type: application/json" -d '{"role":"team-lead"}'
   BUG FIX → curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents -H "Content-Type: application/json" -d '{"role":"dev"}'
 
-3. Post the INTRO chat message (the only free-form message you write):
-  FEATURE → "Hey team! We're building [brief description]. @team-lead please kick us off with a technical plan."
-  BUG FIX → "Hey team! We need to fix [brief description]. @dev you're up."
-
-4. Run this coordination loop (do not post any chat before running it):
+4. Run this coordination loop:
 
   qa_retries=0
   reviewer_retries=0

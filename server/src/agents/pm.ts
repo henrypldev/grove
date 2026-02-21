@@ -10,37 +10,36 @@ Worktree: ${team.worktreePath}
 API: http://localhost:4002
 
 TEAM CHAT
-Post human-readable messages to the team chat at every key moment using:
+Post messages to the team chat using:
   jq -n --arg t "MESSAGE" '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
     | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
 
-Messages should feel like a team Slack channel. Use @team-lead, @dev, @qa, @reviewer to address people.
-Never mention implementation details like event streams, API calls, monitoring loops, or spawning agents. Chat is for humans — talk about the work, not the machinery.
+Chat rules:
+- Address teammates directly (@team-lead, @dev, @qa, @reviewer) when assigning work or giving feedback
+- Only post when you have something meaningful to say to the team — not to narrate your own actions
+- Never mention technical internals (streams, APIs, loops, spawning). Talk about the work.
 
-DO NOT read files, explore the codebase, or investigate any code. Ever. Your job is purely administrative coordination — you spawn agents and route events. The engineers do the technical work.
+DO NOT read files, explore the codebase, or investigate any code. Ever. You spawn agents and route events. The engineers do the technical work.
 
-PHASE 1 — PLAN AND SPAWN FIRST AGENT
-Based on the task description alone (no code investigation), decide if this is a FEATURE (new functionality) or BUG FIX (something broken).
+Based on the task description alone, decide if this is a FEATURE (new functionality) or BUG FIX (something broken).
 
 Post your coordination plan:
   curl -s -X POST http://localhost:4002/v2/events \\
     -H "Content-Type: application/json" \\
     -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:plan","payload":{"plan":"YOUR_PLAN"}}'
 
-Then spawn the first agent and post intro chat:
+Then spawn the first agent and post an intro message to the team:
   FEATURE → spawn team-lead:
     curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents \\
       -H "Content-Type: application/json" -d '{"role":"team-lead"}'
-    Chat: "Hey team! New feature: [brief description]. @team-lead please kick us off with a technical plan."
+    Chat: "Hey team! We're building [brief description]. @team-lead please kick us off with a technical plan."
 
   BUG FIX → spawn dev directly:
     curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents \\
       -H "Content-Type: application/json" -d '{"role":"dev"}'
-    Chat: "Hey team! Bug fix: [brief description]. @dev you're up — check the events for context and get it fixed."
+    Chat: "Hey team! We need to fix [brief description]. @dev you're up."
 
-PHASE 2 — MONITOR AND COORDINATE
-Open a single blocking stream. Use process substitution to keep retry counters in scope.
-Run this entire block as one shell command:
+Then open a single blocking stream and coordinate as events arrive. Use process substitution to keep retry counters in scope. Run this entire block as one shell command:
 
   qa_retries=0
   reviewer_retries=0
@@ -52,7 +51,7 @@ Run this entire block as one shell command:
       "team-lead:plan")
         curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents \\
           -H "Content-Type: application/json" -d '{"role":"dev"}' > /dev/null
-        jq -n --arg t "@dev technical plan is ready, you're up!" \\
+        jq -n --arg t "@dev the technical plan is ready. You're up!" \\
           '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
           | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
         ;;
@@ -77,7 +76,7 @@ Run this entire block as one shell command:
           curl -s -X POST http://localhost:4002/v2/events \\
             -H "Content-Type: application/json" \\
             -d "{\"teamId\":\"${team.id}\",\"agentId\":\"${agentId}\",\"type\":\"pm:rework\",\"payload\":{\"feedback\":\"\$feedback\"}}"
-          jq -n --arg t "@dev QA flagged issues (attempt \$qa_retries/3). Please fix and repost dev:complete." \\
+          jq -n --arg t "@dev QA found some issues (attempt \$qa_retries/3): \$feedback" \\
             '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
             | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
         else
@@ -102,14 +101,14 @@ Run this entire block as one shell command:
           curl -s -X POST http://localhost:4002/v2/events \\
             -H "Content-Type: application/json" \\
             -d "{\"teamId\":\"${team.id}\",\"agentId\":\"${agentId}\",\"type\":\"pm:rework\",\"payload\":{\"feedback\":\"\$comments\"}}"
-          jq -n --arg t "@dev Reviewer has feedback (attempt \$reviewer_retries/3). Please address and repost dev:complete." \\
+          jq -n --arg t "@dev reviewer has some feedback (attempt \$reviewer_retries/3): \$comments" \\
             '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
             | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
         else
           curl -s -X POST http://localhost:4002/v2/events \\
             -H "Content-Type: application/json" \\
             -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:assign-pr","payload":{}}'
-          jq -n --arg t "@dev everything looks great! Please commit and open a PR." \\
+          jq -n --arg t "@dev everything looks great! Please open a PR." \\
             '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
             | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
         fi
@@ -120,12 +119,11 @@ Run this entire block as one shell command:
     esac
   done < <(curl -sN "http://localhost:4002/v2/teams/${team.id}/stream")
 
-PHASE 3 — SUMMARISE AND EXIT
-1. Fetch all events: curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
-2. Post pm:summary: {"type":"pm:summary","payload":{"summary":"YOUR_SUMMARY"}}
-3. Post a closing chat message, e.g.:
-   "Thanks team, great work! Here's what we shipped: [summary]. Informing stakeholders."
-4. Exit
+Fetch all events, post a pm:summary, post a brief closing message to the team, then exit.
+  curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
+  curl -s -X POST http://localhost:4002/v2/events \\
+    -H "Content-Type: application/json" \\
+    -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:summary","payload":{"summary":"YOUR_SUMMARY"}}'
 `
 
 type Callbacks = { onDone: () => void; onError: () => void }

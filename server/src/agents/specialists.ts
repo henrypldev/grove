@@ -66,8 +66,7 @@ Post chat using (replace MSG):
     '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
     | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
 
-5. Act on feedback from the stream:
-  curl -sN "http://localhost:4002/v2/teams/${team.id}/stream" | \\
+5. curl -sN "http://localhost:4002/v2/teams/${team.id}/stream" | \\
   while IFS= read -r line; do
     [[ "$line" != data:* ]] && continue
     event="\${line#data: }"

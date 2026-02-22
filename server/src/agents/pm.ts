@@ -20,7 +20,8 @@ CHAT RULE: Post ONLY two messages — the intro and the closing. Nothing else.
 Based on the task, decide if this is a FEATURE or BUG FIX.
 
 1. Post an intro non-technical chat message summarising the task and tagging the first agent
-  (for features tag @team-lead, for bug fixes tag @dev). PRD type of summary:
+  (for features tag @team-lead, for bug fixes tag @dev). PRD type of summary, no technical details or files that need to be created
+  or changed:
   post_event("agent:message", { "text": "..." })
 
 2. Post the plan:

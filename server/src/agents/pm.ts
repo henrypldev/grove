@@ -1,129 +1,67 @@
 import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
+import { createGroveTools } from './grove-tools'
 import { spawnAgent } from './runner'
+import { spawnDeveloper, spawnQaAgent, spawnReviewerAgent, spawnTeamLead } from './specialists'
 
-const POST_CHAT = (team: Team, agentId: string) =>
-	`jq -n --arg t "MSG" '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-`
-
-const PM_PROMPT = (team: Team, agentId: string) => `
+const PM_PROMPT = (team: Team) => `
 You are the PM for team ${team.id}. You persist until the task is fully complete.
-Your agent ID: ${agentId}
 Task: ${team.task}
 Worktree: ${team.worktreePath}
-API: http://localhost:4002
 
-DO NOT read files, explore the codebase, or investigate any code. You spawn agents and route events.
+CHAT RULE: Post ONLY two messages — the intro and the closing. Nothing else.
 
-CHAT RULE: Post ONLY the two messages described below (intro and closing). The shell loop handles all other messages automatically. Do not post anything else.
+Based on the task, decide if this is a FEATURE or BUG FIX.
 
-Post chat using:
-  ${POST_CHAT(team, agentId)}
+1. Post the intro chat message first:
+  FEATURE: post_event("agent:message", { "text": "New feature: [name]\\n\\nWhat: [what]\\nWhy: [why]\\nAcceptance criteria:\\n- [...]\\n\\n@team-lead please kick us off with a technical plan." })
+  BUG FIX: post_event("agent:message", { "text": "Bug: [title]\\n\\nProblem: [what's wrong]\\nExpected: [correct]\\nActual: [broken]\\n\\n@dev you're up." })
 
----
-
-Based on the task description alone, decide if this is a FEATURE or BUG FIX.
-
-1. Post the INTRO chat message FIRST — before anything else. This is the team's briefing:
-  FEATURE → Write a short PRD: what we're building, why, and the acceptance criteria.
-    e.g. "New feature: [name]\n\nWhat: [what it does]\nWhy: [the goal]\nAcceptance criteria:\n- [criterion 1]\n- [criterion 2]\n\n@team-lead please kick us off with a technical plan."
-  BUG FIX → Describe the issue clearly: what's broken, expected vs actual behaviour.
-    e.g. "Bug: [brief title]\n\nProblem: [what's wrong]\nExpected: [correct behaviour]\nActual: [broken behaviour]\n\n@dev you're up."
-
-2. Post the pm:plan event:
-  curl -s -X POST http://localhost:4002/v2/events \\
-    -H "Content-Type: application/json" \\
-    -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:plan","payload":{"plan":"YOUR_PLAN"}}'
+2. Post the plan:
+  post_event("pm:plan", { "plan": "YOUR_PLAN" })
 
 3. Spawn the first agent:
-  FEATURE → curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents -H "Content-Type: application/json" -d '{"role":"team-lead"}'
-  BUG FIX → curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents -H "Content-Type: application/json" -d '{"role":"dev"}'
+  FEATURE: spawn_agent("team-lead")
+  BUG FIX: spawn_agent("dev")
 
-4. Run this coordination loop:
+4. Coordination loop (track qa_retries and reviewer_retries starting at 0):
 
-  qa_retries=0
-  reviewer_retries=0
-  while IFS= read -r line; do
-    [[ "$line" != data:* ]] && continue
-    event="\${line#data: }"
-    type=$(printf '%s' "$event" | jq -r '.type')
-    case "$type" in
-      "team-lead:plan")
-        curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents \\
-          -H "Content-Type: application/json" -d '{"role":"dev"}' > /dev/null
-        jq -n --arg t "@dev the technical plan is ready. You're up!" \\
-          '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
-          | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
-        ;;
-      "dev:complete")
-        curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents \\
-          -H "Content-Type: application/json" -d '{"role":"qa"}' > /dev/null
-        jq -n --arg t "@qa implementation is ready for testing!" \\
-          '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
-          | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
-        ;;
-      "qa:result")
-        passed=$(printf '%s' "$event" | jq -r '.payload.passed')
-        if [ "$passed" = "false" ]; then
-          qa_retries=$((qa_retries + 1))
-          if [ $qa_retries -ge 3 ]; then
-            curl -s -X POST http://localhost:4002/v2/events \\
-              -H "Content-Type: application/json" \\
-              -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:blocked","payload":{"reason":"QA failed 3 times"}}'
-            break
-          fi
-          feedback=$(printf '%s' "$event" | jq -r '.payload.feedback')
-          curl -s -X POST http://localhost:4002/v2/events \\
-            -H "Content-Type: application/json" \\
-            -d "{\"teamId\":\"${team.id}\",\"agentId\":\"${agentId}\",\"type\":\"pm:rework\",\"payload\":{\"feedback\":\"\$feedback\"}}"
-          jq -n --arg t "@dev QA found some issues (attempt \$qa_retries/3): \$feedback" \\
-            '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
-            | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
-        else
-          curl -s -X POST http://localhost:4002/v2/teams/${team.id}/agents \\
-            -H "Content-Type: application/json" -d '{"role":"reviewer"}' > /dev/null
-          jq -n --arg t "@reviewer QA passed! Ready for your review." \\
-            '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
-            | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
-        fi
-        ;;
-      "reviewer:result")
-        approved=$(printf '%s' "$event" | jq -r '.payload.approved')
-        if [ "$approved" = "false" ]; then
-          reviewer_retries=$((reviewer_retries + 1))
-          if [ $reviewer_retries -ge 3 ]; then
-            curl -s -X POST http://localhost:4002/v2/events \\
-              -H "Content-Type: application/json" \\
-              -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:blocked","payload":{"reason":"Reviewer rejected 3 times"}}'
-            break
-          fi
-          comments=$(printf '%s' "$event" | jq -r '.payload.comments')
-          curl -s -X POST http://localhost:4002/v2/events \\
-            -H "Content-Type: application/json" \\
-            -d "{\"teamId\":\"${team.id}\",\"agentId\":\"${agentId}\",\"type\":\"pm:rework\",\"payload\":{\"feedback\":\"\$comments\"}}"
-          jq -n --arg t "@dev reviewer has some feedback (attempt \$reviewer_retries/3): \$comments" \\
-            '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
-            | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
-        else
-          curl -s -X POST http://localhost:4002/v2/events \\
-            -H "Content-Type: application/json" \\
-            -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:assign-pr","payload":{}}'
-          jq -n --arg t "@dev everything looks great! Please open a PR." \\
-            '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
-            | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
-        fi
-        ;;
-      "dev:pr-created")
-        break
-        ;;
-    esac
-  done < <(curl -sN "http://localhost:4002/v2/teams/${team.id}/stream")
+  Loop:
+    event = wait_for_event(["team-lead:plan", "dev:complete", "qa:result", "reviewer:result", "dev:pr-created"])
 
-5. Fetch all events, post pm:summary, post the CLOSING chat message, then exit:
-  curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
-  curl -s -X POST http://localhost:4002/v2/events \\
-    -H "Content-Type: application/json" \\
-    -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"pm:summary","payload":{"summary":"YOUR_SUMMARY"}}'
-  # closing chat: "Great work team! Here's what we shipped: [summary]."
+    "team-lead:plan":
+      spawn_agent("dev")
+      post_event("agent:message", { "text": "@dev the technical plan is ready. You're up!" })
+
+    "dev:complete":
+      spawn_agent("qa")
+      post_event("agent:message", { "text": "@qa implementation is ready for testing!" })
+
+    "qa:result" where payload.passed == false:
+      qa_retries++
+      if qa_retries >= 3: post_event("pm:blocked", { "reason": "QA failed 3 times" }); break
+      post_event("pm:rework", { "feedback": payload.feedback })
+      post_event("agent:message", { "text": "@dev QA found issues (attempt {qa_retries}/3): {feedback}" })
+
+    "qa:result" where payload.passed == true:
+      spawn_agent("reviewer")
+      post_event("agent:message", { "text": "@reviewer QA passed! Ready for your review." })
+
+    "reviewer:result" where payload.approved == false:
+      reviewer_retries++
+      if reviewer_retries >= 3: post_event("pm:blocked", { "reason": "Reviewer rejected 3 times" }); break
+      post_event("pm:rework", { "feedback": payload.comments })
+      post_event("agent:message", { "text": "@dev reviewer has feedback (attempt {reviewer_retries}/3): {comments}" })
+
+    "reviewer:result" where payload.approved == true:
+      post_event("pm:assign-pr", {})
+      post_event("agent:message", { "text": "@dev everything looks great! Please open a PR." })
+
+    "dev:pr-created": break
+
+5. get_events(0) — read all events for summary
+6. post_event("pm:summary", { "summary": "YOUR_SUMMARY" })
+7. Post the closing: post_event("agent:message", { "text": "Great work team! Here's what we shipped: [summary]." })
 `
 
 type Callbacks = { onDone: () => void; onError: () => void }
@@ -131,14 +69,21 @@ type Callbacks = { onDone: () => void; onError: () => void }
 export async function spawnPm(team: Team, callbacks: Callbacks): Promise<Agent> {
 	log('pm', 'spawning PM', { teamId: team.id })
 	const agentId = generateId()
+	const mcpTools = createGroveTools(team.id, agentId, async role => {
+		if (role === 'team-lead') spawnTeamLead(team)
+		else if (role === 'dev') spawnDeveloper(team)
+		else if (role === 'qa') spawnQaAgent(team)
+		else if (role === 'reviewer') spawnReviewerAgent(team)
+	})
 	return spawnAgent({
 		agentId,
 		teamId: team.id,
 		role: 'pm',
-		prompt: PM_PROMPT(team, agentId),
+		prompt: PM_PROMPT(team),
 		cwd: team.worktreePath,
 		maxBudgetUsd: 10,
-		allowedTools: ['Bash'],
+		allowedTools: ['mcp__grove__*'],
+		mcpTools,
 		onDone: callbacks.onDone,
 		onError: callbacks.onError,
 	})

@@ -1,4 +1,6 @@
+import { cloneRepo, getGitHubOrgs, getGitHubRepos, getOrgRepos } from '../../api/github'
 import { addRepo, withSetupFile } from '../../api/repos'
+import { listDirectories } from '../../config'
 import {
 	dbDeleteRepo,
 	dbGetRepo,
@@ -33,6 +35,28 @@ export async function handleV2Repos(
 	const path = url.pathname
 	const method = req.method
 
+	if (path === '/v2/config/list-directories' && method === 'GET') {
+		const queryPath = url.searchParams.get('path') ?? '/'
+		const dirs = listDirectories(queryPath)
+		return Response.json({ directories: dirs }, { headers })
+	}
+
+	if (path === '/v2/github/repos' && method === 'GET') {
+		return Response.json({ repos: await getGitHubRepos() }, { headers })
+	}
+
+	if (path === '/v2/github/repos/orgs' && method === 'GET') {
+		return Response.json({ orgs: await getGitHubOrgs() }, { headers })
+	}
+
+	const orgReposMatch = matchRoute(path, '/v2/github/repos/orgs/:org')
+	if (orgReposMatch && method === 'GET') {
+		return Response.json(
+			{ repos: await getOrgRepos(orgReposMatch.org) },
+			{ headers },
+		)
+	}
+
 	if (path === '/v2/repos' && method === 'GET') {
 		return Response.json(dbListRepos(), { headers })
 	}
@@ -40,6 +64,15 @@ export async function handleV2Repos(
 	if (path === '/v2/repos' && method === 'POST') {
 		const body = await req.json()
 		const repo = await addRepo(body.path)
+		if (typeof repo === 'string')
+			return Response.json({ error: repo }, { status: 400, headers })
+		dbInsertRepo(repo)
+		return Response.json(withSetupFile(repo), { headers })
+	}
+
+	if (path === '/v2/repos/clone' && method === 'POST') {
+		const body = await req.json()
+		const repo = await cloneRepo(body.fullName)
 		if (typeof repo === 'string')
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)

@@ -8,6 +8,7 @@ import {
 	dbGetTeam,
 	dbInsertTeam,
 	dbListTeams,
+	dbUpdateTeamTitle,
 } from '../../db/teams'
 import type { Team } from '../../types'
 
@@ -74,12 +75,18 @@ export async function handleV2Teams(
 			repoId: body.repoId,
 			worktreePath: worktree.path,
 			task: body.task,
+			title: null,
 			status: 'planning',
 			pmSummary: null,
 			createdAt: now,
 			updatedAt: now,
 		}
 		dbInsertTeam(team)
+
+		const { generateTeamTitle } = await import('../../agents/title')
+		const title = await generateTeamTitle(body.task)
+		dbUpdateTeamTitle(teamId, title)
+		team.title = title
 
 		if (onTeamCreated) await onTeamCreated(team)
 

@@ -64,6 +64,7 @@ export interface Team {
 	repoId: string
 	worktreePath: string
 	task: string
+	title: string | null
 	status: TeamStatus
 	pmSummary: string | null
 	createdAt: number

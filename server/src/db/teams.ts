@@ -6,6 +6,7 @@ interface DbTeam {
 	repo_id: string
 	worktree_path: string
 	task: string
+	title: string | null
 	status: string
 	pm_summary: string | null
 	created_at: number
@@ -18,6 +19,7 @@ function toTeam(row: DbTeam): Team {
 		repoId: row.repo_id,
 		worktreePath: row.worktree_path,
 		task: row.task,
+		title: row.title,
 		status: row.status as TeamStatus,
 		pmSummary: row.pm_summary,
 		createdAt: row.created_at,
@@ -52,19 +54,28 @@ export function dbGetTeam(id: string): Team | null {
 
 export function dbInsertTeam(team: Team): void {
 	getDb().run(
-		`INSERT INTO teams (id, repo_id, worktree_path, task, status, pm_summary, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO teams (id, repo_id, worktree_path, task, title, status, pm_summary, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			team.id,
 			team.repoId,
 			team.worktreePath,
 			team.task,
+			team.title,
 			team.status,
 			team.pmSummary,
 			team.createdAt,
 			team.updatedAt,
 		],
 	)
+}
+
+export function dbUpdateTeamTitle(id: string, title: string): void {
+	getDb().run('UPDATE teams SET title = ?, updated_at = ? WHERE id = ?', [
+		title,
+		Date.now(),
+		id,
+	])
 }
 
 export function dbUpdateTeamStatus(

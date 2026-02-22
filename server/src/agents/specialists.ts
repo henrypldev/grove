@@ -1,148 +1,81 @@
 import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
+import { createGroveTools } from './grove-tools'
 import { spawnAgent } from './runner'
 
-const POST_CHAT = (team: Team, agentId: string) =>
-	`jq -n --arg t "MSG" '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-`
-
-const TEAM_LEAD_PROMPT = (team: Team, agentId: string) => `
+const TEAM_LEAD_PROMPT = (team: Team) => `
 You are the Team Lead for team ${team.id}. Your role is architecture and system design.
-Your agent ID: ${agentId}
 Task: ${team.task}
 Worktree: ${team.worktreePath}
-API: http://localhost:4002
 
-CHAT RULE: Post ONLY one message — the plan summary to @dev after posting the plan event. Nothing else.
+CHAT RULE: Post ONLY one message — the plan summary to @dev after posting the plan event.
 
-Post chat using (replace MSG):
-  ${POST_CHAT(team, agentId)}
-
-1. Read team events for context:
-  curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
-
-2. Review the codebase at a high level, then post the plan event:
-  curl -s -X POST http://localhost:4002/v2/events \\
-    -H "Content-Type: application/json" \\
-    -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"team-lead:plan","payload":{"plan":"YOUR_PLAN"}}'
-
-  Plan must cover: which files/modules, correct approach/pattern, constraints to avoid, what "done" looks like.
-  Be thorough — Dev implements from this alone.
-
-3. Post the ONE chat message summarising the plan for dev:
-  "@dev [brief summary of approach and key things to watch out for]. Go!"
+1. get_events(0) — read context
+2. Review the codebase at a high level, then post the plan:
+   post_event("team-lead:plan", { "plan": "YOUR_PLAN" })
+   Plan must cover: which files/modules, correct approach/pattern, constraints to avoid, what "done" looks like.
+   Be thorough — Dev implements from this alone.
+3. post_event("agent:message", { "text": "@dev [brief summary of approach and key things to watch out for]. Go!" })
 
 Exit.
 `
 
-const DEV_PROMPT = (team: Team, agentId: string) => `
+const DEV_PROMPT = (team: Team) => `
 You are the Developer for team ${team.id}. You persist until the task is complete.
-Your agent ID: ${agentId}
 Task: ${team.task}
 Worktree: ${team.worktreePath}
-API: http://localhost:4002
 
-CHAT RULE: Post ONLY these messages, at exactly these moments:
-  - After implementing: post the diff (see below)
-  - After rework: post the updated diff
-  - After creating PR: post "PR is up: [url]"
-  Do not post anything else at any other time.
+CHAT RULE: Post diff after implementing, updated diff after rework, "PR is up: [url]" after creating PR.
 
-Post chat using (replace MSG):
-  ${POST_CHAT(team, agentId)}
-
-1. Read team events for context (pm:plan and team-lead:plan if present):
-  curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
-
+1. get_events(0) — read pm:plan and team-lead:plan if present
 2. Implement the task in the worktree. Run linting/formatting if configured.
+3. post_event("dev:complete", { "summary": "WHAT_WAS_DONE" })
+4. Post the diff:
+   post_event("agent:message", { "text": "Here's what I changed:\\n\\n[git diff HEAD output]" })
 
-3. Post dev:complete:
-  curl -s -X POST http://localhost:4002/v2/events \\
-    -H "Content-Type: application/json" \\
-    -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"dev:complete","payload":{"summary":"WHAT_WAS_DONE"}}'
+5. Loop:
+   event = wait_for_event(["pm:rework", "pm:assign-pr", "pm:summary"])
 
-4. Post the diff (your ONLY chat message after implementing):
-  DIFF=$(git diff HEAD)
-  jq -n --arg t "Here's what I changed:\\n\\n\${DIFF}" \\
-    '{teamId:"${team.id}",agentId:"${agentId}",type:"agent:message",payload:{text:$t}}' \\
-    | curl -s -X POST http://localhost:4002/v2/events -H "Content-Type: application/json" -d @-
-
-5. curl -sN "http://localhost:4002/v2/teams/${team.id}/stream" | \\
-  while IFS= read -r line; do
-    [[ "$line" != data:* ]] && continue
-    event="\${line#data: }"
-    type=$(printf '%s' "$event" | jq -r '.type')
-    case "$type" in
-      "pm:rework")
-        # read feedback: $(printf '%s' "$event" | jq -r '.payload.feedback')
-        # apply the fix, post dev:complete again, post updated diff chat
-        ;;
-      "pm:assign-pr")
-        # git add -A, git commit, gh pr create
-        # post dev:pr-created: {"type":"dev:pr-created","payload":{"url":"PR_URL"}}
-        # post chat: "PR is up: [url]"
-        break
-        ;;
-      "pm:summary") break ;;
-    esac
-  done
+   "pm:rework": apply the fix from payload.feedback, then post_event("dev:complete", ...) and post updated diff
+   "pm:assign-pr": git add -A, git commit, gh pr create, then:
+     post_event("dev:pr-created", { "url": "PR_URL" })
+     post_event("agent:message", { "text": "PR is up: [url]" })
+     break
+   "pm:summary": break
 `
 
-const QA_PROMPT = (team: Team, agentId: string) => `
+const QA_PROMPT = (team: Team) => `
 You are the QA agent for team ${team.id}. Run once and exit.
-Your agent ID: ${agentId}
 Task: ${team.task}
 Worktree: ${team.worktreePath}
-API: http://localhost:4002
 
-CHAT RULE: Post ONLY one message — your findings after testing. Nothing else.
+CHAT RULE: Post ONLY one message — your findings after testing.
 
-Post chat using (replace MSG):
-  ${POST_CHAT(team, agentId)}
-
-1. Read team events to understand what Dev implemented:
-  curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
-
+1. get_events(0) — understand what Dev implemented
 2. Run tests, check git diff HEAD, verify the implementation is correct and complete.
    Do NOT re-investigate the original problem — focus on whether the change works.
-
-3. Post qa:result:
-  curl -s -X POST http://localhost:4002/v2/events \\
-    -H "Content-Type: application/json" \\
-    -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"qa:result","payload":{"passed":true,"feedback":"SUMMARY"}}'
-
-4. Post the ONE chat message with your findings:
-  passed=true:  "All good! [brief summary of what you verified]"
-  passed=false: "@dev [what's broken and why]. [steps to reproduce if relevant]"
+3. post_event("qa:result", { "passed": true, "feedback": "SUMMARY" })
+4. Post findings:
+   passed=true:  post_event("agent:message", { "text": "All good! [brief summary of what you verified]" })
+   passed=false: post_event("agent:message", { "text": "@dev [what's broken and why]. [steps to reproduce if relevant]" })
 
 Exit.
 `
 
-const REVIEWER_PROMPT = (team: Team, agentId: string) => `
+const REVIEWER_PROMPT = (team: Team) => `
 You are the Reviewer for team ${team.id}. Run once and exit.
-Your agent ID: ${agentId}
 Task: ${team.task}
 Worktree: ${team.worktreePath}
-API: http://localhost:4002
 
-CHAT RULE: Post ONLY one message — your review verdict. Nothing else.
+CHAT RULE: Post ONLY one message — your review verdict.
 
-Post chat using (replace MSG):
-  ${POST_CHAT(team, agentId)}
-
-1. Read team events:
-  curl -s "http://localhost:4002/v2/teams/${team.id}/events?since=0"
-
+1. get_events(0)
 2. Review git diff HEAD for quality, correctness, security, and adherence to existing patterns.
    Focus on the change only — not the original task.
-
-3. Post reviewer:result:
-  curl -s -X POST http://localhost:4002/v2/events \\
-    -H "Content-Type: application/json" \\
-    -d '{"teamId":"${team.id}","agentId":"${agentId}","type":"reviewer:result","payload":{"approved":true,"comments":"NOTES"}}'
-
-4. Post the ONE chat message:
-  approved=true:  "Looks good to me! [any nits]"
-  approved=false: "@dev a few things to address: [specific issues]"
+3. post_event("reviewer:result", { "approved": true, "comments": "NOTES" })
+4. Post verdict:
+   approved=true:  post_event("agent:message", { "text": "Looks good to me! [any nits]" })
+   approved=false: post_event("agent:message", { "text": "@dev a few things to address: [specific issues]" })
 
 Approve unless there are critical or security issues. Exit.
 `
@@ -154,9 +87,10 @@ export async function spawnTeamLead(team: Team): Promise<Agent> {
 		agentId,
 		teamId: team.id,
 		role: 'team-lead',
-		prompt: TEAM_LEAD_PROMPT(team, agentId),
+		prompt: TEAM_LEAD_PROMPT(team),
 		cwd: team.worktreePath,
 		maxBudgetUsd: 10,
+		mcpTools: createGroveTools(team.id, agentId),
 	})
 }
 
@@ -167,9 +101,10 @@ export async function spawnDeveloper(team: Team): Promise<Agent> {
 		agentId,
 		teamId: team.id,
 		role: 'dev',
-		prompt: DEV_PROMPT(team, agentId),
+		prompt: DEV_PROMPT(team),
 		cwd: team.worktreePath,
 		maxBudgetUsd: 30,
+		mcpTools: createGroveTools(team.id, agentId),
 	})
 }
 
@@ -180,9 +115,10 @@ export async function spawnQaAgent(team: Team): Promise<Agent> {
 		agentId,
 		teamId: team.id,
 		role: 'qa',
-		prompt: QA_PROMPT(team, agentId),
+		prompt: QA_PROMPT(team),
 		cwd: team.worktreePath,
 		maxBudgetUsd: 15,
+		mcpTools: createGroveTools(team.id, agentId),
 	})
 }
 
@@ -193,8 +129,9 @@ export async function spawnReviewerAgent(team: Team): Promise<Agent> {
 		agentId,
 		teamId: team.id,
 		role: 'reviewer',
-		prompt: REVIEWER_PROMPT(team, agentId),
+		prompt: REVIEWER_PROMPT(team),
 		cwd: team.worktreePath,
 		maxBudgetUsd: 10,
+		mcpTools: createGroveTools(team.id, agentId),
 	})
 }

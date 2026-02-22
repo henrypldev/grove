@@ -2,10 +2,13 @@ import type {
 	PostToolUseFailureHookInput,
 	PostToolUseHookInput,
 	PreToolUseHookInput,
+	Query,
 } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
 import type { createGroveTools } from './grove-tools'
+import { MessageQueue } from './message-queue'
+import { registerAgent } from './agent-registry'
 import {
 	dbGetAgent,
 	dbIncrementAgentRetry,
@@ -182,6 +185,186 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 		dbUpdateAgentStatus(agent.id, 'error')
 		opts.onError?.(agent.id, err)
 		throw err
+	}
+}
+
+export interface PersistentAgentResult {
+	agent: Agent
+	queue: MessageQueue
+	query: Query
+}
+
+export async function spawnPersistentAgent(
+	opts: AgentRunOptions,
+): Promise<PersistentAgentResult> {
+	const agentId = opts.agentId ?? generateId()
+	const now = Date.now()
+	const agent: Agent = {
+		id: agentId,
+		teamId: opts.teamId,
+		role: opts.role,
+		status: 'planning',
+		activity: null,
+		currentTask: opts.prompt.slice(0, 200),
+		sessionId: null,
+		retryCount: 0,
+		spawnedAt: now,
+		updatedAt: now,
+	}
+	dbInsertAgent(agent)
+	dbUpdateAgentStatus(agent.id, 'working')
+
+	const messageQueue = new MessageQueue()
+	const pending = new Map<string, ToolCall>()
+
+	messageQueue.push(opts.prompt)
+
+	const q = query({
+		prompt: messageQueue,
+		options: {
+			cwd: opts.cwd,
+			maxBudgetUsd: opts.maxBudgetUsd ?? 5,
+			permissionMode: 'bypassPermissions',
+			...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
+			...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+			hooks: buildHooks(agent, pending),
+		},
+	})
+
+	registerAgent(opts.teamId, opts.role, {
+		agentId,
+		queue: messageQueue,
+		query: q,
+	})
+
+	processMessages(q, agent, opts, messageQueue).catch(err => {
+		log('agent', `unhandled error in persistent ${opts.role}`, { agentId, err })
+		dbUpdateAgentStatus(agentId, 'error')
+		opts.onError?.(agentId, err)
+	})
+
+	return { agent, queue: messageQueue, query: q }
+}
+
+async function processMessages(
+	q: Query,
+	agent: Agent,
+	opts: AgentRunOptions,
+	messageQueue?: MessageQueue,
+) {
+	try {
+		for await (const message of q) {
+			if (message.type !== 'user') {
+				dbInsertEvent(
+					agent.teamId,
+					agent.id,
+					`sdk:${message.type}`,
+					message as Record<string, unknown>,
+				)
+			}
+
+			if (message.type === 'system' && message.subtype === 'init') {
+				dbUpdateAgentSessionId(agent.id, message.session_id)
+				if (messageQueue) {
+					messageQueue.sessionId = message.session_id
+				}
+			}
+
+			if (message.type === 'result') {
+				if (messageQueue) {
+					if (message.subtype === 'success') {
+						dbUpdateAgentStatus(agent.id, 'idle')
+					} else {
+						dbUpdateAgentStatus(agent.id, 'error')
+						opts.onError?.(agent.id, new Error(message.subtype))
+					}
+				} else {
+					if (message.subtype === 'success') {
+						dbUpdateAgentStatus(agent.id, 'done')
+						opts.onDone?.(agent.id)
+					} else {
+						dbUpdateAgentStatus(agent.id, 'error')
+						opts.onError?.(agent.id, new Error(message.subtype))
+					}
+				}
+			}
+		}
+		if (messageQueue) {
+			dbUpdateAgentStatus(agent.id, 'done')
+			opts.onDone?.(agent.id)
+		}
+	} catch (err) {
+		dbUpdateAgentStatus(agent.id, 'error')
+		opts.onError?.(agent.id, err)
+		throw err
+	}
+}
+
+function buildHooks(agent: Agent, pending: Map<string, ToolCall>) {
+	return {
+		PreToolUse: [
+			{
+				hooks: [
+					async (input: unknown) => {
+						const h = input as PreToolUseHookInput
+						pending.set(h.tool_use_id, { name: h.tool_name, input: h.tool_input })
+						const activity = activityFromToolName(h.tool_name)
+						dbUpdateAgentActivity(agent.id, activity)
+						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
+							status: 'working',
+							activity,
+						})
+						return {}
+					},
+				],
+			},
+		],
+		PostToolUse: [
+			{
+				hooks: [
+					async (input: unknown) => {
+						const h = input as PostToolUseHookInput
+						const call = pending.get(h.tool_use_id)
+						if (call) {
+							call.output = h.tool_response
+							const arr = agentToolAccumulator.get(agent.id) ?? []
+							arr.push(call)
+							agentToolAccumulator.set(agent.id, arr)
+							pending.delete(h.tool_use_id)
+						}
+						dbUpdateAgentActivity(agent.id, null)
+						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
+							status: 'working',
+							activity: null,
+						})
+						return {}
+					},
+				],
+			},
+		],
+		PostToolUseFailure: [
+			{
+				hooks: [
+					async (input: unknown) => {
+						const h = input as PostToolUseFailureHookInput
+						const call = pending.get(h.tool_use_id)
+						if (call) {
+							call.error = h.error
+							const arr = agentToolAccumulator.get(agent.id) ?? []
+							arr.push(call)
+							agentToolAccumulator.set(agent.id, arr)
+							pending.delete(h.tool_use_id)
+						}
+						dbUpdateAgentActivity(agent.id, null)
+						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
+							status: 'working',
+							activity: null,
+						})
+						return {}
+					},
+				],
+			},
+		],
 	}
 }
 

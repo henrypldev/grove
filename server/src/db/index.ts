@@ -100,4 +100,15 @@ export function initSchema(db: Database) {
       created_at INTEGER NOT NULL
     )
   `)
+
+	db.run(`
+    CREATE TABLE IF NOT EXISTS plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id TEXT NOT NULL REFERENCES teams(id),
+      type TEXT NOT NULL,
+      agent_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `)
 }

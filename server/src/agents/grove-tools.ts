@@ -1,11 +1,9 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
 import { dbInsertEvent, dbListEventsSince } from '../db/events'
-import type { AgentRole } from '../types'
+import { dbGetPlan, dbInsertPlan } from '../db/plans'
 
-export type SpawnRoleFn = (role: AgentRole) => Promise<void>
-
-export function createGroveTools(teamId: string, agentId: string, spawnRole?: SpawnRoleFn) {
+export function createGroveTools(teamId: string, agentId: string) {
 	return createSdkMcpServer({
 		name: 'grove',
 		version: '1.0.0',
@@ -38,55 +36,29 @@ export function createGroveTools(teamId: string, agentId: string, spawnRole?: Sp
 				},
 			),
 			tool(
-				'spawn_agent',
-				'Spawn a new agent for this team',
+				'save_plan',
+				'Store a PRD or technical plan in the database',
 				{
-					role: z
-						.enum(['team-lead', 'dev', 'qa', 'reviewer'])
-						.describe('Role of the agent to spawn'),
+					type: z.enum(['prd', 'technical']).describe('Plan type'),
+					content: z.string().describe('The full plan content in markdown'),
 				},
-				async ({ role }) => {
-					if (!spawnRole) {
-						return { content: [{ type: 'text' as const, text: 'error: spawn not available' }] }
-					}
-					await spawnRole(role as AgentRole)
-					return { content: [{ type: 'text' as const, text: `spawned ${role}` }] }
+				async ({ type, content }) => {
+					dbInsertPlan(teamId, agentId, type, content)
+					return { content: [{ type: 'text' as const, text: `saved ${type} plan` }] }
 				},
 			),
 			tool(
-				'wait_for_event',
-				'Block until an event with one of the given types arrives',
+				'get_plan',
+				'Retrieve the latest plan of a given type',
 				{
-					types: z.array(z.string()).describe('Event types to wait for'),
-					timeout_ms: z
-						.number()
-						.optional()
-						.describe('Timeout in ms. Defaults to 300000 (5 minutes)'),
+					type: z.enum(['prd', 'technical']).describe('Plan type to retrieve'),
 				},
-				async ({ types, timeout_ms = 300_000 }) => {
-					const deadline = Date.now() + timeout_ms
-					let since = Date.now()
-					while (Date.now() < deadline) {
-						const events = dbListEventsSince(teamId, since)
-						const match = events.find(e => types.includes(e.type))
-						if (match) {
-							return {
-								content: [
-									{
-										type: 'text' as const,
-										text: JSON.stringify({ ...match, payload: JSON.parse(match.payload) }),
-									},
-								],
-							}
-						}
-						if (events.length > 0) {
-							since = events[events.length - 1].createdAt
-						}
-						await new Promise(r => setTimeout(r, 1000))
+				async ({ type }) => {
+					const plan = dbGetPlan(teamId, type)
+					if (!plan) {
+						return { content: [{ type: 'text' as const, text: `no ${type} plan found` }] }
 					}
-					return {
-						content: [{ type: 'text' as const, text: JSON.stringify({ error: 'timeout' }) }],
-					}
+					return { content: [{ type: 'text' as const, text: plan.content }] }
 				},
 			),
 		],

@@ -1,11 +1,12 @@
 import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
 import { createGroveTools } from './grove-tools'
-import { spawnPersistentAgent } from './runner'
 import type { PersistentAgentResult } from './runner'
+import { spawnPersistentAgent } from './runner'
 
 const PM_PROMPT = (team: Team) => `
-You are a non-technical PM for team ${team.id}. You coordinate the team via chat using @-mentions.
+You are a non-technical PM for team ${team.id}, you do NOT plan or write anything technical, including the files needed to be changed.
+You coordinate the team via chat using @-mentions. PRDs are only needed for features. You DO NOT investigate bugs, ever.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 

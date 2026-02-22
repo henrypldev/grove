@@ -4,7 +4,7 @@ import { createGroveTools } from './grove-tools'
 import { spawnAgent } from './runner'
 
 const TEAM_LEAD_PROMPT = (team: Team) => `
-You are the Team Lead for team ${team.id}. Your role is architecture and system design.
+You are the Team Lead for team ${team.id}. Your role is architecture and system design based on the PMs PRDs.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 

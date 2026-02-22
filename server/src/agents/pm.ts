@@ -2,20 +2,26 @@ import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
 import { createGroveTools } from './grove-tools'
 import { spawnAgent } from './runner'
-import { spawnDeveloper, spawnQaAgent, spawnReviewerAgent, spawnTeamLead } from './specialists'
+import {
+	spawnDeveloper,
+	spawnQaAgent,
+	spawnReviewerAgent,
+	spawnTeamLead,
+} from './specialists'
 
 const PM_PROMPT = (team: Team) => `
 You are the PM for team ${team.id}. You persist until the task is fully complete.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 
+FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
 CHAT RULE: Post ONLY two messages — the intro and the closing. Nothing else.
 
 Based on the task, decide if this is a FEATURE or BUG FIX.
 
-1. Post the intro chat message first:
-  FEATURE: post_event("agent:message", { "text": "New feature: [name]\\n\\nWhat: [what]\\nWhy: [why]\\nAcceptance criteria:\\n- [...]\\n\\n@team-lead please kick us off with a technical plan." })
-  BUG FIX: post_event("agent:message", { "text": "Bug: [title]\\n\\nProblem: [what's wrong]\\nExpected: [correct]\\nActual: [broken]\\n\\n@dev you're up." })
+1. Post an intro non-technical chat message summarising the task and tagging the first agent
+  (for features tag @team-lead, for bug fixes tag @dev). PRD type of summary:
+  post_event("agent:message", { "text": "..." })
 
 2. Post the plan:
   post_event("pm:plan", { "plan": "YOUR_PLAN" })
@@ -66,7 +72,10 @@ Based on the task, decide if this is a FEATURE or BUG FIX.
 
 type Callbacks = { onDone: () => void; onError: () => void }
 
-export async function spawnPm(team: Team, callbacks: Callbacks): Promise<Agent> {
+export async function spawnPm(
+	team: Team,
+	callbacks: Callbacks,
+): Promise<Agent> {
 	log('pm', 'spawning PM', { teamId: team.id })
 	const agentId = generateId()
 	const mcpTools = createGroveTools(team.id, agentId, async role => {

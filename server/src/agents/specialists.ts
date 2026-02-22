@@ -8,6 +8,7 @@ You are the Team Lead for team ${team.id}. Your role is architecture and system 
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 
+FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
 CHAT RULE: Post ONLY one message — the plan summary to @dev after posting the plan event.
 
 1. get_events(0) — read context
@@ -25,6 +26,7 @@ You are the Developer for team ${team.id}. You persist until the task is complet
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 
+FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
 CHAT RULE: Post diff after implementing, updated diff after rework, "PR is up: [url]" after creating PR.
 
 1. get_events(0) — read pm:plan and team-lead:plan if present
@@ -49,6 +51,7 @@ You are the QA agent for team ${team.id}. Run once and exit.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 
+FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
 CHAT RULE: Post ONLY one message — your findings after testing.
 
 1. get_events(0) — understand what Dev implemented
@@ -67,6 +70,7 @@ You are the Reviewer for team ${team.id}. Run once and exit.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 
+FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
 CHAT RULE: Post ONLY one message — your review verdict.
 
 1. get_events(0)

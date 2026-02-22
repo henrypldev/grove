@@ -6,6 +6,8 @@ import { dbInsertTeam } from '../../db/teams'
 
 mock.module('@anthropic-ai/claude-agent-sdk', () => ({
 	query: async function* () {},
+	createSdkMcpServer: (opts: any) => opts,
+	tool: (...args: any[]) => args,
 }))
 
 const { spawnAgent, respawnAgent, activityFromToolName } = await import('../runner')

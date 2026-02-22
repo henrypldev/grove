@@ -5,6 +5,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
+import type { createGroveTools } from './grove-tools'
 import {
 	dbGetAgent,
 	dbIncrementAgentRetry,
@@ -32,6 +33,7 @@ export interface AgentRunOptions {
 	cwd: string
 	maxBudgetUsd?: number
 	allowedTools?: string[]
+	mcpTools?: ReturnType<typeof createGroveTools>
 	onDone?: (agentId: string) => void
 	onError?: (agentId: string, error: unknown) => void
 }
@@ -84,6 +86,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 				cwd: opts.cwd,
 				maxBudgetUsd: opts.maxBudgetUsd ?? 5,
 				permissionMode: 'bypassPermissions',
+				...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
 				...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
 				hooks: {
 					PreToolUse: [

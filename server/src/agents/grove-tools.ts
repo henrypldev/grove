@@ -15,7 +15,7 @@ export function createGroveTools(teamId: string, agentId: string, spawnRole?: Sp
 				'Post an event to this team',
 				{
 					type: z.string().describe('Event type, e.g. "pm:plan" or "agent:message"'),
-					payload: z.record(z.unknown()).describe('Event payload as a JSON object'),
+					payload: z.record(z.string(), z.unknown()).describe('Event payload as a JSON object'),
 				},
 				async ({ type, payload }) => {
 					dbInsertEvent(teamId, agentId, type, payload as Record<string, unknown>)

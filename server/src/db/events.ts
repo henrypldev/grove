@@ -47,7 +47,7 @@ export function dbListEventsSince(
 ): TeamEvent[] {
 	return getDb()
 		.query<TeamEvent, [string, number, number]>(
-			'SELECT * FROM events WHERE team_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT ?',
+			'SELECT id, team_id as teamId, agent_id as agentId, type, payload, created_at as createdAt FROM events WHERE team_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT ?',
 		)
 		.all(teamId, since, limit)
 }
@@ -62,7 +62,7 @@ export function dbGetLatestEventId(): number {
 export function dbGetEventsSinceId(sinceId: number): TeamEvent[] {
 	return getDb()
 		.query<TeamEvent, [number]>(
-			'SELECT * FROM events WHERE id > ? ORDER BY id ASC LIMIT 500',
+			'SELECT id, team_id as teamId, agent_id as agentId, type, payload, created_at as createdAt FROM events WHERE id > ? ORDER BY id ASC LIMIT 500',
 		)
 		.all(sinceId)
 }
@@ -74,7 +74,7 @@ export function dbGetLatestEventByType(
 	return (
 		getDb()
 			.query<TeamEvent, [string, string]>(
-				'SELECT * FROM events WHERE team_id = ? AND type = ? ORDER BY created_at DESC LIMIT 1',
+				'SELECT id, team_id as teamId, agent_id as agentId, type, payload, created_at as createdAt FROM events WHERE team_id = ? AND type = ? ORDER BY created_at DESC LIMIT 1',
 			)
 			.get(teamId, type) ?? null
 	)

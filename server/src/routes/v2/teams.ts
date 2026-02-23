@@ -88,10 +88,11 @@ export async function handleV2Teams(
 		}
 		dbInsertTeam(team)
 
-		const { generateTeamTitle } = await import('../../agents/title')
-		const title = await generateTeamTitle(body.task)
-		dbUpdateTeamTitle(teamId, title)
-		team.title = title
+		import('../../agents/title').then(({ generateTeamTitle }) =>
+			generateTeamTitle(body.task).then(title =>
+				dbUpdateTeamTitle(teamId, title),
+			),
+		)
 
 		if (onTeamCreated) await onTeamCreated(team)
 

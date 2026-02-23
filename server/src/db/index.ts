@@ -1,5 +1,8 @@
 import { Database } from 'bun:sqlite'
+import { drizzle } from 'drizzle-orm/bun-sqlite'
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { join } from 'node:path'
+import * as schema from './schema'
 
 const DB_DIR = Bun.env.XDG_CONFIG_HOME
 	? join(Bun.env.XDG_CONFIG_HOME, 'grove')
@@ -7,23 +10,26 @@ const DB_DIR = Bun.env.XDG_CONFIG_HOME
 
 export const DB_PATH = join(DB_DIR, 'db.sqlite')
 
-let _db: Database | null = null
+export type DrizzleDb = BunSQLiteDatabase<typeof schema>
 
-export function getDb(): Database {
+let _db: DrizzleDb | null = null
+
+export function getDb(): DrizzleDb {
 	if (_db) return _db
 	Bun.spawnSync(['mkdir', '-p', DB_DIR])
-	_db = new Database(DB_PATH, { create: true })
-	_db.run('PRAGMA journal_mode = WAL')
-	_db.run('PRAGMA foreign_keys = ON')
-	initSchema(_db)
+	const sqlite = new Database(DB_PATH, { create: true })
+	sqlite.run('PRAGMA journal_mode = WAL')
+	sqlite.run('PRAGMA foreign_keys = ON')
+	runLegacyMigrations(sqlite)
+	_db = drizzle(sqlite, { schema })
 	return _db
 }
 
-export function _injectDb(db: Database): void {
+export function _injectDb(db: DrizzleDb): void {
 	_db = db
 }
 
-export function initSchema(db: Database) {
+function runLegacyMigrations(db: Database) {
 	db.run(`
     CREATE TABLE IF NOT EXISTS repos (
       id TEXT PRIMARY KEY,

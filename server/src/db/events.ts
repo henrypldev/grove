@@ -1,5 +1,7 @@
+import { and, asc, desc, eq, gt, sql } from 'drizzle-orm'
 import type { TeamEvent } from '../types'
 import { getDb } from './index'
+import { events, pmReports } from './schema'
 
 type EventListener = (event: TeamEvent) => void
 const listeners = new Map<string, Set<EventListener>>()
@@ -24,10 +26,16 @@ export function dbInsertEvent(
 	payload: Record<string, unknown>,
 ): TeamEvent {
 	const now = Date.now()
-	const result = getDb().run(
-		'INSERT INTO events (team_id, agent_id, type, payload, created_at) VALUES (?, ?, ?, ?, ?)',
-		[teamId, agentId, type, JSON.stringify(payload), now],
-	)
+	const result = getDb()
+		.insert(events)
+		.values({
+			teamId,
+			agentId,
+			type,
+			payload: JSON.stringify(payload),
+			createdAt: now,
+		})
+		.run()
 	const event: TeamEvent = {
 		id: Number(result.lastInsertRowid),
 		teamId,
@@ -36,7 +44,7 @@ export function dbInsertEvent(
 		payload: JSON.stringify(payload),
 		createdAt: now,
 	}
-	listeners.get(teamId)?.forEach(fn => fn(event))
+	listeners.get(teamId)?.forEach((fn) => fn(event))
 	return event
 }
 
@@ -46,25 +54,30 @@ export function dbListEventsSince(
 	limit = 200,
 ): TeamEvent[] {
 	return getDb()
-		.query<TeamEvent, [string, number, number]>(
-			'SELECT id, team_id as teamId, agent_id as agentId, type, payload, created_at as createdAt FROM events WHERE team_id = ? AND created_at > ? ORDER BY created_at ASC LIMIT ?',
-		)
-		.all(teamId, since, limit)
+		.select()
+		.from(events)
+		.where(and(eq(events.teamId, teamId), gt(events.createdAt, since)))
+		.orderBy(asc(events.createdAt))
+		.limit(limit)
+		.all()
 }
 
 export function dbGetLatestEventId(): number {
 	const row = getDb()
-		.query<{ id: number | null }, []>('SELECT MAX(id) as id FROM events')
+		.select({ id: sql<number>`max(${events.id})` })
+		.from(events)
 		.get()
 	return row?.id ?? 0
 }
 
 export function dbGetEventsSinceId(sinceId: number): TeamEvent[] {
 	return getDb()
-		.query<TeamEvent, [number]>(
-			'SELECT id, team_id as teamId, agent_id as agentId, type, payload, created_at as createdAt FROM events WHERE id > ? ORDER BY id ASC LIMIT 500',
-		)
-		.all(sinceId)
+		.select()
+		.from(events)
+		.where(gt(events.id, sinceId))
+		.orderBy(asc(events.id))
+		.limit(500)
+		.all()
 }
 
 export function dbGetLatestEventByType(
@@ -73,10 +86,12 @@ export function dbGetLatestEventByType(
 ): TeamEvent | null {
 	return (
 		getDb()
-			.query<TeamEvent, [string, string]>(
-				'SELECT id, team_id as teamId, agent_id as agentId, type, payload, created_at as createdAt FROM events WHERE team_id = ? AND type = ? ORDER BY created_at DESC LIMIT 1',
-			)
-			.get(teamId, type) ?? null
+			.select()
+			.from(events)
+			.where(and(eq(events.teamId, teamId), eq(events.type, type)))
+			.orderBy(desc(events.createdAt))
+			.limit(1)
+			.get() ?? null
 	)
 }
 
@@ -94,12 +109,12 @@ export function emitEphemeralEvent(
 		payload: JSON.stringify(payload),
 		createdAt: Date.now(),
 	}
-	listeners.get(teamId)?.forEach(fn => fn(event))
+	listeners.get(teamId)?.forEach((fn) => fn(event))
 }
 
 export function dbInsertPmReport(teamId: string, summary: string): void {
-	getDb().run(
-		'INSERT INTO pm_reports (team_id, summary, created_at) VALUES (?, ?, ?)',
-		[teamId, summary, Date.now()],
-	)
+	getDb()
+		.insert(pmReports)
+		.values({ teamId, summary, createdAt: Date.now() })
+		.run()
 }

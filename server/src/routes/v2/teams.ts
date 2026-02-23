@@ -207,7 +207,7 @@ export async function handleV2Teams(
 				{ status: 404, headers },
 			)
 		const { closeTeam } = await import('../../agents/orchestrator')
-		closeTeam(team.id)
+		await closeTeam(team.id)
 		return Response.json({ success: true }, { headers })
 	}
 

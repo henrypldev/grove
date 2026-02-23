@@ -1,7 +1,11 @@
 import { computeDiff } from '../api/diff'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
-import { dbUpdateTeamStatus } from '../db/teams'
+import {
+	dbGetTeam,
+	dbUpdateTeamMetroPort,
+	dbUpdateTeamStatus,
+} from '../db/teams'
 import type { AgentRole, Team } from '../types'
 import { closeAllAgents, getAgent } from './agent-registry'
 import { spawnPm } from './pm'
@@ -150,10 +154,29 @@ export async function routeMessageToAgents(
 	}
 }
 
-export function closeTeam(teamId: string) {
+export async function closeTeam(teamId: string) {
 	log('orchestrator', 'closing team', { teamId })
+	const team = dbGetTeam(teamId)
 	closeAllAgents(teamId)
+	if (team?.metroPort) {
+		await killPort(team.metroPort)
+		dbUpdateTeamMetroPort(teamId, null)
+	}
 	dbUpdateTeamStatus(teamId, 'done')
+}
+
+async function killPort(port: number) {
+	try {
+		const proc = Bun.spawn(['lsof', '-ti', `:${port}`], {
+			stdout: 'pipe',
+			stderr: 'ignore',
+		})
+		const text = await new Response(proc.stdout).text()
+		const pids = text.trim().split('\n').filter(Boolean)
+		for (const pid of pids) {
+			process.kill(Number(pid), 'SIGTERM')
+		}
+	} catch {}
 }
 
 async function spawnSpecialist(team: Team, role: AgentRole) {

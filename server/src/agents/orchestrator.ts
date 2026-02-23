@@ -1,5 +1,10 @@
+import { computeDiff } from '../api/diff'
 import { log } from '../config'
-import { dbGetLatestEventByType, subscribeToTeamEvents } from '../db/events'
+import {
+	dbGetLatestEventByType,
+	dbInsertEvent,
+	subscribeToTeamEvents,
+} from '../db/events'
 import { dbUpdateTeamStatus } from '../db/teams'
 import type { AgentRole, Team } from '../types'
 import { closeAllAgents, getAgent } from './agent-registry'
@@ -75,7 +80,13 @@ export async function onNewTeam(team: Team) {
 
 	})
 
-	subscribeToTeamEvents(team.id, event => {
+	subscribeToTeamEvents(team.id, async event => {
+		if (event.type === 'dev:complete') {
+			const diff = await computeDiff(team.worktreePath)
+			if (diff) {
+				dbInsertEvent(team.id, event.agentId, 'team:diff', diff)
+			}
+		}
 		if (event.type === 'pm:summary') {
 			log('orchestrator', 'pm:summary received, closing all agents', { teamId: team.id })
 			closeAllAgents(team.id)

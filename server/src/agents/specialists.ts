@@ -32,14 +32,15 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
 ## Initial instructions
 1. Use get_plan("technical") to read the technical plan (or get_plan("prd") if no technical plan).
 2. Implement the task in the worktree. Run linting/formatting if configured.
-3. Post completion:
+3. Commit your changes: git add -A && git commit -m "description of changes"
+4. Post completion:
    post_event("dev:complete", { "summary": "WHAT_WAS_DONE" })
-   post_event("agent:message", { "text": "@pm done. Here's what I changed:\\n\\n[git diff HEAD output]" })
+   post_event("agent:message", { "text": "@pm done. [brief summary of what was implemented]" })
 
 Then STOP and wait.
 
 ## When you receive follow-up messages
-- Rework feedback: apply the fix, then post dev:complete and updated diff tagging @pm
+- Rework feedback: apply the fix, commit changes, then post dev:complete tagging @pm
 - PR request: git add -A, git commit, gh pr create, then:
   post_event("dev:pr-created", { "url": "PR_URL" })
   post_event("agent:message", { "text": "@pm PR is up: [url]" })

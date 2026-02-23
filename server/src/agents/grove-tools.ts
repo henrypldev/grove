@@ -65,7 +65,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 				'save_plan',
 				'Store a PRD or technical plan in the database',
 				{
-					type: z.enum(['prd', 'technical']).describe('Plan type'),
+					type: z.enum(['prd', 'technical', 'stories', 'progress']).describe('Plan type'),
 					content: z.string().describe('The full plan content in markdown'),
 				},
 				async ({ type, content }) => {
@@ -79,7 +79,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 				'get_plan',
 				'Retrieve the latest plan of a given type',
 				{
-					type: z.enum(['prd', 'technical']).describe('Plan type to retrieve'),
+					type: z.enum(['prd', 'technical', 'stories', 'progress']).describe('Plan type to retrieve'),
 				},
 				async ({ type }) => {
 					const plan = dbGetPlan(teamId, type)
@@ -91,6 +91,41 @@ export function createGroveTools(teamId: string, agentId: string) {
 						}
 					}
 					return { content: [{ type: 'text' as const, text: plan.content }] }
+				},
+			),
+			tool(
+				'append_progress',
+				'Append a progress entry for the current story. Accumulates across stories.',
+				{
+					entry: z.string().describe('Progress entry in markdown (## story title, changes, learnings, gotchas)'),
+				},
+				async ({ entry }) => {
+					const existing = dbGetPlan(teamId, 'progress')
+					const content = existing ? `${existing.content}\n\n${entry}` : entry
+					dbInsertPlan(teamId, agentId, 'progress', content)
+					return { content: [{ type: 'text' as const, text: 'progress updated' }] }
+				},
+			),
+			tool(
+				'update_story',
+				'Update the status of a single story in the stories plan',
+				{
+					id: z.string().describe('Story ID (e.g. "US-001")'),
+					status: z.enum(['pending', 'in_progress', 'complete', 'skipped']).describe('New status'),
+				},
+				async ({ id, status }) => {
+					const plan = dbGetPlan(teamId, 'stories')
+					if (!plan) {
+						return { content: [{ type: 'text' as const, text: 'no stories plan found' }] }
+					}
+					const stories = JSON.parse(plan.content)
+					const story = stories.find((s: { id: string }) => s.id === id)
+					if (!story) {
+						return { content: [{ type: 'text' as const, text: `story ${id} not found` }] }
+					}
+					story.status = status
+					dbInsertPlan(teamId, agentId, 'stories', JSON.stringify(stories))
+					return { content: [{ type: 'text' as const, text: `${id} → ${status}` }] }
 				},
 			),
 			tool(

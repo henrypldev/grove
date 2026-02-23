@@ -3,7 +3,7 @@ import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
 import { dbGetTeam, dbUpdateTeamPort, dbUpdateTeamStatus } from '../db/teams'
 import type { AgentRole, Team } from '../types'
-import { closeAllAgents, getAgent } from './agent-registry'
+import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
 import { spawnPm } from './pm'
 import {
 	spawnDeveloper,
@@ -52,6 +52,15 @@ export async function onNewTeam(team: Team) {
 		if (!text) return
 
 		await routeMessageToAgents(team, text, event.agentId)
+	})
+
+	subscribeToTeamEvents(team.id, async event => {
+		if (event.type === 'story:complete') {
+			log('orchestrator', 'story complete, cycling agents', { teamId: team.id })
+			closeAgent(team.id, 'dev')
+			closeAgent(team.id, 'qa')
+			closeAgent(team.id, 'reviewer')
+		}
 	})
 
 	subscribeToTeamEvents(team.id, async event => {

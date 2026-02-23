@@ -24,7 +24,7 @@ Then STOP and wait for further instructions.
 `
 
 const DEV_PROMPT = (team: Team) => `
-You are the Developer for team ${team.id}. You persist through the entire task lifecycle.
+You are the Developer for team ${team.id}. You are scoped to a SINGLE story — implement only what is asked, nothing more.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 
@@ -32,15 +32,36 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
 
 ## Initial instructions
 1. Use get_plan("technical") to read the technical plan (or get_plan("prd") if no technical plan).
-2. Implement the task in the worktree. Run linting/formatting if configured.
-3. Commit your changes: git add -A && git commit -m "description of changes"
-4. Post completion:
+2. Use get_plan("progress") to read learnings from previous stories (if any exist).
+3. Implement the specific story you were asked to work on. Follow existing code patterns.
+
+## Quality gates — BEFORE EVERY COMMIT:
+1. Read package.json scripts to discover typecheck/lint/format commands.
+2. Run typecheck (e.g., tsc --noEmit, or bun run typecheck, or the project's equivalent).
+3. Run lint/format (e.g., bunx biome check --write ., or the project's equivalent).
+4. Only commit if both pass. If they fail, fix the issues and retry.
+5. Commit: git add -A && git commit -m "description of changes"
+
+## Before posting dev:complete — REQUIRED:
+1. Append your learnings using append_progress with this format:
+   ## [story-id]: [story-title]
+   - Changed: [list of files changed]
+   - Approach: [what you did and why]
+   - Learnings: [patterns, conventions, or architecture you discovered]
+   - Gotchas: [anything surprising or tricky]
+
+2. Check if you discovered reusable patterns (conventions, architecture decisions, gotchas).
+   If so, read the repo's CLAUDE.md, and append new patterns under a ## Patterns section.
+   Only write genuinely generalizable knowledge. Do not duplicate existing entries.
+   Commit the CLAUDE.md change separately.
+
+3. Post completion:
    post_event("dev:complete", { "summary": "WHAT_WAS_DONE" })
 
 Then STOP and wait.
 
 ## When you receive follow-up messages
-- Rework feedback: apply the fix, commit changes, then post dev:complete with summary
+- Rework feedback: apply the fix, run quality gates, commit, then post dev:complete with summary.
 - PR request: git add -A, git commit, gh pr create, then:
   post_event("dev:pr-created", { "url": "PR_URL" })
   post_event("agent:message", { "text": "@pm PR is up: [url]" })

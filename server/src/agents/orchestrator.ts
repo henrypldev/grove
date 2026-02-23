@@ -1,10 +1,6 @@
 import { computeDiff } from '../api/diff'
 import { log } from '../config'
-import {
-	dbGetLatestEventByType,
-	dbInsertEvent,
-	subscribeToTeamEvents,
-} from '../db/events'
+import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
 import { dbUpdateTeamStatus } from '../db/teams'
 import type { AgentRole, Team } from '../types'
 import { closeAllAgents, getAgent } from './agent-registry'
@@ -27,17 +23,12 @@ export async function onNewTeam(team: Team) {
 
 	await spawnPm(team, {
 		onDone: () => {
-			const event = dbGetLatestEventByType(team.id, 'pm:summary')
-			const summary = event
-				? (JSON.parse(event.payload) as { summary: string }).summary
-				: null
-			log('orchestrator', 'team done', { teamId: team.id })
-			dbUpdateTeamStatus(team.id, 'done', summary ?? undefined)
+			log('orchestrator', 'pm process exited', { teamId: team.id })
 		},
 		onError: () => dbUpdateTeamStatus(team.id, 'blocked'),
 	})
 
-	const unsubscribe = subscribeToTeamEvents(team.id, async event => {
+	subscribeToTeamEvents(team.id, async event => {
 		if (event.type !== 'agent:message') return
 
 		let payload: { text?: string }
@@ -53,35 +44,7 @@ export async function onNewTeam(team: Team) {
 		const text = payload.text
 		if (!text) return
 
-		const mentions = new Set<string>()
-		for (const match of text.matchAll(MENTION_PATTERN)) {
-			mentions.add(match[1])
-		}
-
-		for (const role of mentions) {
-			if (role === 'pm') {
-				const pmAgent = getAgent(team.id, 'pm')
-				if (pmAgent && pmAgent.agentId !== event.agentId) {
-					log('orchestrator', `routing to pm from ${event.agentId}`, {
-						teamId: team.id,
-					})
-					pmAgent.queue.push(text)
-				}
-				continue
-			}
-
-			let agent = getAgent(team.id, role)
-			if (!agent) {
-				await spawnSpecialist(team, role as AgentRole)
-				agent = getAgent(team.id, role)
-			}
-			if (agent && agent.agentId !== event.agentId) {
-				log('orchestrator', `routing to ${role} from ${event.agentId}`, {
-					teamId: team.id,
-				})
-				agent.queue.push(text)
-			}
-		}
+		await routeMessageToAgents(team, text, event.agentId)
 	})
 
 	subscribeToTeamEvents(team.id, async event => {
@@ -102,13 +65,84 @@ export async function onNewTeam(team: Team) {
 			})
 		}
 		if (event.type === 'pm:summary') {
-			log('orchestrator', 'pm:summary received, closing all agents', {
+			const summary = (() => {
+				try {
+					const p =
+						typeof event.payload === 'string'
+							? JSON.parse(event.payload)
+							: event.payload
+					return p.summary ?? null
+				} catch {
+					return null
+				}
+			})()
+			log('orchestrator', 'pm:summary received, team idle', {
 				teamId: team.id,
 			})
-			closeAllAgents(team.id)
-			unsubscribe()
+			dbUpdateTeamStatus(team.id, 'idle', summary ?? undefined)
 		}
 	})
+}
+
+export async function routeMessageToAgents(
+	team: Team,
+	text: string,
+	senderAgentId?: string,
+) {
+	const mentions = new Set<string>()
+	for (const match of text.matchAll(MENTION_PATTERN)) {
+		mentions.add(match[1])
+	}
+
+	if (mentions.size === 0) {
+		const pmAgent = getAgent(team.id, 'pm')
+		if (pmAgent && pmAgent.agentId !== senderAgentId) {
+			log(
+				'orchestrator',
+				`routing to pm (default) from ${senderAgentId ?? 'user'}`,
+				{
+					teamId: team.id,
+				},
+			)
+			pmAgent.queue.push(text)
+		}
+		return
+	}
+
+	for (const role of mentions) {
+		if (role === 'pm') {
+			const pmAgent = getAgent(team.id, 'pm')
+			if (pmAgent && pmAgent.agentId !== senderAgentId) {
+				log('orchestrator', `routing to pm from ${senderAgentId ?? 'user'}`, {
+					teamId: team.id,
+				})
+				pmAgent.queue.push(text)
+			}
+			continue
+		}
+
+		let agent = getAgent(team.id, role)
+		if (!agent) {
+			await spawnSpecialist(team, role as AgentRole)
+			agent = getAgent(team.id, role)
+		}
+		if (agent && agent.agentId !== senderAgentId) {
+			log(
+				'orchestrator',
+				`routing to ${role} from ${senderAgentId ?? 'user'}`,
+				{
+					teamId: team.id,
+				},
+			)
+			agent.queue.push(text)
+		}
+	}
+}
+
+export function closeTeam(teamId: string) {
+	log('orchestrator', 'closing team', { teamId })
+	closeAllAgents(teamId)
+	dbUpdateTeamStatus(teamId, 'done')
 }
 
 async function spawnSpecialist(team: Team, role: AgentRole) {

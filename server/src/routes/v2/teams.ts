@@ -1,7 +1,11 @@
 import { createWorktree } from '../../api/worktrees'
 import { generateId } from '../../config'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
-import { dbListEventsSince, subscribeToTeamEvents } from '../../db/events'
+import {
+	dbInsertEvent,
+	dbListEventsSince,
+	subscribeToTeamEvents,
+} from '../../db/events'
 import { dbGetRepo } from '../../db/repos'
 import {
 	dbArchiveTeam,
@@ -189,6 +193,38 @@ export async function handleV2Teams(
 		return Response.json({ success }, { headers })
 	}
 
+	const closeMatch = matchRoute(path, '/v2/teams/:id/close')
+	if (closeMatch && method === 'POST') {
+		const team = dbGetTeam(closeMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const { closeTeam } = await import('../../agents/orchestrator')
+		closeTeam(team.id)
+		return Response.json({ success: true }, { headers })
+	}
+
+	const messagesMatch = matchRoute(path, '/v2/teams/:id/messages')
+	if (messagesMatch && method === 'POST') {
+		const team = dbGetTeam(messagesMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const body = (await req.json()) as { text?: string }
+		if (!body.text)
+			return Response.json({ error: 'Missing text' }, { status: 400, headers })
+		const event = dbInsertEvent(team.id, null, 'user:message', {
+			text: body.text,
+		})
+		const { routeMessageToAgents } = await import('../../agents/orchestrator')
+		await routeMessageToAgents(team, body.text)
+		return Response.json(event, { headers })
+	}
+
 	const eventsMatch = matchRoute(path, '/v2/teams/:id/events')
 	if (eventsMatch && method === 'GET') {
 		const since = Number(url.searchParams.get('since') ?? '0')
@@ -211,16 +247,12 @@ export async function handleV2Teams(
 				controller.enqueue(enc.encode('data: {"type":"connected"}\n\n'))
 				if (since >= 0) {
 					for (const event of dbListEventsSince(streamMatch.id, since)) {
-						controller.enqueue(
-							enc.encode(`data: ${JSON.stringify(event)}\n\n`),
-						)
+						controller.enqueue(enc.encode(`data: ${JSON.stringify(event)}\n\n`))
 					}
 				}
-				const unsubscribe = subscribeToTeamEvents(streamMatch.id, (event) => {
+				const unsubscribe = subscribeToTeamEvents(streamMatch.id, event => {
 					try {
-						controller.enqueue(
-							enc.encode(`data: ${JSON.stringify(event)}\n\n`),
-						)
+						controller.enqueue(enc.encode(`data: ${JSON.stringify(event)}\n\n`))
 					} catch {}
 				})
 				req.signal.addEventListener('abort', () => {

@@ -19,7 +19,7 @@ export function subscribeToTeamEvents(
 
 export function dbInsertEvent(
 	teamId: string,
-	agentId: string,
+	agentId: string | null,
 	type: string,
 	payload: Record<string, unknown>,
 ): TeamEvent {
@@ -36,7 +36,7 @@ export function dbInsertEvent(
 		payload: JSON.stringify(payload),
 		createdAt: now,
 	}
-	listeners.get(teamId)?.forEach((fn) => fn(event))
+	listeners.get(teamId)?.forEach(fn => fn(event))
 	return event
 }
 
@@ -94,7 +94,7 @@ export function emitEphemeralEvent(
 		payload: JSON.stringify(payload),
 		createdAt: Date.now(),
 	}
-	listeners.get(teamId)?.forEach((fn) => fn(event))
+	listeners.get(teamId)?.forEach(fn => fn(event))
 }
 
 export function dbInsertPmReport(teamId: string, summary: string): void {

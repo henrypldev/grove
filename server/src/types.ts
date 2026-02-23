@@ -42,6 +42,7 @@ export type TeamStatus =
 	| 'active'
 	| 'blocked'
 	| 'review'
+	| 'idle'
 	| 'done'
 	| 'archived'
 export type AgentRole =
@@ -99,7 +100,7 @@ export interface AgentMessagePayload {
 export interface TeamEvent {
 	id: number
 	teamId: string
-	agentId: string
+	agentId: string | null
 	type: string
 	payload: string
 	createdAt: number

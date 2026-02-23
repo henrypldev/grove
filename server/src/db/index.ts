@@ -75,12 +75,37 @@ export function initSchema(db: Database) {
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       team_id TEXT NOT NULL REFERENCES teams(id),
-      agent_id TEXT NOT NULL REFERENCES agents(id),
+      agent_id TEXT REFERENCES agents(id),
       type TEXT NOT NULL,
       payload TEXT NOT NULL,
       created_at INTEGER NOT NULL
     )
   `)
+
+	try {
+		const col = db
+			.query<{ notnull: number }, [string]>(
+				'SELECT "notnull" FROM pragma_table_info(\'events\') WHERE name = ?',
+			)
+			.get('agent_id')
+		if (col && col.notnull === 1) {
+			db.run('PRAGMA foreign_keys = OFF')
+			db.run(`
+        CREATE TABLE events_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          team_id TEXT NOT NULL REFERENCES teams(id),
+          agent_id TEXT REFERENCES agents(id),
+          type TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+      `)
+			db.run('INSERT INTO events_new SELECT * FROM events')
+			db.run('DROP TABLE events')
+			db.run('ALTER TABLE events_new RENAME TO events')
+			db.run('PRAGMA foreign_keys = ON')
+		}
+	} catch {}
 
 	db.run(`
     CREATE INDEX IF NOT EXISTS idx_events_team_created

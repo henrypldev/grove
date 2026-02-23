@@ -111,6 +111,7 @@ describe('handleV2Repos', () => {
 			task: 'task',
 			status: 'planning',
 			pmSummary: null,
+		metroPort: null,
 			createdAt: 1000,
 			updatedAt: 1000,
 		})

@@ -7,12 +7,13 @@ import { closeAllAgents, getAgent } from './agent-registry'
 import { spawnPm } from './pm'
 import {
 	spawnDeveloper,
+	spawnEnvAgent,
 	spawnQaAgent,
 	spawnReviewerAgent,
 	spawnTeamLead,
 } from './specialists'
 
-const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer)\b/g
+const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer|env)\b/g
 
 export async function startOrchestrator() {
 	log('orchestrator', 'starting')
@@ -20,6 +21,10 @@ export async function startOrchestrator() {
 
 export async function onNewTeam(team: Team) {
 	log('orchestrator', 'spawning team', { teamId: team.id })
+
+	spawnEnvAgent(team).catch(err => {
+		log('orchestrator', 'env agent spawn failed', { teamId: team.id, err })
+	})
 
 	await spawnPm(team, {
 		onDone: () => {
@@ -63,6 +68,12 @@ export async function onNewTeam(team: Team) {
 				text: `@pm done. ${payload.summary ?? ''}`,
 				diff: diff ?? undefined,
 			})
+			const envAgent = getAgent(team.id, 'env')
+			if (envAgent) {
+				envAgent.queue.push(
+					'dev:complete — please re-check the fingerprint for native dependency changes.',
+				)
+			}
 		}
 		if (event.type === 'pm:summary') {
 			const summary = (() => {
@@ -151,4 +162,5 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 	else if (role === 'dev') await spawnDeveloper(team)
 	else if (role === 'qa') await spawnQaAgent(team)
 	else if (role === 'reviewer') await spawnReviewerAgent(team)
+	else if (role === 'env') await spawnEnvAgent(team)
 }

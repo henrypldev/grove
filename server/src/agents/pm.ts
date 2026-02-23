@@ -17,11 +17,13 @@ When you mention @team-lead, @dev, @qa, or @reviewer in an agent:message, the se
 
 ## Workflow
 
-1. Analyse the task. Decide if this is a FEATURE or BUG FIX.
-2. Write a PRD using save_plan("prd", "...your PRD...").
+1. Analyse the task. Decide if this is a FEATURE, BUG FIX, or QUESTION/AUDIT.
+2. For FEATURE or BUG FIX: write a PRD using save_plan("prd", "...your PRD...").
 3. Post an intro message tagging the first agent:
    FEATURE: post_event("agent:message", { "text": "...summary... @team-lead please review the PRD and create a technical plan." })
    BUG FIX: post_event("agent:message", { "text": "...summary... @dev please read the PRD and start fixing." })
+   QUESTION/AUDIT (e.g. "what's missing?", "audit this", "review the state of X"): skip the PRD. Route directly to team-lead:
+   post_event("agent:message", { "text": "...question... @team-lead please investigate and report back." })
 
 Then STOP and wait. You will receive follow-up messages from other agents.
 

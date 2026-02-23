@@ -9,6 +9,7 @@ interface DbTeam {
 	title: string | null
 	status: string
 	pm_summary: string | null
+	metro_port: number | null
 	created_at: number
 	updated_at: number
 }
@@ -22,6 +23,7 @@ function toTeam(row: DbTeam): Team {
 		title: row.title,
 		status: row.status as TeamStatus,
 		pmSummary: row.pm_summary,
+		metroPort: row.metro_port,
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
 	}
@@ -54,8 +56,8 @@ export function dbGetTeam(id: string): Team | null {
 
 export function dbInsertTeam(team: Team): void {
 	getDb().run(
-		`INSERT INTO teams (id, repo_id, worktree_path, task, title, status, pm_summary, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO teams (id, repo_id, worktree_path, task, title, status, pm_summary, metro_port, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			team.id,
 			team.repoId,
@@ -64,6 +66,7 @@ export function dbInsertTeam(team: Team): void {
 			team.title,
 			team.status,
 			team.pmSummary,
+			team.metroPort,
 			team.createdAt,
 			team.updatedAt,
 		],
@@ -96,6 +99,14 @@ export function dbUpdateTeamStatus(
 			id,
 		])
 	}
+}
+
+export function dbUpdateTeamMetroPort(id: string, port: number | null): void {
+	getDb().run('UPDATE teams SET metro_port = ?, updated_at = ? WHERE id = ?', [
+		port,
+		Date.now(),
+		id,
+	])
 }
 
 export function dbArchiveTeam(id: string): void {

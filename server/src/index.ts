@@ -3,6 +3,7 @@ import { onNewTeam, startOrchestrator } from './agents/orchestrator'
 import { log, setLogsEnabled } from './config'
 import { getDb } from './db'
 import { handleV1 } from './routes/v1'
+import { handleV2Dashboard } from './routes/v2/dashboard'
 import { handleV2Events } from './routes/v2/events'
 import { handleV2Repos } from './routes/v2/repos'
 import { handleV2Teams, setTeamCreatedHook } from './routes/v2/teams'
@@ -80,6 +81,9 @@ export async function startServer(port: number) {
 			try {
 				const v2ReposResponse = await handleV2Repos(req, url, headers)
 				if (v2ReposResponse) return v2ReposResponse
+
+				const v2DashboardResponse = await handleV2Dashboard(req, url, headers)
+				if (v2DashboardResponse) return v2DashboardResponse
 
 				const v2TeamsResponse = await handleV2Teams(req, url, headers)
 				if (v2TeamsResponse) return v2TeamsResponse

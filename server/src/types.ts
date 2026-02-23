@@ -52,6 +52,7 @@ export type AgentRole =
 	| 'dev'
 	| 'qa'
 	| 'reviewer'
+	| 'env'
 export type AgentStatus =
 	| 'idle'
 	| 'planning'
@@ -68,6 +69,7 @@ export interface Team {
 	title: string | null
 	status: TeamStatus
 	pmSummary: string | null
+	metroPort: number | null
 	createdAt: number
 	updatedAt: number
 }

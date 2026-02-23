@@ -82,6 +82,7 @@ export async function handleV2Teams(
 			title: null,
 			status: 'planning',
 			pmSummary: null,
+			metroPort: null,
 			createdAt: now,
 			updatedAt: now,
 		}
@@ -134,13 +135,14 @@ export async function handleV2Teams(
 		}
 		if (method === 'POST') {
 			const body = (await req.json()) as {
-				role: 'team-lead' | 'dev' | 'qa' | 'reviewer'
+				role: 'team-lead' | 'dev' | 'qa' | 'reviewer' | 'env'
 			}
 			const {
 				spawnTeamLead,
 				spawnDeveloper,
 				spawnQaAgent,
 				spawnReviewerAgent,
+				spawnEnvAgent,
 			} = await import('../../agents/specialists')
 			let agent
 			switch (body.role) {
@@ -155,6 +157,9 @@ export async function handleV2Teams(
 					break
 				case 'reviewer':
 					agent = await spawnReviewerAgent(team)
+					break
+				case 'env':
+					agent = await spawnEnvAgent(team)
 					break
 				default:
 					return Response.json(

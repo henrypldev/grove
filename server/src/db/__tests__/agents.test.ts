@@ -26,6 +26,7 @@ const TEAM = {
 	task: 'task',
 	status: 'planning' as const,
 	pmSummary: null,
+	metroPort: null,
 	createdAt: 1000,
 	updatedAt: 1000,
 }

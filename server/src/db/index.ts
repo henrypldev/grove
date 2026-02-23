@@ -71,6 +71,10 @@ export function initSchema(db: Database) {
 		db.run('ALTER TABLE teams ADD COLUMN title TEXT')
 	} catch {}
 
+	try {
+		db.run('ALTER TABLE teams ADD COLUMN metro_port INTEGER')
+	} catch {}
+
 	db.run(`
     CREATE TABLE IF NOT EXISTS events (
       id INTEGER PRIMARY KEY AUTOINCREMENT,

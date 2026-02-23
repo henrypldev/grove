@@ -82,7 +82,7 @@ export async function handleV2Teams(
 			title: null,
 			status: 'planning',
 			pmSummary: null,
-			metroPort: null,
+			port: null,
 			createdAt: now,
 			updatedAt: now,
 		}

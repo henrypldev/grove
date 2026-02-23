@@ -6,7 +6,7 @@ const PORT_MAX = 8099
 export function allocatePort(): number | null {
 	const teams = dbListTeams()
 	const usedPorts = new Set(
-		teams.map(t => t.metroPort).filter((p): p is number => p !== null),
+		teams.map(t => t.port).filter((p): p is number => p !== null),
 	)
 	for (let port = PORT_MIN; port <= PORT_MAX; port++) {
 		if (!usedPorts.has(port)) return port

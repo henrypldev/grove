@@ -26,7 +26,7 @@ const TEAM = {
 	task: 'task',
 	status: 'planning' as const,
 	pmSummary: null,
-	metroPort: null,
+	port: null,
 	createdAt: 1000,
 	updatedAt: 1000,
 }
@@ -117,7 +117,7 @@ describe('db/events', () => {
 			task: 't',
 			status: 'planning',
 			pmSummary: null,
-	metroPort: null,
+	port: null,
 			createdAt: 1000,
 			updatedAt: 1000,
 		})

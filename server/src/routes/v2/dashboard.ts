@@ -43,7 +43,7 @@ export async function handleV2Dashboard(
 				title: team.title,
 				status: team.status,
 				repoId: team.repoId,
-				metroPort: team.metroPort,
+				port: team.port,
 				agents: agents.map(a => ({
 					id: a.id,
 					role: a.role,

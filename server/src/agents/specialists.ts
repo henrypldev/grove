@@ -1,6 +1,6 @@
 import { allocatePort } from '../api/ports'
 import { generateId, log } from '../config'
-import { dbUpdateTeamMetroPort } from '../db/teams'
+import { dbUpdateTeamPort } from '../db/teams'
 import type { Team } from '../types'
 import { createGroveTools } from './grove-tools'
 import type { PersistentAgentResult } from './runner'
@@ -183,7 +183,7 @@ export async function spawnEnvAgent(
 ): Promise<PersistentAgentResult> {
 	const port = allocatePort()
 	if (!port) throw new Error('No available ports in pool (8082-8099)')
-	dbUpdateTeamMetroPort(team.id, port)
+	dbUpdateTeamPort(team.id, port)
 	log('agent', 'spawning env agent', { teamId: team.id, port })
 	const agentId = generateId()
 	return spawnPersistentAgent({

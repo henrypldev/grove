@@ -69,7 +69,7 @@ export interface Team {
 	title: string | null
 	status: TeamStatus
 	pmSummary: string | null
-	metroPort: number | null
+	port: number | null
 	createdAt: number
 	updatedAt: number
 }

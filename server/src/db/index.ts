@@ -72,7 +72,11 @@ export function initSchema(db: Database) {
 	} catch {}
 
 	try {
-		db.run('ALTER TABLE teams ADD COLUMN metro_port INTEGER')
+		db.run('ALTER TABLE teams ADD COLUMN port INTEGER')
+	} catch {}
+
+	try {
+		db.run('ALTER TABLE teams RENAME COLUMN metro_port TO port')
 	} catch {}
 
 	db.run(`

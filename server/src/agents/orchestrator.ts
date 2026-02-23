@@ -1,11 +1,7 @@
 import { computeDiff } from '../api/diff'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
-import {
-	dbGetTeam,
-	dbUpdateTeamMetroPort,
-	dbUpdateTeamStatus,
-} from '../db/teams'
+import { dbGetTeam, dbUpdateTeamPort, dbUpdateTeamStatus } from '../db/teams'
 import type { AgentRole, Team } from '../types'
 import { closeAllAgents, getAgent } from './agent-registry'
 import { spawnPm } from './pm'
@@ -26,9 +22,11 @@ export async function startOrchestrator() {
 export async function onNewTeam(team: Team) {
 	log('orchestrator', 'spawning team', { teamId: team.id })
 
-	spawnEnvAgent(team).catch(err => {
-		log('orchestrator', 'env agent spawn failed', { teamId: team.id, err })
-	})
+	if (await needsDevServer(team.worktreePath)) {
+		spawnEnvAgent(team).catch(err => {
+			log('orchestrator', 'env agent spawn failed', { teamId: team.id, err })
+		})
+	}
 
 	await spawnPm(team, {
 		onDone: () => {
@@ -158,9 +156,9 @@ export async function closeTeam(teamId: string) {
 	log('orchestrator', 'closing team', { teamId })
 	const team = dbGetTeam(teamId)
 	closeAllAgents(teamId)
-	if (team?.metroPort) {
-		await killPort(team.metroPort)
-		dbUpdateTeamMetroPort(teamId, null)
+	if (team?.port) {
+		await killPort(team.port)
+		dbUpdateTeamPort(teamId, null)
 	}
 	dbUpdateTeamStatus(teamId, 'done')
 }
@@ -186,4 +184,15 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 	else if (role === 'qa') await spawnQaAgent(team)
 	else if (role === 'reviewer') await spawnReviewerAgent(team)
 	else if (role === 'env') await spawnEnvAgent(team)
+}
+
+async function needsDevServer(worktreePath: string): Promise<boolean> {
+	try {
+		const file = Bun.file(`${worktreePath}/package.json`)
+		const pkg = await file.json()
+		const deps = { ...pkg.dependencies, ...pkg.devDependencies }
+		return 'expo' in deps || 'next' in deps || 'vite' in deps
+	} catch {
+		return false
+	}
 }

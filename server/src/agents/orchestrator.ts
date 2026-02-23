@@ -25,7 +25,7 @@ export async function startOrchestrator() {
 export async function onNewTeam(team: Team) {
 	log('orchestrator', 'spawning team', { teamId: team.id })
 
-	const { persistent: pmPersistent } = await spawnPm(team, {
+	await spawnPm(team, {
 		onDone: () => {
 			const event = dbGetLatestEventByType(team.id, 'pm:summary')
 			const summary = event
@@ -42,9 +42,10 @@ export async function onNewTeam(team: Team) {
 
 		let payload: { text?: string }
 		try {
-			payload = typeof event.payload === 'string'
-				? JSON.parse(event.payload)
-				: event.payload
+			payload =
+				typeof event.payload === 'string'
+					? JSON.parse(event.payload)
+					: event.payload
 		} catch {
 			return
 		}
@@ -61,7 +62,9 @@ export async function onNewTeam(team: Team) {
 			if (role === 'pm') {
 				const pmAgent = getAgent(team.id, 'pm')
 				if (pmAgent && pmAgent.agentId !== event.agentId) {
-					log('orchestrator', `routing to pm from ${event.agentId}`, { teamId: team.id })
+					log('orchestrator', `routing to pm from ${event.agentId}`, {
+						teamId: team.id,
+					})
 					pmAgent.queue.push(text)
 				}
 				continue
@@ -73,22 +76,35 @@ export async function onNewTeam(team: Team) {
 				agent = getAgent(team.id, role)
 			}
 			if (agent && agent.agentId !== event.agentId) {
-				log('orchestrator', `routing to ${role} from ${event.agentId}`, { teamId: team.id })
+				log('orchestrator', `routing to ${role} from ${event.agentId}`, {
+					teamId: team.id,
+				})
 				agent.queue.push(text)
 			}
 		}
-
 	})
 
 	subscribeToTeamEvents(team.id, async event => {
 		if (event.type === 'dev:complete') {
-			const diff = await computeDiff(team.worktreePath)
-			if (diff) {
-				dbInsertEvent(team.id, event.agentId, 'team:diff', diff)
+			let payload: { summary?: string }
+			try {
+				payload =
+					typeof event.payload === 'string'
+						? JSON.parse(event.payload)
+						: event.payload
+			} catch {
+				payload = {}
 			}
+			const diff = await computeDiff(team.worktreePath)
+			dbInsertEvent(team.id, event.agentId, 'agent:message', {
+				text: `@pm done. ${payload.summary ?? ''}`,
+				diff: diff ?? undefined,
+			})
 		}
 		if (event.type === 'pm:summary') {
-			log('orchestrator', 'pm:summary received, closing all agents', { teamId: team.id })
+			log('orchestrator', 'pm:summary received, closing all agents', {
+				teamId: team.id,
+			})
 			closeAllAgents(team.id)
 			unsubscribe()
 		}

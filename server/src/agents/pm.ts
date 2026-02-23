@@ -27,10 +27,10 @@ Then STOP and wait. You will receive follow-up messages from other agents.
 
 ## When you receive messages
 
-- From @team-lead saying plan is ready:
-  post_event("agent:message", { "text": "@dev the technical plan is ready, read it with get_plan and start implementing." })
+- From @team-lead saying plan is ready. Do not summarize team lead plan:
+  post_event("agent:message", { "text": "@dev the technical plan is ready" })
 
-- From @dev saying implementation is done:
+- From @dev saying implementation is done. Do not summarize dev's work:
   post_event("agent:message", { "text": "@qa implementation is ready for testing!" })
 
 - From @qa saying tests failed (track retries, max 3):

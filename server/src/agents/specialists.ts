@@ -1,8 +1,8 @@
 import { generateId, log } from '../config'
-import type { Agent, Team } from '../types'
+import type { Team } from '../types'
 import { createGroveTools } from './grove-tools'
-import { spawnPersistentAgent } from './runner'
 import type { PersistentAgentResult } from './runner'
+import { spawnPersistentAgent } from './runner'
 
 const TEAM_LEAD_PROMPT = (team: Team) => `
 You are the Team Lead for team ${team.id}. Your role is architecture and system design.
@@ -35,12 +35,11 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
 3. Commit your changes: git add -A && git commit -m "description of changes"
 4. Post completion:
    post_event("dev:complete", { "summary": "WHAT_WAS_DONE" })
-   post_event("agent:message", { "text": "@pm done. [brief summary of what was implemented]" })
 
 Then STOP and wait.
 
 ## When you receive follow-up messages
-- Rework feedback: apply the fix, commit changes, then post dev:complete tagging @pm
+- Rework feedback: apply the fix, commit changes, then post dev:complete with summary
 - PR request: git add -A, git commit, gh pr create, then:
   post_event("dev:pr-created", { "url": "PR_URL" })
   post_event("agent:message", { "text": "@pm PR is up: [url]" })
@@ -82,7 +81,9 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
 Approve unless there are critical or security issues.
 `
 
-export async function spawnTeamLead(team: Team): Promise<PersistentAgentResult> {
+export async function spawnTeamLead(
+	team: Team,
+): Promise<PersistentAgentResult> {
 	log('agent', 'spawning team lead', { teamId: team.id })
 	const agentId = generateId()
 	return spawnPersistentAgent({
@@ -96,7 +97,9 @@ export async function spawnTeamLead(team: Team): Promise<PersistentAgentResult> 
 	})
 }
 
-export async function spawnDeveloper(team: Team): Promise<PersistentAgentResult> {
+export async function spawnDeveloper(
+	team: Team,
+): Promise<PersistentAgentResult> {
 	log('agent', 'spawning developer', { teamId: team.id })
 	const agentId = generateId()
 	return spawnPersistentAgent({
@@ -124,7 +127,9 @@ export async function spawnQaAgent(team: Team): Promise<PersistentAgentResult> {
 	})
 }
 
-export async function spawnReviewerAgent(team: Team): Promise<PersistentAgentResult> {
+export async function spawnReviewerAgent(
+	team: Team,
+): Promise<PersistentAgentResult> {
 	log('agent', 'spawning reviewer', { teamId: team.id })
 	const agentId = generateId()
 	return spawnPersistentAgent({

@@ -19,6 +19,10 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
    post_event("agent:message", { "text": "@pm technical plan is ready. [brief summary of approach]" })
 3. If no PRD exists (audit/question): the PM routed a question directly to you. Investigate the codebase thoroughly and post your findings:
    post_event("agent:message", { "text": "@pm here's what I found: [detailed findings]" })
+4. After saving the technical plan, check if you discovered reusable patterns about the codebase.
+   If so, read the repo's CLAUDE.md, and append new patterns under a ## Patterns section.
+   Only write genuinely generalizable knowledge — not task-specific details.
+   Do not duplicate existing entries. Commit the CLAUDE.md change separately.
 
 Then STOP and wait for further instructions.
 `

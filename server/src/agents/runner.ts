@@ -6,9 +6,6 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
-import type { createGroveTools } from './grove-tools'
-import { MessageQueue } from './message-queue'
-import { registerAgent } from './agent-registry'
 import {
 	dbGetAgent,
 	dbIncrementAgentRetry,
@@ -18,7 +15,11 @@ import {
 	dbUpdateAgentStatus,
 } from '../db/agents'
 import { dbInsertEvent, emitEphemeralEvent } from '../db/events'
+import { dbInsertUsage } from '../db/usage'
 import type { Agent, AgentRole, ToolCall } from '../types'
+import { registerAgent } from './agent-registry'
+import type { createGroveTools } from './grove-tools'
+import { MessageQueue } from './message-queue'
 
 const agentToolAccumulator = new Map<string, ToolCall[]>()
 
@@ -42,9 +43,11 @@ export interface AgentRunOptions {
 }
 
 export function activityFromToolName(toolName: string): string {
-	if (['Bash', 'BashOutput', 'KillShell'].includes(toolName)) return 'running commands'
+	if (['Bash', 'BashOutput', 'KillShell'].includes(toolName))
+		return 'running commands'
 	if (['Read', 'Glob', 'Grep'].includes(toolName)) return 'reading files'
-	if (['Edit', 'Write', 'NotebookEdit'].includes(toolName)) return 'writing code'
+	if (['Edit', 'Write', 'NotebookEdit'].includes(toolName))
+		return 'writing code'
 	if (['WebFetch', 'WebSearch'].includes(toolName)) return 'researching'
 	if (toolName === 'Task') return 'spawning agents'
 	if (toolName === 'SendMessage') return 'communicating'
@@ -95,15 +98,23 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 					PreToolUse: [
 						{
 							hooks: [
-								async (input) => {
+								async input => {
 									const h = input as PreToolUseHookInput
-									pending.set(h.tool_use_id, { name: h.tool_name, input: h.tool_input })
+									pending.set(h.tool_use_id, {
+										name: h.tool_name,
+										input: h.tool_input,
+									})
 									const activity = activityFromToolName(h.tool_name)
 									dbUpdateAgentActivity(agent.id, activity)
-									emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-										status: 'working',
-										activity,
-									})
+									emitEphemeralEvent(
+										agent.teamId,
+										agent.id,
+										'agent:status_change',
+										{
+											status: 'working',
+											activity,
+										},
+									)
 									return {}
 								},
 							],
@@ -112,7 +123,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 					PostToolUse: [
 						{
 							hooks: [
-								async (input) => {
+								async input => {
 									const h = input as PostToolUseHookInput
 									const call = pending.get(h.tool_use_id)
 									if (call) {
@@ -123,10 +134,15 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 										pending.delete(h.tool_use_id)
 									}
 									dbUpdateAgentActivity(agent.id, null)
-									emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-										status: 'working',
-										activity: null,
-									})
+									emitEphemeralEvent(
+										agent.teamId,
+										agent.id,
+										'agent:status_change',
+										{
+											status: 'working',
+											activity: null,
+										},
+									)
 									return {}
 								},
 							],
@@ -135,7 +151,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 					PostToolUseFailure: [
 						{
 							hooks: [
-								async (input) => {
+								async input => {
 									const h = input as PostToolUseFailureHookInput
 									const call = pending.get(h.tool_use_id)
 									if (call) {
@@ -146,10 +162,15 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 										pending.delete(h.tool_use_id)
 									}
 									dbUpdateAgentActivity(agent.id, null)
-									emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-										status: 'working',
-										activity: null,
-									})
+									emitEphemeralEvent(
+										agent.teamId,
+										agent.id,
+										'agent:status_change',
+										{
+											status: 'working',
+											activity: null,
+										},
+									)
 									return {}
 								},
 							],
@@ -172,6 +193,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 			}
 
 			if (message.type === 'result') {
+				recordUsage(agent, message as unknown as Record<string, unknown>)
 				if (message.subtype === 'success') {
 					dbUpdateAgentStatus(agent.id, 'done')
 					opts.onDone?.(agent.id)
@@ -271,6 +293,7 @@ async function processMessages(
 			}
 
 			if (message.type === 'result') {
+				recordUsage(agent, message as unknown as Record<string, unknown>)
 				if (messageQueue) {
 					if (message.subtype === 'success') {
 						dbUpdateAgentStatus(agent.id, 'idle')
@@ -307,7 +330,10 @@ function buildHooks(agent: Agent, pending: Map<string, ToolCall>) {
 				hooks: [
 					async (input: unknown) => {
 						const h = input as PreToolUseHookInput
-						pending.set(h.tool_use_id, { name: h.tool_name, input: h.tool_input })
+						pending.set(h.tool_use_id, {
+							name: h.tool_name,
+							input: h.tool_input,
+						})
 						const activity = activityFromToolName(h.tool_name)
 						dbUpdateAgentActivity(agent.id, activity)
 						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
@@ -365,6 +391,29 @@ function buildHooks(agent: Agent, pending: Map<string, ToolCall>) {
 				],
 			},
 		],
+	}
+}
+
+function recordUsage(agent: Agent, message: Record<string, unknown>) {
+	const modelUsage = message.modelUsage as
+		| Record<string, Record<string, number>>
+		| undefined
+	if (!modelUsage) return
+	for (const [model, mu] of Object.entries(modelUsage)) {
+		dbInsertUsage({
+			teamId: agent.teamId,
+			agentId: agent.id,
+			model,
+			inputTokens: mu.inputTokens ?? 0,
+			outputTokens: mu.outputTokens ?? 0,
+			cacheReadTokens: mu.cacheReadInputTokens ?? 0,
+			cacheCreationTokens: mu.cacheCreationInputTokens ?? 0,
+			costUsd: mu.costUSD ?? 0,
+			durationMs: (message.duration_ms as number) ?? 0,
+			durationApiMs: (message.duration_api_ms as number) ?? 0,
+			numTurns: (message.num_turns as number) ?? 0,
+			createdAt: Date.now(),
+		})
 	}
 }
 

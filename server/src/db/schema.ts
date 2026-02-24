@@ -1,4 +1,10 @@
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import {
+	index,
+	integer,
+	real,
+	sqliteTable,
+	text,
+} from 'drizzle-orm/sqlite-core'
 
 export const repos = sqliteTable('repos', {
 	id: text('id').primaryKey(),
@@ -52,7 +58,7 @@ export const events = sqliteTable(
 		payload: text('payload').notNull(),
 		createdAt: integer('created_at').notNull(),
 	},
-	(table) => [
+	table => [
 		index('idx_events_team_created').on(table.teamId, table.createdAt),
 		index('idx_events_agent_created').on(table.agentId, table.createdAt),
 	],
@@ -66,6 +72,31 @@ export const pmReports = sqliteTable('pm_reports', {
 	summary: text('summary').notNull(),
 	createdAt: integer('created_at').notNull(),
 })
+
+export const usage = sqliteTable(
+	'usage',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		teamId: text('team_id')
+			.notNull()
+			.references(() => teams.id),
+		agentId: text('agent_id').references(() => agents.id),
+		model: text('model').notNull(),
+		inputTokens: integer('input_tokens').notNull(),
+		outputTokens: integer('output_tokens').notNull(),
+		cacheReadTokens: integer('cache_read_tokens').notNull().default(0),
+		cacheCreationTokens: integer('cache_creation_tokens').notNull().default(0),
+		costUsd: real('cost_usd').notNull(),
+		durationMs: integer('duration_ms').notNull(),
+		durationApiMs: integer('duration_api_ms').notNull(),
+		numTurns: integer('num_turns').notNull(),
+		createdAt: integer('created_at').notNull(),
+	},
+	table => [
+		index('idx_usage_created').on(table.createdAt),
+		index('idx_usage_team_created').on(table.teamId, table.createdAt),
+	],
+)
 
 export const plans = sqliteTable('plans', {
 	id: integer('id').primaryKey({ autoIncrement: true }),

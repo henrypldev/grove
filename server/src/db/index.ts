@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite'
-import { drizzle } from 'drizzle-orm/bun-sqlite'
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { join } from 'node:path'
+import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
+import { drizzle } from 'drizzle-orm/bun-sqlite'
 import * as schema from './schema'
 
 const DB_DIR = Bun.env.XDG_CONFIG_HOME
@@ -139,6 +139,29 @@ function runLegacyMigrations(db: Database) {
       created_at INTEGER NOT NULL
     )
   `)
+
+	db.run(`
+    CREATE TABLE IF NOT EXISTS usage (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      team_id TEXT NOT NULL REFERENCES teams(id),
+      agent_id TEXT REFERENCES agents(id),
+      model TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL,
+      output_tokens INTEGER NOT NULL,
+      cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+      cost_usd REAL NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      duration_api_ms INTEGER NOT NULL,
+      num_turns INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    )
+  `)
+
+	db.run('CREATE INDEX IF NOT EXISTS idx_usage_created ON usage(created_at)')
+	db.run(
+		'CREATE INDEX IF NOT EXISTS idx_usage_team_created ON usage(team_id, created_at)',
+	)
 
 	db.run(`
     CREATE TABLE IF NOT EXISTS plans (

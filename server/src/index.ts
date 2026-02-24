@@ -7,6 +7,7 @@ import { handleV2Dashboard } from './routes/v2/dashboard'
 import { handleV2Events } from './routes/v2/events'
 import { handleV2Repos } from './routes/v2/repos'
 import { handleV2Teams, setTeamCreatedHook } from './routes/v2/teams'
+import { handleV2Usage } from './routes/v2/usage'
 import { cleanupStaleSessions } from './terminal/ttyd'
 import { startEventPoller, wsHandlers } from './websocket'
 
@@ -84,6 +85,9 @@ export async function startServer(port: number) {
 
 				const v2DashboardResponse = await handleV2Dashboard(req, url, headers)
 				if (v2DashboardResponse) return v2DashboardResponse
+
+				const v2UsageResponse = await handleV2Usage(req, url, headers)
+				if (v2UsageResponse) return v2UsageResponse
 
 				const v2TeamsResponse = await handleV2Teams(req, url, headers)
 				if (v2TeamsResponse) return v2TeamsResponse

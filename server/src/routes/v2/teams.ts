@@ -295,7 +295,18 @@ export async function handleV2Teams(
 		if (!text)
 			return Response.json({ error: 'Missing text' }, { status: 400, headers })
 
-		const event = dbInsertEvent(team.id, null, 'user:message', { text })
+		const attachments = contentBlocks
+			? (contentBlocks as Array<Record<string, unknown>>)
+					.filter(b => b.type === 'image' || b.type === 'document')
+					.map(b => {
+						const src = b.source as Record<string, string>
+						return { type: b.type as string, mediaType: src.media_type }
+					})
+			: undefined
+		const event = dbInsertEvent(team.id, null, 'user:message', {
+			text,
+			...(attachments?.length ? { attachments } : {}),
+		})
 		const { routeMessageToAgents } = await import('../../agents/orchestrator')
 		await routeMessageToAgents(team, text, undefined, contentBlocks)
 		return Response.json(event, { headers })

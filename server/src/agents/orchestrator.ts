@@ -1,4 +1,4 @@
-import { computeDiff } from '../api/diff'
+import { computeDiff, getHeadSha } from '../api/diff'
 import { registerTeamServe, unregisterTeamServe } from '../api/tailscale-serve'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
@@ -15,6 +15,8 @@ import {
 } from './specialists'
 
 const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer|env)\b/g
+
+const devBaseCommit = new Map<string, string>()
 
 export async function startOrchestrator() {
 	log('orchestrator', 'starting')
@@ -87,7 +89,9 @@ export async function onNewTeam(team: Team) {
 			} catch {
 				payload = {}
 			}
-			const diff = await computeDiff(team.worktreePath)
+			const base = devBaseCommit.get(team.id)
+			const diff = await computeDiff(team.worktreePath, base)
+			devBaseCommit.delete(team.id)
 			dbInsertEvent(team.id, event.agentId, 'agent:message', {
 				text: `@pm done. ${payload.summary ?? ''}`,
 				diff: diff ?? undefined,
@@ -203,8 +207,11 @@ async function killPort(port: number) {
 async function spawnSpecialist(team: Team, role: AgentRole) {
 	log('orchestrator', `spawning specialist ${role}`, { teamId: team.id })
 	if (role === 'team-lead') await spawnTeamLead(team)
-	else if (role === 'dev') await spawnDeveloper(team)
-	else if (role === 'qa') await spawnQaAgent(team)
+	else if (role === 'dev') {
+		const sha = await getHeadSha(team.worktreePath)
+		if (sha) devBaseCommit.set(team.id, sha)
+		await spawnDeveloper(team)
+	} else if (role === 'qa') await spawnQaAgent(team)
 	else if (role === 'reviewer') await spawnReviewerAgent(team)
 	else if (role === 'env') await spawnEnvAgent(team)
 }

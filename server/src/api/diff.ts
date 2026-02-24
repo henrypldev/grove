@@ -1,3 +1,11 @@
+export async function getHeadSha(cwd: string): Promise<string | null> {
+	try {
+		return (await Bun.$`git -C ${cwd} rev-parse HEAD`.text()).trim()
+	} catch {
+		return null
+	}
+}
+
 export type DiffFile = {
 	path: string
 	status: 'added' | 'modified' | 'deleted'
@@ -11,19 +19,27 @@ export type DiffResult = {
 	stat: string
 }
 
-export async function computeDiff(cwd: string): Promise<DiffResult | null> {
+export async function computeDiff(
+	cwd: string,
+	baseRef?: string,
+): Promise<DiffResult | null> {
 	let nameStatus: string
 	let numstat: string
 	let statOutput: string
 	let diffOutput: string
 	try {
-		const originBase = await Bun.$`git -C ${cwd} merge-base origin/main HEAD`
-			.quiet()
-			.nothrow()
-		const base =
-			originBase.exitCode === 0
-				? originBase.stdout.toString().trim()
-				: (await Bun.$`git -C ${cwd} merge-base main HEAD`.text()).trim()
+		let base: string
+		if (baseRef) {
+			base = baseRef
+		} else {
+			const originBase = await Bun.$`git -C ${cwd} merge-base origin/main HEAD`
+				.quiet()
+				.nothrow()
+			base =
+				originBase.exitCode === 0
+					? originBase.stdout.toString().trim()
+					: (await Bun.$`git -C ${cwd} merge-base main HEAD`.text()).trim()
+		}
 		;[nameStatus, numstat, statOutput, diffOutput] = await Promise.all([
 			Bun.$`git -C ${cwd} diff ${base} HEAD --name-status`.text(),
 			Bun.$`git -C ${cwd} diff ${base} HEAD --numstat`.text(),

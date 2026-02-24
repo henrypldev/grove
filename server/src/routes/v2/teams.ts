@@ -1,5 +1,5 @@
 import { createWorktree } from '../../api/worktrees'
-import { generateId } from '../../config'
+import { generateId, getTerminalHost } from '../../config'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
 import {
 	dbInsertEvent,
@@ -110,7 +110,10 @@ export async function handleV2Teams(
 					{ status: 404, headers },
 				)
 			const agents = dbListAgentsByTeam(teamMatch.id)
-			return Response.json({ ...team, agents }, { headers })
+			const devUrl = team.port
+				? `https://${await getTerminalHost()}/dev-${team.id}/`
+				: null
+			return Response.json({ ...team, devUrl, agents }, { headers })
 		}
 		if (method === 'DELETE') {
 			const team = dbGetTeam(teamMatch.id)

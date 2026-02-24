@@ -1,4 +1,5 @@
 import { computeDiff } from '../api/diff'
+import { registerTeamServe, unregisterTeamServe } from '../api/tailscale-serve'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
 import { dbGetTeam, dbUpdateTeamPort, dbUpdateTeamStatus } from '../db/teams'
@@ -52,6 +53,23 @@ export async function onNewTeam(team: Team) {
 		if (!text) return
 
 		await routeMessageToAgents(team, text, event.agentId ?? undefined)
+	})
+
+	subscribeToTeamEvents(team.id, async event => {
+		if (event.type === 'env:ready') {
+			let payload: { port?: number }
+			try {
+				payload =
+					typeof event.payload === 'string'
+						? JSON.parse(event.payload)
+						: event.payload
+			} catch {
+				payload = {}
+			}
+			if (payload.port) {
+				registerTeamServe(team.id, payload.port)
+			}
+		}
 	})
 
 	subscribeToTeamEvents(team.id, async event => {
@@ -165,6 +183,7 @@ export async function closeTeam(teamId: string) {
 	log('orchestrator', 'closing team', { teamId })
 	const team = dbGetTeam(teamId)
 	closeAllAgents(teamId)
+	unregisterTeamServe(teamId)
 	if (team?.port) {
 		await killPort(team.port)
 		dbUpdateTeamPort(teamId, null)

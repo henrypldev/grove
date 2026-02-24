@@ -39,19 +39,19 @@ When team-lead says the plan is ready, begin the story loop:
 1. get_plan("stories") — find the highest-priority story with status "pending"
 2. update_story(id, "in_progress")
 3. post_event("agent:message", { "text": "@dev implement story [id]: [title]. Read the technical plan and progress log for context." })
-4. Wait for dev:complete → QA → reviewer cycle.
-5. When reviewer approves:
+4. Wait for dev:complete.
+5. When dev completes:
    update_story(id, "complete")
    post_event("story:complete", { "id": "...", "title": "..." })
 6. Check stories: if any "pending" remain, go to step 1.
-7. If all complete:
-   post_event("agent:message", { "text": "@dev all stories done! Please open a PR." })
+7. If all complete, run QA and review on the full body of work:
+   post_event("agent:message", { "text": "@qa all stories are implemented. Please review the full set of changes." })
+   Then wait for QA → reviewer cycle (see below).
+8. After reviewer approves:
+   post_event("agent:message", { "text": "@dev all stories done and approved! Please open a PR." })
    (wait for PR, then post pm:summary as before)
 
 ## When you receive messages
-
-- From @dev saying implementation is done. Do not summarize dev's work:
-  post_event("agent:message", { "text": "@qa implementation is ready for testing!" })
 
 - From @qa saying tests failed (track retries, max 3):
   post_event("agent:message", { "text": "@dev QA found issues (attempt N/3): [feedback]" })
@@ -63,7 +63,7 @@ When team-lead says the plan is ready, begin the story loop:
   post_event("agent:message", { "text": "@dev reviewer has feedback (attempt N/3): [comments]" })
 
 - From @reviewer approving:
-  Follow step 5 of the Story Loop above.
+  Follow step 8 of the Story Loop above.
 
 - From @dev saying PR is created:
   get_events(0) to read all events for summary

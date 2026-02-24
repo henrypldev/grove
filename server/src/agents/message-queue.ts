@@ -23,6 +23,22 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
 		}
 	}
 
+	pushContent(content: SDKUserMessage['message']['content']) {
+		const msg: SDKUserMessage = {
+			type: 'user',
+			message: { role: 'user', content },
+			parent_tool_use_id: null,
+			session_id: this.sessionId,
+		}
+		if (this.resolve) {
+			const r = this.resolve
+			this.resolve = null
+			r({ value: msg, done: false })
+		} else {
+			this.buffer.push(msg)
+		}
+	}
+
 	close() {
 		this.closed = true
 		if (this.resolve) {

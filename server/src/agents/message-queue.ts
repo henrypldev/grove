@@ -2,7 +2,8 @@ import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 
 export class MessageQueue implements AsyncIterable<SDKUserMessage> {
 	private buffer: SDKUserMessage[] = []
-	private resolve: ((value: IteratorResult<SDKUserMessage>) => void) | null = null
+	private resolve: ((value: IteratorResult<SDKUserMessage>) => void) | null =
+		null
 	private closed = false
 	sessionId = ''
 
@@ -38,7 +39,10 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
 					return Promise.resolve({ value: this.buffer.shift()!, done: false })
 				}
 				if (this.closed) {
-					return Promise.resolve({ value: undefined as unknown as SDKUserMessage, done: true })
+					return Promise.resolve({
+						value: undefined as unknown as SDKUserMessage,
+						done: true,
+					})
 				}
 				return new Promise<IteratorResult<SDKUserMessage>>(r => {
 					this.resolve = r

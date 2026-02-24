@@ -45,8 +45,9 @@ describe('db/repos', () => {
 	})
 
 	test('insert with envVars round-trips', () => {
-		dbInsertRepo({ ...REPO, id: 'r2', envVars: { FOO: 'bar' } })
+		const vars = [{ key: 'FOO', value: 'bar', filePath: '.env' }]
+		dbInsertRepo({ ...REPO, id: 'r2', envVars: vars })
 		const got = dbGetRepo('r2')
-		expect(got?.envVars).toEqual({ FOO: 'bar' })
+		expect(got?.envVars).toEqual(vars)
 	})
 })

@@ -1,4 +1,9 @@
-import { cloneRepo, getGitHubOrgs, getGitHubRepos, getOrgRepos } from '../../api/github'
+import {
+	cloneRepo,
+	getGitHubOrgs,
+	getGitHubRepos,
+	getOrgRepos,
+} from '../../api/github'
 import { addRepo, withSetupFile } from '../../api/repos'
 import { listDirectories } from '../../config'
 import {

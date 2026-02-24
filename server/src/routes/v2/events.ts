@@ -1,7 +1,7 @@
+import { popAgentTools } from '../../agents/runner'
 import { dbGetAgent } from '../../db/agents'
 import { dbInsertEvent } from '../../db/events'
 import { dbGetTeam } from '../../db/teams'
-import { popAgentTools } from '../../agents/runner'
 
 export async function handleV2Events(
 	req: Request,

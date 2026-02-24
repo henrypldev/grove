@@ -129,9 +129,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 					const plan = dbGetPlan(teamId, 'stories')
 					if (!plan) {
 						return {
-							content: [
-								{ type: 'text' as const, text: 'no tasks plan found' },
-							],
+							content: [{ type: 'text' as const, text: 'no tasks plan found' }],
 						}
 					}
 					const stories = JSON.parse(plan.content)

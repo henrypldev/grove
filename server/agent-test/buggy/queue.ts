@@ -29,6 +29,10 @@ export class JobQueue {
 	}
 
 	stats() {
-		return { processed: this.processed, failed: this.failed, pending: this.jobs.length }
+		return {
+			processed: this.processed,
+			failed: this.failed,
+			pending: this.jobs.length,
+		}
 	}
 }

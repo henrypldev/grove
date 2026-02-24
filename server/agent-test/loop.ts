@@ -1,12 +1,17 @@
+import path from 'node:path'
 import { query } from '@anthropic-ai/claude-agent-sdk'
-import path from 'path'
 
 const serverDir = path.resolve(import.meta.dir, '..')
 const projectRoot = path.resolve(serverDir, '..')
 
 async function resetTestEnv() {
 	const proc = Bun.spawn(
-		['git', 'restore', 'server/agent-test/buggy/', 'server/agent-test/feature/'],
+		[
+			'git',
+			'restore',
+			'server/agent-test/buggy/',
+			'server/agent-test/feature/',
+		],
 		{ cwd: projectRoot, stdout: 'inherit', stderr: 'inherit' },
 	)
 	await proc.exited
@@ -55,7 +60,16 @@ Use the Task tool to delegate work through this hierarchy:
 
 Working directory: ${serverDir}`
 
-const roles = ['Orchestrator', 'PM', 'Team Lead', 'Dev-1', 'Dev-2', 'Dev-3', 'Reviewer', 'QA']
+const roles = [
+	'Orchestrator',
+	'PM',
+	'Team Lead',
+	'Dev-1',
+	'Dev-2',
+	'Dev-3',
+	'Reviewer',
+	'QA',
+]
 const sessionNames = new Map<string, string>()
 
 function nameFor(sessionId: string): string {
@@ -70,7 +84,8 @@ function say(sessionId: string, text: string) {
 	const name = nameFor(sessionId)
 	const lines = text.trim().split('\n')
 	console.log(`\n[${name}] ${lines[0]}`)
-	for (const line of lines.slice(1)) console.log(`${''.padEnd(name.length + 3)}${line}`)
+	for (const line of lines.slice(1))
+		console.log(`${''.padEnd(name.length + 3)}${line}`)
 }
 
 console.log('Starting agent loop...\n')
@@ -104,7 +119,9 @@ try {
 									return { continue: false }
 								}
 
-								console.log(`\nIteration ${iteration}/${maxIterations} — tests still failing, continuing...\n`)
+								console.log(
+									`\nIteration ${iteration}/${maxIterations} — tests still failing, continuing...\n`,
+								)
 								return {
 									continue: true,
 									systemMessage: `Tests still failing (iteration ${iteration}/${maxIterations}):\n\n${result.output}\n\nContinue fixing the source files.`,

@@ -92,7 +92,7 @@ export function startEventPoller() {
 				broadcast(teamId, {
 					type: 'agent:event',
 					teamId: event.teamId,
-					agentId: event.agentId,
+					agentId: event.agentId ?? '',
 					role: 'dev',
 					event: JSON.parse(event.payload),
 				})

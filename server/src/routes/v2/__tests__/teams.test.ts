@@ -88,7 +88,8 @@ describe('handleV2Teams', () => {
 			task: 'x',
 			status: 'planning',
 			pmSummary: null,
-		port: null,
+			port: null,
+			title: null,
 			createdAt: 1000,
 			updatedAt: 1000,
 		})
@@ -119,7 +120,8 @@ describe('handleV2Teams', () => {
 			task: 'x',
 			status: 'planning',
 			pmSummary: null,
-		port: null,
+			port: null,
+			title: null,
 			createdAt: 1000,
 			updatedAt: 1000,
 		})
@@ -140,7 +142,8 @@ describe('handleV2Teams', () => {
 			task: 'x',
 			status: 'planning',
 			pmSummary: null,
-		port: null,
+			port: null,
+			title: null,
 			createdAt: 1000,
 			updatedAt: 1000,
 		})

@@ -1,13 +1,35 @@
 import { describe, expect, test } from 'bun:test'
-import { averageCompletionTime, getActiveTaskCount, tasksDueForReview } from './stats'
 import type { Task } from './stats'
+import {
+	averageCompletionTime,
+	getActiveTaskCount,
+	tasksDueForReview,
+} from './stats'
 
 const now = Date.now()
 
 const tasks: Task[] = [
-	{ id: '1', status: 'todo', priority: 2, createdAt: now - 5000, completedAt: null },
-	{ id: '2', status: 'in_progress', priority: 3, createdAt: now - 4000, completedAt: null },
-	{ id: '3', status: 'done', priority: 1, createdAt: now - 3000, completedAt: now - 1000 },
+	{
+		id: '1',
+		status: 'todo',
+		priority: 2,
+		createdAt: now - 5000,
+		completedAt: null,
+	},
+	{
+		id: '2',
+		status: 'in_progress',
+		priority: 3,
+		createdAt: now - 4000,
+		completedAt: null,
+	},
+	{
+		id: '3',
+		status: 'done',
+		priority: 1,
+		createdAt: now - 3000,
+		completedAt: now - 1000,
+	},
 ]
 
 describe('stats', () => {

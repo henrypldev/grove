@@ -28,7 +28,10 @@ export function dbInsertRepo(repo: Repo): void {
 }
 
 export function dbDeleteRepo(id: string): boolean {
-	const result = getDb().delete(repos).where(eq(repos.id, id)).run()
+	const result = getDb()
+		.delete(repos)
+		.where(eq(repos.id, id))
+		.run() as unknown as { changes: number }
 	return result.changes > 0
 }
 

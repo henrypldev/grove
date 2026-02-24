@@ -32,7 +32,8 @@ describe('handleV2Events', () => {
 			task: 'x',
 			status: 'planning',
 			pmSummary: null,
-		port: null,
+			port: null,
+			title: null,
 			createdAt: 1000,
 			updatedAt: 1000,
 		})

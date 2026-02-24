@@ -27,6 +27,7 @@ const TEAM = {
 	status: 'planning' as const,
 	pmSummary: null,
 	port: null,
+	title: null,
 	createdAt: 1000,
 	updatedAt: 1000,
 }
@@ -90,9 +91,12 @@ describe('db/events', () => {
 
 	test('emitEphemeralEvent fires listeners without persisting', () => {
 		const received: unknown[] = []
-		const unsub = subscribeToTeamEvents('t1', (ev) => received.push(ev))
+		const unsub = subscribeToTeamEvents('t1', ev => received.push(ev))
 
-		emitEphemeralEvent('t1', 'a1', 'agent:status_change', { status: 'working', activity: 'reading files' })
+		emitEphemeralEvent('t1', 'a1', 'agent:status_change', {
+			status: 'working',
+			activity: 'reading files',
+		})
 
 		expect(received).toHaveLength(1)
 		const ev = received[0] as { type: string; id: number }
@@ -117,7 +121,8 @@ describe('db/events', () => {
 			task: 't',
 			status: 'planning',
 			pmSummary: null,
-	port: null,
+			port: null,
+			title: null,
 			createdAt: 1000,
 			updatedAt: 1000,
 		})

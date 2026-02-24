@@ -2,13 +2,19 @@ import { describe, expect, test } from 'bun:test'
 
 const responses: Array<Response> = []
 
-globalThis.fetch = async (_url: string | URL | Request, _init?: RequestInit) => {
+globalThis.fetch = async (
+	_url: string | URL | Request,
+	_init?: RequestInit,
+) => {
 	const next = responses.shift()
 	if (next) return next
-	return new Response(JSON.stringify({ id: '1', name: 'Test', email: 't@t.com' }), {
-		status: 200,
-		headers: { 'Content-Type': 'application/json' },
-	})
+	return new Response(
+		JSON.stringify({ id: '1', name: 'Test', email: 't@t.com' }),
+		{
+			status: 200,
+			headers: { 'Content-Type': 'application/json' },
+		},
+	)
 }
 
 let lastInit: RequestInit | undefined

@@ -51,12 +51,14 @@ export async function onNewTeam(team: Team) {
 		const text = payload.text
 		if (!text) return
 
-		await routeMessageToAgents(team, text, event.agentId)
+		await routeMessageToAgents(team, text, event.agentId ?? undefined)
 	})
 
 	subscribeToTeamEvents(team.id, async event => {
 		if (event.type === 'story:complete') {
-			log('orchestrator', 'story complete, cycling dev agent', { teamId: team.id })
+			log('orchestrator', 'story complete, cycling dev agent', {
+				teamId: team.id,
+			})
 			closeAgent(team.id, 'dev')
 		}
 	})

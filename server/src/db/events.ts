@@ -35,7 +35,7 @@ export function dbInsertEvent(
 			payload: JSON.stringify(payload),
 			createdAt: now,
 		})
-		.run()
+		.run() as unknown as { lastInsertRowid: number }
 	const event: TeamEvent = {
 		id: Number(result.lastInsertRowid),
 		teamId,
@@ -44,14 +44,11 @@ export function dbInsertEvent(
 		payload: JSON.stringify(payload),
 		createdAt: now,
 	}
-	listeners.get(teamId)?.forEach((fn) => fn(event))
+	for (const fn of listeners.get(teamId) ?? []) fn(event)
 	return event
 }
 
-export function dbListEventsSince(
-	teamId: string,
-	since: number,
-): TeamEvent[] {
+export function dbListEventsSince(teamId: string, since: number): TeamEvent[] {
 	return getDb()
 		.select()
 		.from(events)
@@ -107,7 +104,7 @@ export function emitEphemeralEvent(
 		payload: JSON.stringify(payload),
 		createdAt: Date.now(),
 	}
-	listeners.get(teamId)?.forEach((fn) => fn(event))
+	for (const fn of listeners.get(teamId) ?? []) fn(event)
 }
 
 export function dbInsertPmReport(teamId: string, summary: string): void {

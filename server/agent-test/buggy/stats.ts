@@ -12,7 +12,10 @@ export function getActiveTaskCount(tasks: Task[]): number {
 
 export function averageCompletionTime(tasks: Task[]): number {
 	const completed = tasks.filter(t => t.completedAt !== null)
-	const total = completed.reduce((sum, t) => sum + (t.completedAt! - t.createdAt), 0)
+	const total = completed.reduce(
+		(sum, t) => sum + (t.completedAt! - t.createdAt),
+		0,
+	)
 	return total / tasks.length
 }
 

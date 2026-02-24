@@ -10,7 +10,9 @@ mock.module('@anthropic-ai/claude-agent-sdk', () => ({
 	tool: (...args: any[]) => args,
 }))
 
-const { spawnAgent, respawnAgent, activityFromToolName } = await import('../runner')
+const { spawnAgent, respawnAgent, activityFromToolName } = await import(
+	'../runner'
+)
 
 const REPO = {
 	id: 'r1',
@@ -27,25 +29,26 @@ const TEAM = {
 	status: 'planning' as const,
 	pmSummary: null,
 	port: null,
+	title: null,
 	createdAt: 1000,
 	updatedAt: 1000,
 }
 
 test('activityFromToolName maps known tools', () => {
-  expect(activityFromToolName('Bash')).toBe('running commands')
-  expect(activityFromToolName('BashOutput')).toBe('running commands')
-  expect(activityFromToolName('KillShell')).toBe('running commands')
-  expect(activityFromToolName('Read')).toBe('reading files')
-  expect(activityFromToolName('Glob')).toBe('reading files')
-  expect(activityFromToolName('Grep')).toBe('reading files')
-  expect(activityFromToolName('Edit')).toBe('writing code')
-  expect(activityFromToolName('Write')).toBe('writing code')
-  expect(activityFromToolName('NotebookEdit')).toBe('writing code')
-  expect(activityFromToolName('WebFetch')).toBe('researching')
-  expect(activityFromToolName('WebSearch')).toBe('researching')
-  expect(activityFromToolName('Task')).toBe('spawning agents')
-  expect(activityFromToolName('SendMessage')).toBe('communicating')
-  expect(activityFromToolName('UnknownTool')).toBe('working')
+	expect(activityFromToolName('Bash')).toBe('running commands')
+	expect(activityFromToolName('BashOutput')).toBe('running commands')
+	expect(activityFromToolName('KillShell')).toBe('running commands')
+	expect(activityFromToolName('Read')).toBe('reading files')
+	expect(activityFromToolName('Glob')).toBe('reading files')
+	expect(activityFromToolName('Grep')).toBe('reading files')
+	expect(activityFromToolName('Edit')).toBe('writing code')
+	expect(activityFromToolName('Write')).toBe('writing code')
+	expect(activityFromToolName('NotebookEdit')).toBe('writing code')
+	expect(activityFromToolName('WebFetch')).toBe('researching')
+	expect(activityFromToolName('WebSearch')).toBe('researching')
+	expect(activityFromToolName('Task')).toBe('spawning agents')
+	expect(activityFromToolName('SendMessage')).toBe('communicating')
+	expect(activityFromToolName('UnknownTool')).toBe('working')
 })
 
 describe('agent/runner', () => {

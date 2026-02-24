@@ -146,7 +146,7 @@ export async function handleV2Teams(
 				spawnReviewerAgent,
 				spawnEnvAgent,
 			} = await import('../../agents/specialists')
-			let agent
+			let agent: Awaited<ReturnType<typeof spawnDeveloper>> | undefined
 			switch (body.role) {
 				case 'team-lead':
 					agent = await spawnTeamLead(team)

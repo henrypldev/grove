@@ -25,6 +25,7 @@ const TEAM = {
 	status: 'planning' as const,
 	pmSummary: null,
 	port: null,
+	title: null,
 	createdAt: 1000,
 	updatedAt: 1000,
 }

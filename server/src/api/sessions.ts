@@ -508,11 +508,11 @@ export async function uploadFile(
 	await Bun.$`mkdir -p ${imagesDir}`.quiet()
 
 	let fileName = file.name
-	const ext = fileName.includes('.') ? '.' + fileName.split('.').pop() : ''
+	const ext = fileName.includes('.') ? `.${fileName.split('.').pop()}` : ''
 	const base = ext ? fileName.slice(0, -ext.length) : fileName
 	let targetPath = `${imagesDir}/${fileName}`
 	let counter = 1
-	const fs = await import('fs')
+	const fs = await import('node:fs')
 	while (fs.existsSync(targetPath)) {
 		fileName = `${base}-${counter}${ext}`
 		targetPath = `${imagesDir}/${fileName}`

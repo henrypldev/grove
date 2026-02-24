@@ -6,6 +6,7 @@ import {
 	dbListEventsSince,
 	subscribeToTeamEvents,
 } from '../../db/events'
+import { dbGetPlan } from '../../db/plans'
 import { dbGetRepo } from '../../db/repos'
 import {
 	dbArchiveTeam,
@@ -274,6 +275,26 @@ export async function handleV2Teams(
 				'Access-Control-Allow-Origin': '*',
 			},
 		})
+	}
+
+	const plansMatch = matchRoute(path, '/v2/teams/:id/plans/:type')
+	if (plansMatch && method === 'GET') {
+		const team = dbGetTeam(plansMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const plan = dbGetPlan(plansMatch.id, plansMatch.type)
+		if (!plan)
+			return Response.json(
+				{ error: 'Plan not found' },
+				{ status: 404, headers },
+			)
+		return Response.json(
+			{ type: plansMatch.type, content: plan.content },
+			{ headers },
+		)
 	}
 
 	return null

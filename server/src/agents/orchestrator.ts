@@ -67,6 +67,7 @@ export async function onNewTeam(team: Team) {
 				payload = {}
 			}
 			if (payload.port) {
+				dbUpdateTeamPort(team.id, payload.port)
 				registerTeamServe(team.id, payload.port)
 			}
 		}
@@ -183,8 +184,8 @@ export async function closeTeam(teamId: string) {
 	log('orchestrator', 'closing team', { teamId })
 	const team = dbGetTeam(teamId)
 	closeAllAgents(teamId)
-	unregisterTeamServe(teamId)
 	if (team?.port) {
+		unregisterTeamServe(teamId, team.port)
 		await killPort(team.port)
 		dbUpdateTeamPort(teamId, null)
 	}

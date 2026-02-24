@@ -111,7 +111,7 @@ export async function handleV2Teams(
 				)
 			const agents = dbListAgentsByTeam(teamMatch.id)
 			const devUrl = team.port
-				? `https://${await getTerminalHost()}/dev-${team.id}/`
+				? `https://${await getTerminalHost()}:${team.port}`
 				: null
 			return Response.json({ ...team, devUrl, agents }, { headers })
 		}

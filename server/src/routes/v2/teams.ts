@@ -5,6 +5,7 @@ import {
 	startTeamStep,
 	stopTeamStep,
 } from '../../api/setup-v2'
+import { isPortActive } from '../../api/ports'
 import { createWorktree } from '../../api/worktrees'
 import { generateId, getTerminalHost } from '../../config'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
@@ -119,10 +120,14 @@ export async function handleV2Teams(
 					{ status: 404, headers },
 				)
 			const agents = dbListAgentsByTeam(teamMatch.id)
-			const devUrl = team.port
+			const portAlive = team.port && isPortActive(team.port)
+			const devUrl = portAlive
 				? `https://${await getTerminalHost()}:${team.port}`
 				: null
-			return Response.json({ ...team, devUrl, agents }, { headers })
+			return Response.json(
+				{ ...team, port: portAlive ? team.port : null, devUrl, agents },
+				{ headers },
+			)
 		}
 		if (method === 'DELETE') {
 			const team = dbGetTeam(teamMatch.id)

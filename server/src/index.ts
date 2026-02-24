@@ -8,6 +8,7 @@ import { handleV2Events } from './routes/v2/events'
 import { handleV2Repos } from './routes/v2/repos'
 import { handleV2Teams, setTeamCreatedHook } from './routes/v2/teams'
 import { handleV2Usage } from './routes/v2/usage'
+import { startPortPoller } from './api/ports'
 import { cleanupStaleSessions } from './terminal/ttyd'
 import { startEventPoller, wsHandlers } from './websocket'
 
@@ -20,6 +21,7 @@ export async function startServer(port: number) {
 	log('server', 'starting up')
 	await cleanupStaleSessions()
 	startEventPoller()
+	startPortPoller()
 
 	setInterval(async () => {
 		await cleanupStaleSessions()

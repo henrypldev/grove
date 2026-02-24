@@ -1,3 +1,4 @@
+import { isPortActive } from '../../api/ports'
 import { dbListAgentsByTeam } from '../../db/agents'
 import { dbGetLatestEventByType } from '../../db/events'
 import { dbListTeams } from '../../db/teams'
@@ -43,7 +44,7 @@ export async function handleV2Dashboard(
 				title: team.title,
 				status: team.status,
 				repoId: team.repoId,
-				port: team.port,
+				port: team.port && isPortActive(team.port) ? team.port : null,
 				agents: agents.map(a => ({
 					id: a.id,
 					role: a.role,

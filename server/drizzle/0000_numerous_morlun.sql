@@ -66,3 +66,24 @@ CREATE TABLE `teams` (
 	`updated_at` integer NOT NULL,
 	FOREIGN KEY (`repo_id`) REFERENCES `repos`(`id`) ON UPDATE no action ON DELETE no action
 );
+--> statement-breakpoint
+CREATE TABLE `usage` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`team_id` text NOT NULL,
+	`agent_id` text,
+	`model` text NOT NULL,
+	`input_tokens` integer NOT NULL,
+	`output_tokens` integer NOT NULL,
+	`cache_read_tokens` integer DEFAULT 0 NOT NULL,
+	`cache_creation_tokens` integer DEFAULT 0 NOT NULL,
+	`cost_usd` real NOT NULL,
+	`duration_ms` integer NOT NULL,
+	`duration_api_ms` integer NOT NULL,
+	`num_turns` integer NOT NULL,
+	`created_at` integer NOT NULL,
+	FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`agent_id`) REFERENCES `agents`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE INDEX `idx_usage_created` ON `usage` (`created_at`);--> statement-breakpoint
+CREATE INDEX `idx_usage_team_created` ON `usage` (`team_id`,`created_at`);

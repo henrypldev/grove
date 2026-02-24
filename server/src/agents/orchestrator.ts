@@ -8,6 +8,7 @@ import {
 	dbUpdateTeamPrUrl,
 	dbUpdateTeamStatus,
 } from '../db/teams'
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentRole, Team } from '../types'
 import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
 import { spawnPm } from './pm'
@@ -146,6 +147,7 @@ export async function routeMessageToAgents(
 	team: Team,
 	text: string,
 	senderAgentId?: string,
+	contentBlocks?: SDKUserMessage['message']['content'],
 ) {
 	const mentions = new Set<string>()
 	for (const match of text.matchAll(MENTION_PATTERN)) {
@@ -162,7 +164,11 @@ export async function routeMessageToAgents(
 					teamId: team.id,
 				},
 			)
-			pmAgent.queue.push(text)
+			if (contentBlocks) {
+				pmAgent.queue.pushContent(contentBlocks)
+			} else {
+				pmAgent.queue.push(text)
+			}
 		}
 		return
 	}
@@ -174,7 +180,11 @@ export async function routeMessageToAgents(
 				log('orchestrator', `routing to pm from ${senderAgentId ?? 'user'}`, {
 					teamId: team.id,
 				})
-				pmAgent.queue.push(text)
+				if (contentBlocks) {
+					pmAgent.queue.pushContent(contentBlocks)
+				} else {
+					pmAgent.queue.push(text)
+				}
 			}
 			continue
 		}
@@ -192,7 +202,11 @@ export async function routeMessageToAgents(
 					teamId: team.id,
 				},
 			)
-			agent.queue.push(text)
+			if (contentBlocks) {
+				agent.queue.pushContent(contentBlocks)
+			} else {
+				agent.queue.push(text)
+			}
 		}
 	}
 }

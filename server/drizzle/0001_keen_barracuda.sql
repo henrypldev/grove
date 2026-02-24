@@ -1,0 +1,1 @@
+ALTER TABLE `teams` ADD `pr_url` text;

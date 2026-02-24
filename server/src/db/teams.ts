@@ -40,6 +40,7 @@ export function dbInsertTeam(team: Team): void {
 			status: team.status,
 			pmSummary: team.pmSummary,
 			port: team.port,
+			prUrl: team.prUrl,
 			createdAt: team.createdAt,
 			updatedAt: team.updatedAt,
 		})
@@ -77,6 +78,14 @@ export function dbUpdateTeamPort(id: string, port: number | null): void {
 		.run()
 }
 
+export function dbUpdateTeamPrUrl(id: string, prUrl: string): void {
+	getDb()
+		.update(teams)
+		.set({ prUrl, updatedAt: Date.now() })
+		.where(eq(teams.id, id))
+		.run()
+}
+
 export function dbArchiveTeam(id: string): void {
 	dbUpdateTeamStatus(id, 'archived')
 }
@@ -91,6 +100,7 @@ function toTeam(row: typeof teams.$inferSelect): Team {
 		status: row.status as TeamStatus,
 		pmSummary: row.pmSummary,
 		port: row.port,
+		prUrl: row.prUrl,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,
 	}

@@ -92,6 +92,7 @@ export async function handleV2Teams(
 			status: 'planning',
 			pmSummary: null,
 			port: null,
+			prUrl: null,
 			createdAt: now,
 			updatedAt: now,
 		}

@@ -2,7 +2,12 @@ import { computeDiff, getHeadSha } from '../api/diff'
 import { registerTeamServe, unregisterTeamServe } from '../api/tailscale-serve'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
-import { dbGetTeam, dbUpdateTeamPort, dbUpdateTeamStatus } from '../db/teams'
+import {
+	dbGetTeam,
+	dbUpdateTeamPort,
+	dbUpdateTeamPrUrl,
+	dbUpdateTeamStatus,
+} from '../db/teams'
 import type { AgentRole, Team } from '../types'
 import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
 import { spawnPm } from './pm'
@@ -101,6 +106,20 @@ export async function onNewTeam(team: Team) {
 				envAgent.queue.push(
 					'dev:complete — please re-check the fingerprint for native dependency changes.',
 				)
+			}
+		}
+		if (event.type === 'dev:pr-created') {
+			let payload: { url?: string }
+			try {
+				payload =
+					typeof event.payload === 'string'
+						? JSON.parse(event.payload)
+						: event.payload
+			} catch {
+				payload = {}
+			}
+			if (payload.url) {
+				dbUpdateTeamPrUrl(team.id, payload.url)
 			}
 		}
 		if (event.type === 'pm:summary') {

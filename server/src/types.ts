@@ -70,6 +70,7 @@ export interface Team {
 	status: TeamStatus
 	pmSummary: string | null
 	port: number | null
+	prUrl: string | null
 	createdAt: number
 	updatedAt: number
 }

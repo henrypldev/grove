@@ -27,6 +27,7 @@ export const teams = sqliteTable('teams', {
 	status: text('status').notNull(),
 	pmSummary: text('pm_summary'),
 	port: integer('port'),
+	prUrl: text('pr_url'),
 	createdAt: integer('created_at').notNull(),
 	updatedAt: integer('updated_at').notNull(),
 })

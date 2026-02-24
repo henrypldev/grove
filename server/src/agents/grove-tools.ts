@@ -99,12 +99,12 @@ export function createGroveTools(teamId: string, agentId: string) {
 			),
 			tool(
 				'append_progress',
-				'Append a progress entry for the current story. Accumulates across stories.',
+				'Append a progress entry for the current task. Accumulates across tasks.',
 				{
 					entry: z
 						.string()
 						.describe(
-							'Progress entry in markdown (## story title, changes, learnings, gotchas)',
+							'Progress entry in markdown (## task title, changes, learnings, gotchas)',
 						),
 				},
 				async ({ entry }) => {
@@ -118,9 +118,9 @@ export function createGroveTools(teamId: string, agentId: string) {
 			),
 			tool(
 				'update_story',
-				'Update the status of a single story in the stories plan',
+				'Update the status of a single task in the tasks plan',
 				{
-					id: z.string().describe('Story ID (e.g. "1", "2")'),
+					id: z.string().describe('Task ID (e.g. "1", "2")'),
 					status: z
 						.enum(['pending', 'in_progress', 'complete', 'skipped'])
 						.describe('New status'),
@@ -130,7 +130,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 					if (!plan) {
 						return {
 							content: [
-								{ type: 'text' as const, text: 'no stories plan found' },
+								{ type: 'text' as const, text: 'no tasks plan found' },
 							],
 						}
 					}
@@ -139,7 +139,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 					if (!story) {
 						return {
 							content: [
-								{ type: 'text' as const, text: `story ${id} not found` },
+								{ type: 'text' as const, text: `task ${id} not found` },
 							],
 						}
 					}

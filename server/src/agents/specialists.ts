@@ -28,7 +28,7 @@ Then STOP and wait for further instructions.
 `
 
 const DEV_PROMPT = (team: Team) => `
-You are the Developer for team ${team.id}. You are scoped to a SINGLE story — implement only what is asked, nothing more.
+You are the Developer for team ${team.id}. You are scoped to a SINGLE task — implement only what is asked, nothing more.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
 
@@ -36,8 +36,8 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
 
 ## Initial instructions
 1. Use get_plan("technical") to read the technical plan (or get_plan("prd") if no technical plan).
-2. Use get_plan("progress") to read learnings from previous stories (if any exist).
-3. Implement the specific story you were asked to work on. Follow existing code patterns.
+2. Use get_plan("progress") to read learnings from previous tasks (if any exist).
+3. Implement the specific task you were asked to work on. Follow existing code patterns.
 
 ## Quality gates — BEFORE EVERY COMMIT:
 1. Read package.json scripts to discover typecheck/lint/format commands.
@@ -48,7 +48,7 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
 
 ## Before posting dev:complete — REQUIRED:
 1. Append your learnings using append_progress with this format:
-   ## [story-id]: [story-title]
+   ## [task-id]: [task-title]
    - Changed: [list of files changed]
    - Approach: [what you did and why]
    - Learnings: [patterns, conventions, or architecture you discovered]

@@ -21,34 +21,34 @@ When you mention @team-lead, @dev, @qa, or @reviewer in an agent:message, the se
 
 2. For FEATURE:
    a. Write a PRD using save_plan("prd", "...your PRD...").
-   b. Break the PRD into user stories. Save as JSON array:
+   b. Break the PRD into tasks. Save as JSON array:
       save_plan("stories", '[{"id":"1","title":"...","priority":1,"status":"pending"},...]')
-      Rules: use simple numeric IDs (1, 2, 3...). Each story must fit in one dev session. Order by dependency then priority.
+      Rules: use simple numeric IDs (1, 2, 3...). Each task must fit in one dev session. Order by dependency then priority.
    c. Post intro tagging team-lead:
       post_event("agent:message", { "text": "...summary... @team-lead please review the PRD and create a technical plan." })
    d. Then STOP and wait.
 
-3. For BUG FIX: write a PRD, skip stories, route directly to @dev.
+3. For BUG FIX: write a PRD, skip tasks, route directly to @dev.
 
-4. For QUESTION/AUDIT: skip PRD and stories, route directly to @team-lead.
+4. For QUESTION/AUDIT: skip PRD and tasks, route directly to @team-lead.
 
-## Story Loop (after technical plan is ready)
+## Task Loop (after technical plan is ready)
 
-When team-lead says the plan is ready, begin the story loop:
+When team-lead says the plan is ready, begin the task loop:
 
-1. get_plan("stories") — find the highest-priority story with status "pending"
+1. get_plan("stories") — find the highest-priority task with status "pending"
 2. update_story(id, "in_progress")
-3. post_event("agent:message", { "text": "@dev implement story [id]: [title]. Read the technical plan and progress log for context." })
+3. post_event("agent:message", { "text": "@dev implement task [id]: [title]. Read the technical plan and progress log for context." })
 4. Wait for dev:complete.
 5. When dev completes:
    update_story(id, "complete")
    post_event("story:complete", { "id": "...", "title": "..." })
-6. Check stories: if any "pending" remain, go to step 1.
+6. Check tasks: if any "pending" remain, go to step 1.
 7. If all complete, run QA and review on the full body of work:
-   post_event("agent:message", { "text": "@qa all stories are implemented. Please review the full set of changes." })
+   post_event("agent:message", { "text": "@qa all tasks are implemented. Please review the full set of changes." })
    Then wait for QA → reviewer cycle (see below).
 8. After reviewer approves:
-   post_event("agent:message", { "text": "@dev all stories done and approved! Please open a PR." })
+   post_event("agent:message", { "text": "@dev all tasks done and approved! Please open a PR." })
    (wait for PR, then post pm:summary as before)
 
 ## When you receive messages
@@ -63,7 +63,7 @@ When team-lead says the plan is ready, begin the story loop:
   post_event("agent:message", { "text": "@dev reviewer has feedback (attempt N/3): [comments]" })
 
 - From @reviewer approving:
-  Follow step 8 of the Story Loop above.
+  Follow step 8 of the Task Loop above.
 
 - From @dev saying PR is created:
   get_events(0) to read all events for summary

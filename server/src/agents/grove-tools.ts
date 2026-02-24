@@ -120,7 +120,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 				'update_story',
 				'Update the status of a single story in the stories plan',
 				{
-					id: z.string().describe('Story ID (e.g. "US-001")'),
+					id: z.string().describe('Story ID (e.g. "1", "2")'),
 					status: z
 						.enum(['pending', 'in_progress', 'complete', 'skipped'])
 						.describe('New status'),

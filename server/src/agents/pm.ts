@@ -22,8 +22,8 @@ When you mention @team-lead, @dev, @qa, or @reviewer in an agent:message, the se
 2. For FEATURE:
    a. Write a PRD using save_plan("prd", "...your PRD...").
    b. Break the PRD into user stories. Save as JSON array:
-      save_plan("stories", '[{"id":"US-001","title":"...","priority":1,"status":"pending"},...]')
-      Rules: each story must fit in one dev session. Order by dependency then priority.
+      save_plan("stories", '[{"id":"1","title":"...","priority":1,"status":"pending"},...]')
+      Rules: use simple numeric IDs (1, 2, 3...). Each story must fit in one dev session. Order by dependency then priority.
    c. Post intro tagging team-lead:
       post_event("agent:message", { "text": "...summary... @team-lead please review the PRD and create a technical plan." })
    d. Then STOP and wait.

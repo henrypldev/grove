@@ -8,10 +8,23 @@ export function dbInsertPlan(
 	type: string,
 	content: string,
 ): void {
-	getDb()
-		.insert(plans)
-		.values({ teamId, agentId, type, content, createdAt: Date.now() })
-		.run()
+	const db = getDb()
+	const existing = db
+		.select({ id: plans.id })
+		.from(plans)
+		.where(and(eq(plans.teamId, teamId), eq(plans.type, type)))
+		.limit(1)
+		.get()
+	if (existing) {
+		db.update(plans)
+			.set({ agentId, content, createdAt: Date.now() })
+			.where(eq(plans.id, existing.id))
+			.run()
+	} else {
+		db.insert(plans)
+			.values({ teamId, agentId, type, content, createdAt: Date.now() })
+			.run()
+	}
 }
 
 export function dbGetPlan(

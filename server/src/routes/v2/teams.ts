@@ -23,7 +23,17 @@ import {
 	dbListTeams,
 	dbUpdateTeamTitle,
 } from '../../db/teams'
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { Team } from '../../types'
+
+const IMAGE_TYPES = new Set([
+	'image/jpeg',
+	'image/png',
+	'image/gif',
+	'image/webp',
+])
+const PDF_TYPE = 'application/pdf'
+const MAX_FILE_SIZE = 5 * 1024 * 1024
 
 function matchRoute(
 	path: string,
@@ -239,14 +249,55 @@ export async function handleV2Teams(
 				{ error: 'Team not found' },
 				{ status: 404, headers },
 			)
-		const body = (await req.json()) as { text?: string }
-		if (!body.text)
+
+		let text: string | undefined
+		let contentBlocks: SDKUserMessage['message']['content'] | undefined
+
+		const contentType = req.headers.get('content-type') ?? ''
+		if (contentType.includes('multipart/form-data')) {
+			const formData = await req.formData()
+			text = formData.get('text') as string | undefined
+			if (!text)
+				return Response.json(
+					{ error: 'Missing text' },
+					{ status: 400, headers },
+				)
+
+			const files = formData.getAll('files') as File[]
+			if (files.length > 0) {
+				const blocks: Array<Record<string, unknown>> = []
+				for (const file of files) {
+					if (file.size > MAX_FILE_SIZE) continue
+					const mime = file.type
+					const data = Buffer.from(await file.arrayBuffer()).toString('base64')
+					if (IMAGE_TYPES.has(mime)) {
+						blocks.push({
+							type: 'image',
+							source: { type: 'base64', media_type: mime, data },
+						})
+					} else if (mime === PDF_TYPE) {
+						blocks.push({
+							type: 'document',
+							source: { type: 'base64', media_type: mime, data },
+						})
+					}
+				}
+				if (blocks.length > 0) {
+					blocks.push({ type: 'text', text })
+					contentBlocks = blocks as SDKUserMessage['message']['content']
+				}
+			}
+		} else {
+			const body = (await req.json()) as { text?: string }
+			text = body.text
+		}
+
+		if (!text)
 			return Response.json({ error: 'Missing text' }, { status: 400, headers })
-		const event = dbInsertEvent(team.id, null, 'user:message', {
-			text: body.text,
-		})
+
+		const event = dbInsertEvent(team.id, null, 'user:message', { text })
 		const { routeMessageToAgents } = await import('../../agents/orchestrator')
-		await routeMessageToAgents(team, body.text)
+		await routeMessageToAgents(team, text, undefined, contentBlocks)
 		return Response.json(event, { headers })
 	}
 

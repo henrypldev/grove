@@ -1,3 +1,10 @@
+import {
+	cancelTeamSetup,
+	retryTeamSetup,
+	startTeamSetup,
+	startTeamStep,
+	stopTeamStep,
+} from '../../api/setup-v2'
 import { createWorktree } from '../../api/worktrees'
 import { generateId, getTerminalHost } from '../../config'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
@@ -94,6 +101,8 @@ export async function handleV2Teams(
 				dbUpdateTeamTitle(teamId, title),
 			),
 		)
+
+		startTeamSetup(teamId, worktree.path, repo.setupSteps)
 
 		if (onTeamCreated) await onTeamCreated(team)
 
@@ -298,6 +307,73 @@ export async function handleV2Teams(
 			{ type: plansMatch.type, content: plan.content },
 			{ headers },
 		)
+	}
+
+	const setupRetryMatch = matchRoute(path, '/v2/teams/:id/setup/retry')
+	if (setupRetryMatch && method === 'POST') {
+		const team = dbGetTeam(setupRetryMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const repo = dbGetRepo(team.repoId)
+		await retryTeamSetup(
+			setupRetryMatch.id,
+			team.worktreePath,
+			repo?.setupSteps,
+		)
+		return Response.json({ success: true }, { headers })
+	}
+
+	const setupCancelMatch = matchRoute(path, '/v2/teams/:id/setup/cancel')
+	if (setupCancelMatch && method === 'POST') {
+		const team = dbGetTeam(setupCancelMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		cancelTeamSetup(setupCancelMatch.id)
+		return Response.json({ success: true }, { headers })
+	}
+
+	const setupStopMatch = matchRoute(path, '/v2/teams/:id/setup/stop')
+	if (setupStopMatch && method === 'POST') {
+		const team = dbGetTeam(setupStopMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const body = (await req.json()) as { step?: number }
+		if (typeof body.step !== 'number')
+			return Response.json(
+				{ error: 'Missing step index' },
+				{ status: 400, headers },
+			)
+		const error = stopTeamStep(setupStopMatch.id, body.step)
+		if (error) return Response.json({ error }, { status: 400, headers })
+		return Response.json({ success: true }, { headers })
+	}
+
+	const setupStartMatch = matchRoute(path, '/v2/teams/:id/setup/start')
+	if (setupStartMatch && method === 'POST') {
+		const team = dbGetTeam(setupStartMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const body = (await req.json()) as { step?: number }
+		if (typeof body.step !== 'number')
+			return Response.json(
+				{ error: 'Missing step index' },
+				{ status: 400, headers },
+			)
+		const error = startTeamStep(setupStartMatch.id, body.step)
+		if (error) return Response.json({ error }, { status: 400, headers })
+		return Response.json({ success: true }, { headers })
 	}
 
 	return null

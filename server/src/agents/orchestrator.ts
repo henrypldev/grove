@@ -23,12 +23,6 @@ export async function startOrchestrator() {
 export async function onNewTeam(team: Team) {
 	log('orchestrator', 'spawning team', { teamId: team.id })
 
-	if (await needsDevServer(team.worktreePath)) {
-		spawnEnvAgent(team).catch(err => {
-			log('orchestrator', 'env agent spawn failed', { teamId: team.id, err })
-		})
-	}
-
 	await spawnPm(team, {
 		onDone: () => {
 			log('orchestrator', 'pm process exited', { teamId: team.id })
@@ -213,15 +207,4 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 	else if (role === 'qa') await spawnQaAgent(team)
 	else if (role === 'reviewer') await spawnReviewerAgent(team)
 	else if (role === 'env') await spawnEnvAgent(team)
-}
-
-async function needsDevServer(worktreePath: string): Promise<boolean> {
-	try {
-		const file = Bun.file(`${worktreePath}/package.json`)
-		const pkg = await file.json()
-		const deps = { ...pkg.dependencies, ...pkg.devDependencies }
-		return 'expo' in deps || 'next' in deps || 'vite' in deps
-	} catch {
-		return false
-	}
 }

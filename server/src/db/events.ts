@@ -51,14 +51,12 @@ export function dbInsertEvent(
 export function dbListEventsSince(
 	teamId: string,
 	since: number,
-	limit = 200,
 ): TeamEvent[] {
 	return getDb()
 		.select()
 		.from(events)
 		.where(and(eq(events.teamId, teamId), gt(events.createdAt, since)))
 		.orderBy(asc(events.createdAt))
-		.limit(limit)
 		.all()
 }
 

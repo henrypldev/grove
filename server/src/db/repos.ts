@@ -35,6 +35,18 @@ export function dbDeleteRepo(id: string): boolean {
 	return result.changes > 0
 }
 
+export function dbUpdateRepoSetupSteps(
+	id: string,
+	setupSteps: Repo['setupSteps'],
+): boolean {
+	const result = getDb()
+		.update(repos)
+		.set({ setupSteps: setupSteps ? JSON.stringify(setupSteps) : null })
+		.where(eq(repos.id, id))
+		.run() as unknown as { changes: number }
+	return result.changes > 0
+}
+
 function toRepo(row: typeof repos.$inferSelect): Repo {
 	return {
 		id: row.id,

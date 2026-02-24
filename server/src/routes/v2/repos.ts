@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import {
 	cloneRepo,
 	getGitHubOrgs,
@@ -11,6 +13,7 @@ import {
 	dbGetRepo,
 	dbInsertRepo,
 	dbListRepos,
+	dbUpdateRepoSetupSteps,
 } from '../../db/repos'
 import { dbListTeamsByRepo } from '../../db/teams'
 
@@ -105,6 +108,115 @@ export async function handleV2Repos(
 			)
 		const teams = dbListTeamsByRepo(repoTeamsMatch.id)
 		return Response.json(teams, { headers })
+	}
+
+	const setupMatch = matchRoute(path, '/v2/repos/:id/setup')
+	if (setupMatch) {
+		const repo = dbGetRepo(setupMatch.id)
+		if (!repo)
+			return Response.json(
+				{ error: 'Repo not found' },
+				{ status: 404, headers },
+			)
+
+		if (method === 'GET') {
+			const setupFile = join(repo.path, '.grove', 'setup.json')
+			if (existsSync(setupFile)) {
+				const data = await Bun.file(setupFile).json()
+				return Response.json(data.setup ?? [], { headers })
+			}
+			return Response.json(repo.setupSteps ?? [], { headers })
+		}
+
+		if (method === 'POST') {
+			const body = await req.json()
+			if (!body.name || !body.run)
+				return Response.json(
+					{ error: 'Missing name or run' },
+					{ status: 400, headers },
+				)
+			const steps = repo.setupSteps ?? []
+			steps.push({
+				name: body.name,
+				run: body.run,
+				background: body.background || undefined,
+			})
+			dbUpdateRepoSetupSteps(setupMatch.id, steps)
+			return Response.json(steps, { headers })
+		}
+
+		if (method === 'PUT') {
+			const body = await req.json()
+			if (typeof body.index !== 'number' || !body.name || !body.run)
+				return Response.json(
+					{ error: 'Missing index, name, or run' },
+					{ status: 400, headers },
+				)
+			const steps = repo.setupSteps ?? []
+			if (body.index < 0 || body.index >= steps.length)
+				return Response.json(
+					{ error: 'Invalid index' },
+					{ status: 400, headers },
+				)
+			steps[body.index] = {
+				name: body.name,
+				run: body.run,
+				background: body.background || undefined,
+			}
+			dbUpdateRepoSetupSteps(setupMatch.id, steps)
+			return Response.json(steps, { headers })
+		}
+
+		if (method === 'DELETE') {
+			const body = await req.json()
+			if (typeof body.index !== 'number')
+				return Response.json(
+					{ error: 'Missing index' },
+					{ status: 400, headers },
+				)
+			const steps = repo.setupSteps ?? []
+			if (body.index < 0 || body.index >= steps.length)
+				return Response.json(
+					{ error: 'Invalid index' },
+					{ status: 400, headers },
+				)
+			steps.splice(body.index, 1)
+			dbUpdateRepoSetupSteps(
+				setupMatch.id,
+				steps.length > 0 ? steps : undefined,
+			)
+			return Response.json(steps, { headers })
+		}
+	}
+
+	const setupReorderMatch = matchRoute(path, '/v2/repos/:id/setup/reorder')
+	if (setupReorderMatch && method === 'PATCH') {
+		const repo = dbGetRepo(setupReorderMatch.id)
+		if (!repo)
+			return Response.json(
+				{ error: 'Repo not found' },
+				{ status: 404, headers },
+			)
+		const body = await req.json()
+		if (!Array.isArray(body.order))
+			return Response.json(
+				{ error: 'Missing order array' },
+				{ status: 400, headers },
+			)
+		const steps = repo.setupSteps ?? []
+		if (
+			body.order.length !== steps.length ||
+			![...body.order]
+				.sort((a: number, b: number) => a - b)
+				.every((v: number, i: number) => v === i)
+		)
+			return Response.json(
+				{ error: 'order must be a permutation of current indices' },
+				{ status: 400, headers },
+			)
+		const reordered = body.order.map((i: number) => steps[i])
+		dbUpdateRepoSetupSteps(setupReorderMatch.id, reordered)
+		return Response.json(reordered, { headers })
 	}
 
 	return null

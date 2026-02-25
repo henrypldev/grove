@@ -12,6 +12,7 @@ import {
 } from '../db/teams'
 import type { AgentRole, Team } from '../types'
 import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
+import { resolveUserReply } from './grove-tools'
 import { respawnPm, spawnPm } from './pm'
 import {
 	spawnDeveloper,
@@ -133,6 +134,8 @@ export async function routeMessageToAgents(
 	senderAgentId?: string,
 	contentBlocks?: SDKUserMessage['message']['content'],
 ) {
+	if (!senderAgentId && resolveUserReply(team.id, text)) return
+
 	const mentions = new Set<string>()
 	for (const match of text.matchAll(MENTION_PATTERN)) {
 		mentions.add(match[1])

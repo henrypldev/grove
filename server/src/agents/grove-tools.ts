@@ -1,8 +1,19 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
+import { dbUpdateAgentStatus } from '../db/agents'
 import { dbInsertEvent, dbListEventsSince } from '../db/events'
 import { dbGetPlan, dbInsertPlan } from '../db/plans'
 import { dbGetTeam, dbListTeams } from '../db/teams'
+
+const pendingUserReplies = new Map<string, (answer: string) => void>()
+
+export function resolveUserReply(teamId: string, answer: string): boolean {
+	const resolve = pendingUserReplies.get(teamId)
+	if (!resolve) return false
+	pendingUserReplies.delete(teamId)
+	resolve(answer)
+	return true
+}
 
 function parseConflictFiles(mergeTreeOutput: string): string[] {
 	const files: string[] = []
@@ -146,6 +157,24 @@ export function createGroveTools(teamId: string, agentId: string) {
 					return {
 						content: [{ type: 'text' as const, text: `${id} → ${status}` }],
 					}
+				},
+			),
+			tool(
+				'ask_user',
+				'Ask the user clarifying questions before writing a PRD. Returns the user reply as a string.',
+				{
+					questions: z
+						.array(z.string())
+						.describe('List of clarifying questions to ask the user'),
+				},
+				async ({ questions }) => {
+					dbInsertEvent(teamId, agentId, 'pm:questions', { questions })
+					dbUpdateAgentStatus(agentId, 'waiting')
+					const answer = await new Promise<string>(resolve => {
+						pendingUserReplies.set(teamId, resolve)
+					})
+					dbUpdateAgentStatus(agentId, 'working')
+					return { content: [{ type: 'text' as const, text: answer }] }
 				},
 			),
 			tool(

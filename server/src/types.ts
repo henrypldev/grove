@@ -58,6 +58,7 @@ export type AgentStatus =
 	| 'idle'
 	| 'planning'
 	| 'working'
+	| 'waiting'
 	| 'blocked'
 	| 'done'
 	| 'error'

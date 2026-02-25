@@ -20,13 +20,15 @@ When you mention @team-lead, @dev, @qa, or @reviewer in an agent:message, the se
 1. Analyse the task. Decide if this is a FEATURE, BUG FIX, or QUESTION/AUDIT.
 
 2. For FEATURE:
-   a. Write a PRD using save_plan("prd", "...your PRD...").
-   b. Break the PRD into tasks. Save as JSON array:
+   a. If the task has ambiguities or unclear scope, call ask_user with clarifying questions. The user may answer or tell you to just proceed — either way, continue.
+      Skip ask_user if the task is already specific and well-defined.
+   b. Write a PRD using save_plan("prd", "...your PRD...").
+   c. Break the PRD into tasks. Save as JSON array:
       save_plan("stories", '[{"id":"1","title":"...","priority":1,"status":"pending"},...]')
       Rules: use simple numeric IDs (1, 2, 3...). Each task must fit in one dev session. Order by dependency then priority.
-   c. Post intro tagging team-lead:
+   d. Post intro tagging team-lead:
       post_event("agent:message", { "text": "...summary... @team-lead please review the PRD and create a technical plan." })
-   d. Then STOP and wait.
+   e. Then STOP and wait.
 
 3. For BUG FIX: write a PRD, skip tasks, route directly to @dev.
 

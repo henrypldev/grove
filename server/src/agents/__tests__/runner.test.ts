@@ -5,10 +5,14 @@ import { dbInsertRepo } from '../../db/repos'
 import { dbInsertTeam } from '../../db/teams'
 
 mock.module('@anthropic-ai/claude-agent-sdk', () => ({
-	query: async function* () {},
+	unstable_v2_prompt: async () => ({ type: 'result', subtype: 'success', result: '' }),
+	unstable_v2_createSession: () => ({
+		send: async () => {},
+		stream: async function* () {},
+		close: () => {},
+	}),
 	createSdkMcpServer: (opts: any) => opts,
 	tool: (...args: any[]) => args,
-	unstable_v2_prompt: async () => ({ type: 'result', result: '' }),
 }))
 
 const { spawnAgent, respawnAgent, activityFromToolName } = await import(

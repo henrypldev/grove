@@ -34,6 +34,7 @@ export interface AgentRunOptions {
 	teamId: string
 	role: AgentRole
 	prompt: string
+	contentBlocks?: SDKUserMessage['message']['content']
 	cwd: string
 	maxBudgetUsd?: number
 	allowedTools?: string[]
@@ -240,6 +241,9 @@ export async function spawnPersistentAgent(
 	const pending = new Map<string, ToolCall>()
 
 	messageQueue.push(opts.prompt)
+	if (opts.contentBlocks) {
+		messageQueue.pushContent(opts.contentBlocks)
+	}
 
 	const q = query({
 		prompt: messageQueue,

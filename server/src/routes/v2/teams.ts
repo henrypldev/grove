@@ -1,3 +1,5 @@
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import { isPortActive } from '../../api/ports'
 import {
 	cancelTeamSetup,
 	retryTeamSetup,
@@ -5,7 +7,6 @@ import {
 	startTeamStep,
 	stopTeamStep,
 } from '../../api/setup-v2'
-import { isPortActive } from '../../api/ports'
 import { createWorktree } from '../../api/worktrees'
 import { generateId, getTerminalHost } from '../../config'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
@@ -23,7 +24,6 @@ import {
 	dbListTeams,
 	dbUpdateTeamTitle,
 } from '../../db/teams'
-import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { Team } from '../../types'
 
 const IMAGE_TYPES = new Set([
@@ -53,8 +53,18 @@ function matchRoute(
 	return params
 }
 
-export let onTeamCreated: ((team: Team) => Promise<void>) | null = null
-export function setTeamCreatedHook(hook: (team: Team) => Promise<void>) {
+export let onTeamCreated:
+	| ((
+			team: Team,
+			contentBlocks?: SDKUserMessage['message']['content'],
+	  ) => Promise<void>)
+	| null = null
+export function setTeamCreatedHook(
+	hook: (
+		team: Team,
+		contentBlocks?: SDKUserMessage['message']['content'],
+	) => Promise<void>,
+) {
 	onTeamCreated = hook
 }
 
@@ -71,14 +81,53 @@ export async function handleV2Teams(
 	}
 
 	if (path === '/v2/teams' && method === 'POST') {
-		const body = (await req.json()) as { repoId: string; task: string }
-		if (!body.repoId || !body.task) {
+		let repoId: string | undefined
+		let task: string | undefined
+		let contentBlocks: SDKUserMessage['message']['content'] | undefined
+
+		const contentType = req.headers.get('content-type') ?? ''
+		if (contentType.includes('multipart/form-data')) {
+			const formData = await req.formData()
+			repoId = formData.get('repoId') as string | undefined
+			task = formData.get('task') as string | undefined
+
+			const files = formData.getAll('files') as File[]
+			if (files.length > 0) {
+				const blocks: Array<Record<string, unknown>> = []
+				for (const file of files) {
+					if (file.size > MAX_FILE_SIZE) continue
+					const mime = file.type
+					const data = Buffer.from(await file.arrayBuffer()).toString('base64')
+					if (IMAGE_TYPES.has(mime)) {
+						blocks.push({
+							type: 'image',
+							source: { type: 'base64', media_type: mime, data },
+						})
+					} else if (mime === PDF_TYPE) {
+						blocks.push({
+							type: 'document',
+							source: { type: 'base64', media_type: mime, data },
+						})
+					}
+				}
+				if (blocks.length > 0 && task) {
+					blocks.push({ type: 'text', text: task })
+					contentBlocks = blocks as SDKUserMessage['message']['content']
+				}
+			}
+		} else {
+			const body = (await req.json()) as { repoId: string; task: string }
+			repoId = body.repoId
+			task = body.task
+		}
+
+		if (!repoId || !task) {
 			return Response.json(
 				{ error: 'Missing repoId or task' },
 				{ status: 400, headers },
 			)
 		}
-		const repo = dbGetRepo(body.repoId)
+		const repo = dbGetRepo(repoId)
 		if (!repo)
 			return Response.json(
 				{ error: 'Repo not found' },
@@ -87,7 +136,7 @@ export async function handleV2Teams(
 
 		const teamId = generateId()
 		const branch = `grove-team-${teamId}`
-		const worktree = await createWorktree(body.repoId, branch, 'main')
+		const worktree = await createWorktree(repoId, branch, 'main')
 		if (typeof worktree === 'string') {
 			return Response.json({ error: worktree }, { status: 400, headers })
 		}
@@ -95,9 +144,9 @@ export async function handleV2Teams(
 		const now = Date.now()
 		const team: Team = {
 			id: teamId,
-			repoId: body.repoId,
+			repoId,
 			worktreePath: worktree.path,
-			task: body.task,
+			task,
 			title: null,
 			status: 'planning',
 			pmSummary: null,
@@ -108,15 +157,16 @@ export async function handleV2Teams(
 		}
 		dbInsertTeam(team)
 
+		const taskText = task
 		import('../../agents/title').then(({ generateTeamTitle }) =>
-			generateTeamTitle(body.task).then(title =>
+			generateTeamTitle(taskText).then(title =>
 				dbUpdateTeamTitle(teamId, title),
 			),
 		)
 
 		startTeamSetup(teamId, worktree.path, repo.setupSteps)
 
-		if (onTeamCreated) await onTeamCreated(team)
+		if (onTeamCreated) await onTeamCreated(team, contentBlocks)
 
 		return Response.json(team, { headers })
 	}

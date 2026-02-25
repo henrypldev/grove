@@ -1,3 +1,4 @@
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
 import { createGroveTools } from './grove-tools'
@@ -73,7 +74,11 @@ When team-lead says the plan is ready, begin the task loop:
 If any agent fails 3 times, post_event("pm:blocked", { "reason": "..." }) and then post_event("pm:summary", { "summary": "blocked: ..." }).
 `
 
-type Callbacks = { onDone: () => void; onError: () => void }
+type Callbacks = {
+	onDone: () => void
+	onError: () => void
+	contentBlocks?: SDKUserMessage['message']['content']
+}
 
 export async function spawnPm(
 	team: Team,
@@ -87,6 +92,7 @@ export async function spawnPm(
 		teamId: team.id,
 		role: 'pm',
 		prompt: PM_PROMPT(team),
+		contentBlocks: callbacks.contentBlocks,
 		cwd: team.worktreePath,
 		maxBudgetUsd: 10,
 		allowedTools: ['mcp__grove__*'],

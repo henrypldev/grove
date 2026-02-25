@@ -1,3 +1,4 @@
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { computeDiff, getHeadSha } from '../api/diff'
 import { registerTeamServe, unregisterTeamServe } from '../api/tailscale-serve'
 import { log } from '../config'
@@ -8,7 +9,6 @@ import {
 	dbUpdateTeamPrUrl,
 	dbUpdateTeamStatus,
 } from '../db/teams'
-import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentRole, Team } from '../types'
 import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
 import { spawnPm } from './pm'
@@ -28,7 +28,10 @@ export async function startOrchestrator() {
 	log('orchestrator', 'starting')
 }
 
-export async function onNewTeam(team: Team) {
+export async function onNewTeam(
+	team: Team,
+	contentBlocks?: SDKUserMessage['message']['content'],
+) {
 	log('orchestrator', 'spawning team', { teamId: team.id })
 
 	await spawnPm(team, {
@@ -36,6 +39,7 @@ export async function onNewTeam(team: Team) {
 			log('orchestrator', 'pm process exited', { teamId: team.id })
 		},
 		onError: () => dbUpdateTeamStatus(team.id, 'blocked'),
+		contentBlocks,
 	})
 
 	subscribeToTeamEvents(team.id, async event => {

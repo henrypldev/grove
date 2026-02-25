@@ -1,7 +1,6 @@
 import type { ServerWebSocket } from 'bun'
 import {
 	dbGetEventsSinceId,
-	dbListEventsSince,
 	subscribeToGlobalEvents,
 	subscribeToTeamEvents,
 } from '../db/events'

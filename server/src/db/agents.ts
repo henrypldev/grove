@@ -85,7 +85,12 @@ export function dbUpdateAgentStatus(
 		broadcastToChannel(`team:${agent.teamId}`, {
 			type: 'agent:update',
 			channel: `team:${agent.teamId}`,
-			data: { id, teamId: agent.teamId, status, currentTask: currentTask ?? null },
+			data: {
+				id,
+				teamId: agent.teamId,
+				status,
+				currentTask: currentTask ?? null,
+			},
 		})
 	}
 }

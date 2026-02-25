@@ -90,6 +90,27 @@ export function dbGetLatestEventByType(
 	)
 }
 
+type GlobalEventListener = (event: {
+	type: string
+	payload: Record<string, unknown>
+}) => void
+const globalListeners = new Set<GlobalEventListener>()
+
+export function subscribeToGlobalEvents(fn: GlobalEventListener): () => void {
+	globalListeners.add(fn)
+	return () => {
+		globalListeners.delete(fn)
+	}
+}
+
+export function emitGlobalEvent(
+	type: string,
+	payload: Record<string, unknown>,
+): void {
+	const event = { type, payload }
+	for (const fn of globalListeners) fn(event)
+}
+
 export function emitEphemeralEvent(
 	teamId: string,
 	agentId: string,

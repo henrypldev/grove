@@ -1,5 +1,6 @@
 import { and, desc, eq, ne } from 'drizzle-orm'
 import type { Team, TeamStatus } from '../types'
+import { broadcastToChannel } from '../websocket'
 import { getDb } from './index'
 import { teams } from './schema'
 
@@ -53,6 +54,11 @@ export function dbUpdateTeamTitle(id: string, title: string): void {
 		.set({ title, updatedAt: Date.now() })
 		.where(eq(teams.id, id))
 		.run()
+	broadcastToChannel('global', {
+		type: 'team:update',
+		channel: 'global',
+		data: { id, title },
+	})
 }
 
 export function dbUpdateTeamStatus(
@@ -68,6 +74,11 @@ export function dbUpdateTeamStatus(
 		values.pmSummary = pmSummary
 	}
 	getDb().update(teams).set(values).where(eq(teams.id, id)).run()
+	broadcastToChannel('global', {
+		type: 'team:update',
+		channel: 'global',
+		data: { id, status, ...(pmSummary !== undefined ? { pmSummary } : {}) },
+	})
 }
 
 export function dbUpdateTeamPort(id: string, port: number | null): void {
@@ -76,6 +87,11 @@ export function dbUpdateTeamPort(id: string, port: number | null): void {
 		.set({ port, updatedAt: Date.now() })
 		.where(eq(teams.id, id))
 		.run()
+	broadcastToChannel('global', {
+		type: 'team:update',
+		channel: 'global',
+		data: { id, port },
+	})
 }
 
 export function dbUpdateTeamPrUrl(id: string, prUrl: string): void {
@@ -84,6 +100,11 @@ export function dbUpdateTeamPrUrl(id: string, prUrl: string): void {
 		.set({ prUrl, updatedAt: Date.now() })
 		.where(eq(teams.id, id))
 		.run()
+	broadcastToChannel('global', {
+		type: 'team:update',
+		channel: 'global',
+		data: { id, prUrl },
+	})
 }
 
 export function dbArchiveTeam(id: string): void {

@@ -10,6 +10,7 @@ export async function handleV2Usage(
 
 	const period = url.searchParams.get('period') ?? 'day'
 	const teamId = url.searchParams.get('teamId') ?? undefined
+	const repoId = url.searchParams.get('repoId') ?? undefined
 
 	let since: number
 	if (period === 'session') {
@@ -35,7 +36,7 @@ export async function handleV2Usage(
 		since = Date.now() - 86400000
 	}
 
-	const rows = dbGetUsage({ teamId, since })
+	const rows = dbGetUsage({ teamId, repoId, since })
 
 	let totalCostUsd = 0
 	let totalInputTokens = 0

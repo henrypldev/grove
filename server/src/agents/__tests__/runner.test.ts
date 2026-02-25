@@ -5,7 +5,11 @@ import { dbInsertRepo } from '../../db/repos'
 import { dbInsertTeam } from '../../db/teams'
 
 mock.module('@anthropic-ai/claude-agent-sdk', () => ({
-	unstable_v2_prompt: async () => ({ type: 'result', subtype: 'success', result: '' }),
+	unstable_v2_prompt: async () => ({
+		type: 'result',
+		subtype: 'success',
+		result: '',
+	}),
 	unstable_v2_createSession: () => ({
 		send: async () => {},
 		stream: async function* () {},

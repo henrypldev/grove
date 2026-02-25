@@ -38,9 +38,7 @@ async function isPortListening(port: number): Promise<boolean> {
 
 async function pollPorts() {
 	const teams = dbListTeams()
-	const ports = teams
-		.map(t => t.port)
-		.filter((p): p is number => p !== null)
+	const ports = teams.map(t => t.port).filter((p): p is number => p !== null)
 	const results = await Promise.all(
 		ports.map(async port => ({ port, alive: await isPortListening(port) })),
 	)

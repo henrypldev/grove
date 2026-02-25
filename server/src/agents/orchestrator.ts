@@ -150,7 +150,7 @@ export async function routeMessageToAgents(
 	}
 
 	if (mentions.size === 0) {
-		let pmAgent = getAgent(team.id, 'pm')
+		const pmAgent = getAgent(team.id, 'pm')
 		if (!pmAgent) {
 			log('orchestrator', 'pm not found, respawning', { teamId: team.id })
 			await respawnPm(team, text, pmCallbacks)
@@ -175,7 +175,7 @@ export async function routeMessageToAgents(
 
 	for (const role of mentions) {
 		if (role === 'pm') {
-			let pmAgent = getAgent(team.id, 'pm')
+			const pmAgent = getAgent(team.id, 'pm')
 			if (!pmAgent) {
 				log('orchestrator', 'pm not found, respawning', { teamId: team.id })
 				await respawnPm(team, text, pmCallbacks)

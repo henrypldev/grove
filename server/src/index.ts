@@ -1,5 +1,6 @@
 import pkg from '../package.json'
 import { onNewTeam, startOrchestrator } from './agents/orchestrator'
+import { startPortPoller } from './api/ports'
 import { log, setLogsEnabled } from './config'
 import { getDb } from './db'
 import { handleV1 } from './routes/v1'
@@ -8,7 +9,6 @@ import { handleV2Events } from './routes/v2/events'
 import { handleV2Repos } from './routes/v2/repos'
 import { handleV2Teams, setTeamCreatedHook } from './routes/v2/teams'
 import { handleV2Usage } from './routes/v2/usage'
-import { startPortPoller } from './api/ports'
 import { cleanupStaleSessions } from './terminal/ttyd'
 import { startEventPoller, wsHandlers } from './websocket'
 
@@ -38,7 +38,8 @@ export async function startServer(port: number) {
 			const headers = {
 				'Content-Type': 'application/json',
 				'Access-Control-Allow-Origin': '*',
-				'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+				'Access-Control-Allow-Methods':
+					'GET, POST, PUT, PATCH, DELETE, OPTIONS',
 				'Access-Control-Allow-Headers': 'Content-Type',
 			}
 

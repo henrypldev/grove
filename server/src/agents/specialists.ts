@@ -159,4 +159,3 @@ export async function spawnReviewerAgent(team: Team): Promise<Agent> {
 		mcpTools: createGroveTools(team.id, agentId),
 	})
 }
-

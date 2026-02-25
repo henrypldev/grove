@@ -1,6 +1,6 @@
 import { popAgentTools } from '../../agents/runner'
 import { dbGetAgent } from '../../db/agents'
-import { dbInsertEvent, subscribeToGlobalEvents } from '../../db/events'
+import { dbInsertEvent } from '../../db/events'
 import { dbGetTeam } from '../../db/teams'
 
 export async function handleV2Events(
@@ -10,29 +10,6 @@ export async function handleV2Events(
 ): Promise<Response | null> {
 	const path = url.pathname
 	const method = req.method
-
-	if (path === '/v2/events' && method === 'GET') {
-		const enc = new TextEncoder()
-		const stream = new ReadableStream({
-			start(controller) {
-				controller.enqueue(enc.encode('data: {"type":"connected"}\n\n'))
-				const unsub = subscribeToGlobalEvents(event => {
-					try {
-						controller.enqueue(enc.encode(`data: ${JSON.stringify(event)}\n\n`))
-					} catch {}
-				})
-				req.signal.addEventListener('abort', () => unsub())
-			},
-		})
-		return new Response(stream, {
-			headers: {
-				'Content-Type': 'text/event-stream',
-				'Cache-Control': 'no-cache',
-				Connection: 'keep-alive',
-				'Access-Control-Allow-Origin': '*',
-			},
-		})
-	}
 
 	if (path === '/v2/events' && method === 'POST') {
 		const body = (await req.json()) as {

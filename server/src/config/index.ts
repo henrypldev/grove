@@ -11,14 +11,12 @@ export type {
 
 import type { PushToken, Repo, SessionData } from '../types'
 
-const CONFIG_DIR = Bun.env.XDG_CONFIG_HOME
-	? join(Bun.env.XDG_CONFIG_HOME, 'grove')
-	: join(Bun.env.HOME ?? '', '.config', 'grove')
+export const GROVE_DIR = join(Bun.env.HOME ?? '', '.grove')
 
-const CONFIG_FILE = join(CONFIG_DIR, 'config.json')
-const SESSIONS_FILE = join(CONFIG_DIR, 'sessions.json')
-export const LOG_FILE = join(CONFIG_DIR, 'server.log')
-export const WORKTREES_DIR = join(Bun.env.HOME ?? '', '.claude-worktrees')
+const CONFIG_FILE = join(GROVE_DIR, 'config.json')
+const SESSIONS_FILE = join(GROVE_DIR, 'sessions.json')
+export const LOG_FILE = join(GROVE_DIR, 'server.log')
+export const WORKTREES_DIR = join(GROVE_DIR, 'worktrees')
 
 let logsEnabled = true
 
@@ -52,7 +50,7 @@ export async function getTerminalHost(): Promise<string> {
 	return cachedTerminalHost
 }
 
-const CERT_DIR = join(CONFIG_DIR, 'certs')
+const CERT_DIR = join(GROVE_DIR, 'certs')
 
 export async function ensureTailscaleCerts(): Promise<{
 	cert: string
@@ -88,9 +86,9 @@ interface SessionsState {
 }
 
 async function ensureConfigDir() {
-	const dir = Bun.file(CONFIG_DIR)
+	const dir = Bun.file(GROVE_DIR)
 	if (!(await dir.exists())) {
-		await Bun.$`mkdir -p ${CONFIG_DIR}`.quiet()
+		await Bun.$`mkdir -p ${GROVE_DIR}`.quiet()
 	}
 }
 
@@ -167,7 +165,7 @@ export async function saveSessions(state: SessionsState) {
 
 export async function getCloneDirectory(): Promise<string> {
 	const config = await loadConfig()
-	return config.cloneDirectory ?? join(Bun.env.HOME ?? '', 'Developer')
+	return config.cloneDirectory ?? join(GROVE_DIR, 'repos')
 }
 
 export function listDirectories(path: string): string[] {

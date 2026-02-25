@@ -119,26 +119,23 @@ export interface PmReport {
 
 export type WsClientMessage =
 	| { type: 'auth'; payload: { deviceType: 'mac' | 'mobile' } }
-	| { type: 'subscribe'; payload: { teamIds: string[] } }
-	| { type: 'replay'; payload: { teamId: string; since: number } }
+	| { type: 'subscribe'; channels: string[] }
+	| { type: 'unsubscribe'; channels: string[] }
+	| { type: 'replay'; channel: string; sinceId: number }
+	| { type: 'ping' }
 
 export type WsServerMessage =
+	| { type: 'event'; channel: string; data: TeamEvent }
 	| {
-			type: 'agent:event'
-			teamId: string
-			agentId: string
-			role: AgentRole
-			event: Record<string, unknown>
+			type: 'team:update'
+			channel: 'global'
+			data: Partial<Team> & { id: string }
 	  }
 	| {
-			type: 'agent:status'
-			teamId: string
-			agentId: string
-			status: AgentStatus
+			type: 'agent:update'
+			channel: string
+			data: Partial<Agent> & { id: string; teamId: string }
 	  }
-	| { type: 'pm:report'; teamId: string; summary: string }
-	| { type: 'team:status'; teamId: string; status: TeamStatus }
-	| { type: 'team:spawned'; team: Team }
-	| { type: 'replay:batch'; events: TeamEvent[] }
+	| { type: 'replay:batch'; channel: string; events: TeamEvent[] }
 	| { type: 'connected' }
-	| { type: 'heartbeat' }
+	| { type: 'pong' }

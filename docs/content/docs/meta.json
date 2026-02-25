@@ -1,4 +1,11 @@
 {
 	"title": "Grove",
-	"pages": ["---Getting Started---", "index", "tailscale", "---Reference---", "cli", "configuration"]
+	"pages": [
+		"---Getting Started---",
+		"index",
+		"tailscale",
+		"---Reference---",
+		"cli",
+		"configuration"
+	]
 }

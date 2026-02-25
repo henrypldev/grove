@@ -95,10 +95,10 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 			...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
 			...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
 			hooks: buildHooks(agent, pending),
-		})
+		} as any)
 
-		if (result.session_id) {
-			dbUpdateAgentSessionId(agent.id, result.session_id)
+		if ((result as any).session_id) {
+			dbUpdateAgentSessionId(agent.id, (result as any).session_id)
 		}
 		recordUsage(agent, result as unknown as Record<string, unknown>)
 		dbUpdateAgentStatus(agent.id, 'done')
@@ -150,7 +150,7 @@ export async function spawnPersistentAgent(
 		...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
 		...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
 		hooks: buildHooks(agent, pending),
-	})
+	} as any)
 
 	registerAgent(opts.teamId, opts.role, {
 		agentId,
@@ -179,9 +179,7 @@ async function runPersistentLoop(
 			if (!item) break
 
 			const text =
-				item.type === 'text'
-					? item.text
-					: JSON.stringify(item.content)
+				item.type === 'text' ? item.text : JSON.stringify(item.content)
 			await session.send(text)
 
 			for await (const message of session.stream()) {

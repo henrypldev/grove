@@ -14,8 +14,8 @@ export async function generateTeamTitle(task: string): Promise<string> {
 		const result = await unstable_v2_prompt(`${PROMPT}\n\nTask: ${task}`, {
 			maxTurns: 1,
 			allowedTools: [],
-		})
-		return result.result?.trim() || fallback
+		} as any)
+		return (result as any).result?.trim() || fallback
 	} catch {
 		return fallback
 	}

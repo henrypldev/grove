@@ -79,7 +79,8 @@ export async function detectSetupSteps(
 			disallowedTools: ['Edit', 'Write', 'Task', 'WebFetch', 'WebSearch'],
 		})
 
-		const text = typeof result.result === 'string' ? result.result : ''
+		const text =
+			typeof (result as any).result === 'string' ? (result as any).result : ''
 		const jsonMatch = text.match(/\{[\s\S]*\}/)
 		if (!jsonMatch) {
 			log('setup-detector', 'no JSON found in result', { repoId, text })

@@ -2,9 +2,11 @@ import type {
 	PostToolUseFailureHookInput,
 	PostToolUseHookInput,
 	PreToolUseHookInput,
-	Query,
 } from '@anthropic-ai/claude-agent-sdk'
-import { query } from '@anthropic-ai/claude-agent-sdk'
+import {
+	unstable_v2_createSession,
+	unstable_v2_prompt,
+} from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
 import {
 	dbGetAgent,
@@ -34,7 +36,7 @@ export interface AgentRunOptions {
 	teamId: string
 	role: AgentRole
 	prompt: string
-	contentBlocks?: SDKUserMessage['message']['content']
+	contentBlocks?: unknown[]
 	cwd: string
 	maxBudgetUsd?: number
 	allowedTools?: string[]
@@ -83,127 +85,24 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 
 async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 	dbUpdateAgentStatus(agent.id, 'working')
-
 	const pending = new Map<string, ToolCall>()
 
 	try {
-		for await (const message of query({
-			prompt: opts.prompt,
-			options: {
-				cwd: opts.cwd,
-				maxBudgetUsd: opts.maxBudgetUsd ?? 5,
-				permissionMode: 'bypassPermissions',
-				...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
-				...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
-				hooks: {
-					PreToolUse: [
-						{
-							hooks: [
-								async input => {
-									const h = input as PreToolUseHookInput
-									pending.set(h.tool_use_id, {
-										name: h.tool_name,
-										input: h.tool_input,
-									})
-									const activity = activityFromToolName(h.tool_name)
-									dbUpdateAgentActivity(agent.id, activity)
-									emitEphemeralEvent(
-										agent.teamId,
-										agent.id,
-										'agent:status_change',
-										{
-											status: 'working',
-											activity,
-										},
-									)
-									return {}
-								},
-							],
-						},
-					],
-					PostToolUse: [
-						{
-							hooks: [
-								async input => {
-									const h = input as PostToolUseHookInput
-									const call = pending.get(h.tool_use_id)
-									if (call) {
-										call.output = h.tool_response
-										const arr = agentToolAccumulator.get(agent.id) ?? []
-										arr.push(call)
-										agentToolAccumulator.set(agent.id, arr)
-										pending.delete(h.tool_use_id)
-									}
-									dbUpdateAgentActivity(agent.id, null)
-									emitEphemeralEvent(
-										agent.teamId,
-										agent.id,
-										'agent:status_change',
-										{
-											status: 'working',
-											activity: null,
-										},
-									)
-									return {}
-								},
-							],
-						},
-					],
-					PostToolUseFailure: [
-						{
-							hooks: [
-								async input => {
-									const h = input as PostToolUseFailureHookInput
-									const call = pending.get(h.tool_use_id)
-									if (call) {
-										call.error = h.error
-										const arr = agentToolAccumulator.get(agent.id) ?? []
-										arr.push(call)
-										agentToolAccumulator.set(agent.id, arr)
-										pending.delete(h.tool_use_id)
-									}
-									dbUpdateAgentActivity(agent.id, null)
-									emitEphemeralEvent(
-										agent.teamId,
-										agent.id,
-										'agent:status_change',
-										{
-											status: 'working',
-											activity: null,
-										},
-									)
-									return {}
-								},
-							],
-						},
-					],
-				},
-			},
-		})) {
-			if (message.type !== 'user') {
-				dbInsertEvent(
-					agent.teamId,
-					agent.id,
-					`sdk:${message.type}`,
-					message as Record<string, unknown>,
-				)
-			}
+		const result = await unstable_v2_prompt(opts.prompt, {
+			cwd: opts.cwd,
+			maxBudgetUsd: opts.maxBudgetUsd ?? 5,
+			permissionMode: 'bypassPermissions',
+			...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
+			...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+			hooks: buildHooks(agent, pending),
+		})
 
-			if (message.type === 'system' && message.subtype === 'init') {
-				dbUpdateAgentSessionId(agent.id, message.session_id)
-			}
-
-			if (message.type === 'result') {
-				recordUsage(agent, message as unknown as Record<string, unknown>)
-				if (message.subtype === 'success') {
-					dbUpdateAgentStatus(agent.id, 'done')
-					opts.onDone?.(agent.id)
-				} else {
-					dbUpdateAgentStatus(agent.id, 'error')
-					opts.onError?.(agent.id, new Error(message.subtype))
-				}
-			}
+		if (result.session_id) {
+			dbUpdateAgentSessionId(agent.id, result.session_id)
 		}
+		recordUsage(agent, result as unknown as Record<string, unknown>)
+		dbUpdateAgentStatus(agent.id, 'done')
+		opts.onDone?.(agent.id)
 	} catch (err) {
 		dbUpdateAgentStatus(agent.id, 'error')
 		opts.onError?.(agent.id, err)
@@ -214,7 +113,6 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 export interface PersistentAgentResult {
 	agent: Agent
 	queue: MessageQueue
-	query: Query
 }
 
 export async function spawnPersistentAgent(
@@ -238,88 +136,81 @@ export async function spawnPersistentAgent(
 	dbUpdateAgentStatus(agent.id, 'working')
 
 	const messageQueue = new MessageQueue()
-	const pending = new Map<string, ToolCall>()
-
 	messageQueue.push(opts.prompt)
 	if (opts.contentBlocks) {
-		messageQueue.pushContent(opts.contentBlocks)
+		messageQueue.pushContent(opts.contentBlocks as unknown[])
 	}
 
-	const q = query({
-		prompt: messageQueue,
-		options: {
-			cwd: opts.cwd,
-			maxBudgetUsd: opts.maxBudgetUsd ?? 5,
-			permissionMode: 'bypassPermissions',
-			...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
-			...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
-			hooks: buildHooks(agent, pending),
-		},
+	const pending = new Map<string, ToolCall>()
+
+	const session = unstable_v2_createSession({
+		cwd: opts.cwd,
+		maxBudgetUsd: opts.maxBudgetUsd ?? 5,
+		permissionMode: 'bypassPermissions',
+		...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
+		...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+		hooks: buildHooks(agent, pending),
 	})
 
 	registerAgent(opts.teamId, opts.role, {
 		agentId,
 		queue: messageQueue,
-		query: q,
+		session,
 	})
 
-	processMessages(q, agent, opts, messageQueue).catch(err => {
+	runPersistentLoop(session, agent, opts, messageQueue).catch(err => {
 		log('agent', `unhandled error in persistent ${opts.role}`, { agentId, err })
 		dbUpdateAgentStatus(agentId, 'error')
 		opts.onError?.(agentId, err)
 	})
 
-	return { agent, queue: messageQueue, query: q }
+	return { agent, queue: messageQueue }
 }
 
-async function processMessages(
-	q: Query,
+async function runPersistentLoop(
+	session: ReturnType<typeof unstable_v2_createSession>,
 	agent: Agent,
 	opts: AgentRunOptions,
-	messageQueue?: MessageQueue,
+	queue: MessageQueue,
 ) {
 	try {
-		for await (const message of q) {
-			if (message.type !== 'user') {
-				dbInsertEvent(
-					agent.teamId,
-					agent.id,
-					`sdk:${message.type}`,
-					message as Record<string, unknown>,
-				)
-			}
+		while (true) {
+			const item = await queue.dequeue()
+			if (!item) break
 
-			if (message.type === 'system' && message.subtype === 'init') {
-				dbUpdateAgentSessionId(agent.id, message.session_id)
-				if (messageQueue) {
-					messageQueue.sessionId = message.session_id
+			const text =
+				item.type === 'text'
+					? item.text
+					: JSON.stringify(item.content)
+			await session.send(text)
+
+			for await (const message of session.stream()) {
+				if (message.type !== 'user') {
+					dbInsertEvent(
+						agent.teamId,
+						agent.id,
+						`sdk:${message.type}`,
+						message as Record<string, unknown>,
+					)
 				}
-			}
 
-			if (message.type === 'result') {
-				recordUsage(agent, message as unknown as Record<string, unknown>)
-				if (messageQueue) {
+				if (message.type === 'system' && message.subtype === 'init') {
+					dbUpdateAgentSessionId(agent.id, message.session_id)
+				}
+
+				if (message.type === 'result') {
+					recordUsage(agent, message as unknown as Record<string, unknown>)
 					if (message.subtype === 'success') {
 						dbUpdateAgentStatus(agent.id, 'idle')
 					} else {
 						dbUpdateAgentStatus(agent.id, 'error')
 						opts.onError?.(agent.id, new Error(message.subtype))
 					}
-				} else {
-					if (message.subtype === 'success') {
-						dbUpdateAgentStatus(agent.id, 'done')
-						opts.onDone?.(agent.id)
-					} else {
-						dbUpdateAgentStatus(agent.id, 'error')
-						opts.onError?.(agent.id, new Error(message.subtype))
-					}
 				}
 			}
 		}
-		if (messageQueue) {
-			dbUpdateAgentStatus(agent.id, 'done')
-			opts.onDone?.(agent.id)
-		}
+		dbUpdateAgentStatus(agent.id, 'done')
+		opts.onDone?.(agent.id)
 	} catch (err) {
 		dbUpdateAgentStatus(agent.id, 'error')
 		opts.onError?.(agent.id, err)

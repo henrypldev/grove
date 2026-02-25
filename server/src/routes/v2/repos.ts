@@ -8,7 +8,7 @@ import {
 	getOrgRepos,
 } from '../../api/github'
 import { addRepo, withSetupFile } from '../../api/repos'
-import { listDirectories } from '../../config'
+import { listDirectories, log } from '../../config'
 import { emitGlobalEvent } from '../../db/events'
 import {
 	dbDeleteRepo,
@@ -18,6 +18,30 @@ import {
 	dbUpdateRepoSetupSteps,
 } from '../../db/repos'
 import { dbListTeamsByRepo } from '../../db/teams'
+import type { Repo } from '../../types'
+
+function triggerDetection(repo: Repo) {
+	detectSetupSteps(repo.id, repo.path)
+		.then(result => {
+			if (result) {
+				emitGlobalEvent('repo:setup-detected', {
+					repoId: repo.id,
+					steps: result.steps,
+					fingerprint: result.fingerprint ?? null,
+					needsNativeBuild: result.needsNativeBuild ?? false,
+				})
+			} else {
+				emitGlobalEvent('repo:setup-detection-failed', { repoId: repo.id })
+			}
+		})
+		.catch(err => {
+			log('setup-detector', 'post-detection error', {
+				repoId: repo.id,
+				err,
+			})
+			emitGlobalEvent('repo:setup-detection-failed', { repoId: repo.id })
+		})
+}
 
 function matchRoute(
 	path: string,
@@ -78,16 +102,7 @@ export async function handleV2Repos(
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
 		if (!existsSync(join(repo.path, '.grove', 'setup.json'))) {
-			detectSetupSteps(repo.id, repo.path).then(result => {
-				if (result) {
-					emitGlobalEvent('repo:setup-detected', {
-						repoId: repo.id,
-						steps: result.steps,
-						fingerprint: result.fingerprint ?? null,
-						needsNativeBuild: result.needsNativeBuild ?? false,
-					})
-				}
-			})
+			triggerDetection(repo)
 		}
 		return Response.json(withSetupFile(repo), { headers })
 	}
@@ -99,16 +114,7 @@ export async function handleV2Repos(
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
 		if (!existsSync(join(repo.path, '.grove', 'setup.json'))) {
-			detectSetupSteps(repo.id, repo.path).then(result => {
-				if (result) {
-					emitGlobalEvent('repo:setup-detected', {
-						repoId: repo.id,
-						steps: result.steps,
-						fingerprint: result.fingerprint ?? null,
-						needsNativeBuild: result.needsNativeBuild ?? false,
-					})
-				}
-			})
+			triggerDetection(repo)
 		}
 		return Response.json(withSetupFile(repo), { headers })
 	}
@@ -254,17 +260,7 @@ export async function handleV2Repos(
 				{ status: 404, headers },
 			)
 
-		detectSetupSteps(repo.id, repo.path).then(result => {
-			if (result) {
-				emitGlobalEvent('repo:setup-detected', {
-					repoId: repo.id,
-					steps: result.steps,
-					fingerprint: result.fingerprint ?? null,
-					needsNativeBuild: result.needsNativeBuild ?? false,
-				})
-			}
-		})
-
+		triggerDetection(repo)
 		return Response.json({ detecting: true }, { headers })
 	}
 

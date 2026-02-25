@@ -32,7 +32,7 @@ export async function startServer(port: number) {
 		websocket: wsHandlers,
 		async fetch(req, server) {
 			const url = new URL(req.url)
-			const path = url.pathname
+			const path = url.pathname.replace(/\/+$/, '') || '/'
 			const method = req.method
 
 			const headers = {

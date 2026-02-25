@@ -194,25 +194,7 @@ export async function routeMessageToAgents(
 			continue
 		}
 
-		let agent = getAgent(team.id, role)
-		if (!agent) {
-			await spawnSpecialist(team, role as AgentRole)
-			agent = getAgent(team.id, role)
-		}
-		if (agent && agent.agentId !== senderAgentId) {
-			log(
-				'orchestrator',
-				`routing to ${role} from ${senderAgentId ?? 'user'}`,
-				{
-					teamId: team.id,
-				},
-			)
-			if (contentBlocks) {
-				agent.queue.pushContent(contentBlocks)
-			} else {
-				agent.queue.push(text)
-			}
-		}
+		await spawnSpecialist(team, role as AgentRole)
 	}
 }
 

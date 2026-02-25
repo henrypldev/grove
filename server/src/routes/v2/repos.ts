@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { detectSetupSteps } from '../../agents/setup-detector'
 import {
 	cloneRepo,
 	getGitHubOrgs,
@@ -8,6 +9,7 @@ import {
 } from '../../api/github'
 import { addRepo, withSetupFile } from '../../api/repos'
 import { listDirectories } from '../../config'
+import { emitGlobalEvent } from '../../db/events'
 import {
 	dbDeleteRepo,
 	dbGetRepo,
@@ -75,6 +77,18 @@ export async function handleV2Repos(
 		if (typeof repo === 'string')
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
+		if (!existsSync(join(repo.path, '.grove', 'setup.json'))) {
+			detectSetupSteps(repo.id, repo.path).then(result => {
+				if (result) {
+					emitGlobalEvent('repo:setup-detected', {
+						repoId: repo.id,
+						steps: result.steps,
+						fingerprint: result.fingerprint ?? null,
+						needsNativeBuild: result.needsNativeBuild ?? false,
+					})
+				}
+			})
+		}
 		return Response.json(withSetupFile(repo), { headers })
 	}
 
@@ -84,6 +98,18 @@ export async function handleV2Repos(
 		if (typeof repo === 'string')
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
+		if (!existsSync(join(repo.path, '.grove', 'setup.json'))) {
+			detectSetupSteps(repo.id, repo.path).then(result => {
+				if (result) {
+					emitGlobalEvent('repo:setup-detected', {
+						repoId: repo.id,
+						steps: result.steps,
+						fingerprint: result.fingerprint ?? null,
+						needsNativeBuild: result.needsNativeBuild ?? false,
+					})
+				}
+			})
+		}
 		return Response.json(withSetupFile(repo), { headers })
 	}
 

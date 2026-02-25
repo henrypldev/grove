@@ -8,6 +8,7 @@ mock.module('@anthropic-ai/claude-agent-sdk', () => ({
 	query: async function* () {},
 	createSdkMcpServer: (opts: any) => opts,
 	tool: (...args: any[]) => args,
+	unstable_v2_prompt: async () => ({ type: 'result', result: '' }),
 }))
 
 const { spawnAgent, respawnAgent, activityFromToolName } = await import(

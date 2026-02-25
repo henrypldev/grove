@@ -3,13 +3,10 @@ import { join } from 'node:path'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
+import { GROVE_DIR } from '../config'
 import * as schema from './schema'
 
-const DB_DIR = Bun.env.XDG_CONFIG_HOME
-	? join(Bun.env.XDG_CONFIG_HOME, 'grove')
-	: join(Bun.env.HOME ?? '', '.grove')
-
-export const DB_PATH = join(DB_DIR, 'db.sqlite')
+export const DB_PATH = join(GROVE_DIR, 'db.sqlite')
 
 export type DrizzleDb = BunSQLiteDatabase<typeof schema>
 
@@ -17,7 +14,7 @@ let _db: DrizzleDb | null = null
 
 export function getDb(): DrizzleDb {
 	if (_db) return _db
-	Bun.spawnSync(['mkdir', '-p', DB_DIR])
+	Bun.spawnSync(['mkdir', '-p', GROVE_DIR])
 	const sqlite = new Database(DB_PATH, { create: true })
 	sqlite.run('PRAGMA journal_mode = WAL')
 	sqlite.run('PRAGMA foreign_keys = ON')

@@ -1,6 +1,7 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { computeDiff, getHeadSha } from '../api/diff'
 import { unregisterTeamServe } from '../api/tailscale-serve'
+import { deleteWorktree } from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
 import {
@@ -208,6 +209,10 @@ export async function closeTeam(teamId: string) {
 		dbUpdateTeamPort(teamId, null)
 	}
 	dbUpdateTeamStatus(teamId, 'done')
+	if (team) {
+		const branch = `grove-team-${teamId}`
+		await deleteWorktree(team.repoId, branch, true)
+	}
 }
 
 async function killPort(port: number) {

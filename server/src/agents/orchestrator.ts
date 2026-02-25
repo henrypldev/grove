@@ -11,7 +11,7 @@ import {
 } from '../db/teams'
 import type { AgentRole, Team } from '../types'
 import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
-import { spawnPm } from './pm'
+import { respawnPm, spawnPm } from './pm'
 import {
 	spawnDeveloper,
 	spawnEnvAgent,
@@ -37,8 +37,12 @@ export async function onNewTeam(
 	await spawnPm(team, {
 		onDone: () => {
 			log('orchestrator', 'pm process exited', { teamId: team.id })
+			closeAgent(team.id, 'pm')
 		},
-		onError: () => dbUpdateTeamStatus(team.id, 'blocked'),
+		onError: () => {
+			dbUpdateTeamStatus(team.id, 'blocked')
+			closeAgent(team.id, 'pm')
+		},
 		contentBlocks,
 	})
 
@@ -158,9 +162,26 @@ export async function routeMessageToAgents(
 		mentions.add(match[1])
 	}
 
+	const pmCallbacks = {
+		onDone: () => {
+			log('orchestrator', 'pm process exited', { teamId: team.id })
+			closeAgent(team.id, 'pm')
+		},
+		onError: () => {
+			dbUpdateTeamStatus(team.id, 'blocked')
+			closeAgent(team.id, 'pm')
+		},
+		contentBlocks,
+	}
+
 	if (mentions.size === 0) {
-		const pmAgent = getAgent(team.id, 'pm')
-		if (pmAgent && pmAgent.agentId !== senderAgentId) {
+		let pmAgent = getAgent(team.id, 'pm')
+		if (!pmAgent) {
+			log('orchestrator', 'pm not found, respawning', { teamId: team.id })
+			await respawnPm(team, text, pmCallbacks)
+			return
+		}
+		if (pmAgent.agentId !== senderAgentId) {
 			log(
 				'orchestrator',
 				`routing to pm (default) from ${senderAgentId ?? 'user'}`,
@@ -179,8 +200,13 @@ export async function routeMessageToAgents(
 
 	for (const role of mentions) {
 		if (role === 'pm') {
-			const pmAgent = getAgent(team.id, 'pm')
-			if (pmAgent && pmAgent.agentId !== senderAgentId) {
+			let pmAgent = getAgent(team.id, 'pm')
+			if (!pmAgent) {
+				log('orchestrator', 'pm not found, respawning', { teamId: team.id })
+				await respawnPm(team, text, pmCallbacks)
+				continue
+			}
+			if (pmAgent.agentId !== senderAgentId) {
 				log('orchestrator', `routing to pm from ${senderAgentId ?? 'user'}`, {
 					teamId: team.id,
 				})

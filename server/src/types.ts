@@ -16,6 +16,8 @@ export interface Repo {
 	name: string
 	envVars?: EnvVar[]
 	setupSteps?: SetupStep[]
+	fingerprint?: string
+	needsNativeBuild?: boolean
 }
 
 export interface SessionData {

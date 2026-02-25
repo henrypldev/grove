@@ -22,6 +22,8 @@ export function dbInsertRepo(repo: Repo): void {
 			path: repo.path,
 			envVars: repo.envVars ? JSON.stringify(repo.envVars) : null,
 			setupSteps: repo.setupSteps ? JSON.stringify(repo.setupSteps) : null,
+			fingerprint: repo.fingerprint ?? null,
+			needsNativeBuild: repo.needsNativeBuild ? 1 : null,
 			addedAt: Date.now(),
 		})
 		.run()
@@ -47,6 +49,22 @@ export function dbUpdateRepoSetupSteps(
 	return result.changes > 0
 }
 
+export function dbUpdateRepoFingerprint(
+	id: string,
+	fingerprint: string,
+	needsNativeBuild: boolean,
+): boolean {
+	const result = getDb()
+		.update(repos)
+		.set({
+			fingerprint,
+			needsNativeBuild: needsNativeBuild ? 1 : null,
+		})
+		.where(eq(repos.id, id))
+		.run() as unknown as { changes: number }
+	return result.changes > 0
+}
+
 function toRepo(row: typeof repos.$inferSelect): Repo {
 	return {
 		id: row.id,
@@ -54,5 +72,7 @@ function toRepo(row: typeof repos.$inferSelect): Repo {
 		path: row.path,
 		envVars: row.envVars ? JSON.parse(row.envVars) : undefined,
 		setupSteps: row.setupSteps ? JSON.parse(row.setupSteps) : undefined,
+		fingerprint: row.fingerprint ?? undefined,
+		needsNativeBuild: row.needsNativeBuild ? true : undefined,
 	}
 }

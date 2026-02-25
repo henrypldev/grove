@@ -13,6 +13,8 @@ export const repos = sqliteTable('repos', {
 	githubUrl: text('github_url'),
 	envVars: text('env_vars'),
 	setupSteps: text('setup_steps'),
+	fingerprint: text('fingerprint'),
+	needsNativeBuild: integer('needs_native_build'),
 	addedAt: integer('added_at').notNull(),
 })
 

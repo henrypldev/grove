@@ -1,6 +1,6 @@
 import { unstable_v2_prompt } from '@anthropic-ai/claude-agent-sdk'
 import { log } from '../config'
-import { dbUpdateRepoSetupSteps } from '../db/repos'
+import { dbUpdateRepoFingerprint, dbUpdateRepoSetupSteps } from '../db/repos'
 import type { SetupStep } from '../types'
 
 const SETUP_DETECTOR_PROMPT = (
@@ -79,6 +79,13 @@ export async function detectSetupSteps(
 		}
 
 		dbUpdateRepoSetupSteps(repoId, parsed.steps)
+		if (parsed.fingerprint) {
+			dbUpdateRepoFingerprint(
+				repoId,
+				parsed.fingerprint,
+				parsed.needsNativeBuild ?? false,
+			)
+		}
 		log('setup-detector', 'detection complete', {
 			repoId,
 			stepCount: parsed.steps.length,

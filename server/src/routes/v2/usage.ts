@@ -38,22 +38,36 @@ export async function handleV2Usage(
 
 	const rows = dbGetUsage({ teamId, repoId, since })
 
-	let totalCostUsd = 0
 	let totalInputTokens = 0
 	let totalOutputTokens = 0
+	let totalCacheReadTokens = 0
+	let totalCacheCreationTokens = 0
+	let totalNumTurns = 0
+	let totalDurationMs = 0
+	let totalDurationApiMs = 0
 	const byModel: Record<
 		string,
 		{ inputTokens: number; outputTokens: number; costUsd: number }
 	> = {}
 	const byDay: Record<
 		string,
-		{ inputTokens: number; outputTokens: number; costUsd: number }
+		{
+			inputTokens: number
+			outputTokens: number
+			cacheReadTokens: number
+			cacheCreationTokens: number
+			numTurns: number
+		}
 	> = {}
 
 	for (const row of rows) {
-		totalCostUsd += row.costUsd
 		totalInputTokens += row.inputTokens
 		totalOutputTokens += row.outputTokens
+		totalCacheReadTokens += row.cacheReadTokens
+		totalCacheCreationTokens += row.cacheCreationTokens
+		totalNumTurns += row.numTurns
+		totalDurationMs += row.durationMs
+		totalDurationApiMs += row.durationApiMs
 
 		if (!byModel[row.model]) {
 			byModel[row.model] = { inputTokens: 0, outputTokens: 0, costUsd: 0 }
@@ -64,15 +78,34 @@ export async function handleV2Usage(
 
 		const day = new Date(row.createdAt).toISOString().slice(0, 10)
 		if (!byDay[day]) {
-			byDay[day] = { inputTokens: 0, outputTokens: 0, costUsd: 0 }
+			byDay[day] = {
+				inputTokens: 0,
+				outputTokens: 0,
+				cacheReadTokens: 0,
+				cacheCreationTokens: 0,
+				numTurns: 0,
+			}
 		}
 		byDay[day].inputTokens += row.inputTokens
 		byDay[day].outputTokens += row.outputTokens
-		byDay[day].costUsd += row.costUsd
+		byDay[day].cacheReadTokens += row.cacheReadTokens
+		byDay[day].cacheCreationTokens += row.cacheCreationTokens
+		byDay[day].numTurns += row.numTurns
 	}
 
+	const count = rows.length || 1
 	return Response.json(
-		{ totalCostUsd, totalInputTokens, totalOutputTokens, byModel, byDay },
+		{
+			totalInputTokens,
+			totalOutputTokens,
+			totalCacheReadTokens,
+			totalCacheCreationTokens,
+			totalNumTurns,
+			avgDurationMs: Math.round(totalDurationMs / count),
+			avgDurationApiMs: Math.round(totalDurationApiMs / count),
+			byModel,
+			byDay,
+		},
 		{ headers },
 	)
 }

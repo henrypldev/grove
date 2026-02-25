@@ -1,5 +1,6 @@
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { Agent, AgentRole, AgentStatus } from '../types'
+import { broadcastToChannel } from '../websocket'
 import { getDb } from './index'
 import { agents } from './schema'
 
@@ -59,6 +60,14 @@ export function dbUpdateAgentActivity(
 		.set({ activity, updatedAt: Date.now() })
 		.where(eq(agents.id, id))
 		.run()
+	const agent = dbGetAgent(id)
+	if (agent) {
+		broadcastToChannel(`team:${agent.teamId}`, {
+			type: 'agent:update',
+			channel: `team:${agent.teamId}`,
+			data: { id, teamId: agent.teamId, activity },
+		})
+	}
 }
 
 export function dbUpdateAgentStatus(
@@ -71,6 +80,14 @@ export function dbUpdateAgentStatus(
 		.set({ status, currentTask: currentTask ?? null, updatedAt: Date.now() })
 		.where(eq(agents.id, id))
 		.run()
+	const agent = dbGetAgent(id)
+	if (agent) {
+		broadcastToChannel(`team:${agent.teamId}`, {
+			type: 'agent:update',
+			channel: `team:${agent.teamId}`,
+			data: { id, teamId: agent.teamId, status, currentTask: currentTask ?? null },
+		})
+	}
 }
 
 export function dbUpdateAgentSessionId(id: string, sessionId: string): void {

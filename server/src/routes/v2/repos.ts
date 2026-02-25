@@ -245,5 +245,28 @@ export async function handleV2Repos(
 		return Response.json(reordered, { headers })
 	}
 
+	const detectMatch = matchRoute(path, '/v2/repos/:id/detect')
+	if (detectMatch && method === 'POST') {
+		const repo = dbGetRepo(detectMatch.id)
+		if (!repo)
+			return Response.json(
+				{ error: 'Repo not found' },
+				{ status: 404, headers },
+			)
+
+		detectSetupSteps(repo.id, repo.path).then(result => {
+			if (result) {
+				emitGlobalEvent('repo:setup-detected', {
+					repoId: repo.id,
+					steps: result.steps,
+					fingerprint: result.fingerprint ?? null,
+					needsNativeBuild: result.needsNativeBuild ?? false,
+				})
+			}
+		})
+
+		return Response.json({ detecting: true }, { headers })
+	}
+
 	return null
 }

@@ -79,6 +79,7 @@ interface Config {
 	webhookUrl?: string
 	cloneDirectory?: string
 	pushTokens?: PushToken[]
+	settings?: Record<string, string>
 }
 
 interface SessionsState {
@@ -197,6 +198,23 @@ export function listDirectories(path: string): string[] {
 	} catch {
 		return []
 	}
+}
+
+export async function getSetting(key: string): Promise<string | null> {
+	const config = await loadConfig()
+	return config.settings?.[key] ?? null
+}
+
+export async function setSetting(key: string, value: string): Promise<void> {
+	const config = await loadConfig()
+	if (!config.settings) config.settings = {}
+	config.settings[key] = value
+	await saveConfig(config)
+}
+
+export async function getAllSettings(): Promise<Record<string, string>> {
+	const config = await loadConfig()
+	return config.settings ?? {}
 }
 
 export function generateId(): string {

@@ -101,11 +101,6 @@ export const usage = sqliteTable(
 	],
 )
 
-export const settings = sqliteTable('settings', {
-	key: text('key').primaryKey(),
-	value: text('value').notNull(),
-})
-
 export const plans = sqliteTable('plans', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	teamId: text('team_id')

@@ -22,13 +22,6 @@
       "when": 1772025336827,
       "tag": "0002_brown_sway",
       "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "6",
-      "when": 1772027678627,
-      "tag": "0003_spooky_doctor_faustus",
-      "breakpoints": true
     }
   ]
 }

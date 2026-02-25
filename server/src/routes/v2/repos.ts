@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import pkg from '../../../package.json'
 import { detectSetupSteps } from '../../agents/setup-detector'
 import {
 	cloneRepo,
@@ -8,7 +9,16 @@ import {
 	getOrgRepos,
 } from '../../api/github'
 import { addRepo, withSetupFile } from '../../api/repos'
-import { listDirectories, log } from '../../config'
+import {
+	getAllSettings,
+	getCloneDirectory,
+	getSetting,
+	listDirectories,
+	loadConfig,
+	log,
+	saveConfig,
+	setSetting,
+} from '../../config'
 import { emitGlobalEvent } from '../../db/events'
 import {
 	dbDeleteRepo,
@@ -17,7 +27,6 @@ import {
 	dbListRepos,
 	dbUpdateRepoSetupSteps,
 } from '../../db/repos'
-import { dbGetAllSettings, dbGetSetting, dbSetSetting } from '../../db/settings'
 import { dbListTeamsByRepo } from '../../db/teams'
 import type { Repo } from '../../types'
 
@@ -72,15 +81,38 @@ export async function handleV2Repos(
 	const method = req.method
 
 	if (path === '/v2/config/settings' && method === 'GET') {
-		return Response.json(dbGetAllSettings(), { headers })
+		return Response.json(await getAllSettings(), { headers })
 	}
 
 	if (path === '/v2/config/settings' && method === 'PATCH') {
 		const body = await req.json()
 		for (const [key, value] of Object.entries(body)) {
-			dbSetSetting(key, String(value))
+			await setSetting(key, String(value))
 		}
-		return Response.json(dbGetAllSettings(), { headers })
+		return Response.json(await getAllSettings(), { headers })
+	}
+
+	if (path === '/v2/version' && method === 'GET') {
+		return Response.json({ version: pkg.version }, { headers })
+	}
+
+	if (path === '/v2/config/clone-directory' && method === 'GET') {
+		const dir = await getCloneDirectory()
+		return Response.json({ cloneDirectory: dir }, { headers })
+	}
+
+	if (path === '/v2/config/clone-directory' && method === 'PUT') {
+		const body = await req.json()
+		if (!body.cloneDirectory || typeof body.cloneDirectory !== 'string') {
+			return Response.json(
+				{ error: 'Missing cloneDirectory field' },
+				{ status: 400, headers },
+			)
+		}
+		const config = await loadConfig()
+		config.cloneDirectory = body.cloneDirectory
+		await saveConfig(config)
+		return Response.json({ cloneDirectory: body.cloneDirectory }, { headers })
 	}
 
 	if (path === '/v2/config/list-directories' && method === 'GET') {
@@ -116,7 +148,7 @@ export async function handleV2Repos(
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
 		if (
-			dbGetSetting('autoDetect') === 'true' &&
+			(await getSetting('autoDetect')) === 'true' &&
 			!existsSync(join(repo.path, '.grove', 'setup.json'))
 		) {
 			triggerDetection(repo)
@@ -131,7 +163,7 @@ export async function handleV2Repos(
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
 		if (
-			dbGetSetting('autoDetect') === 'true' &&
+			(await getSetting('autoDetect')) === 'true' &&
 			!existsSync(join(repo.path, '.grove', 'setup.json'))
 		) {
 			triggerDetection(repo)

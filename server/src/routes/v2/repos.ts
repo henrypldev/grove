@@ -8,7 +8,7 @@ import {
 	getOrgRepos,
 } from '../../api/github'
 import { addRepo, withSetupFile } from '../../api/repos'
-import { listDirectories, loadConfig, log, saveConfig } from '../../config'
+import { listDirectories, log } from '../../config'
 import { emitGlobalEvent } from '../../db/events'
 import {
 	dbDeleteRepo,
@@ -17,6 +17,7 @@ import {
 	dbListRepos,
 	dbUpdateRepoSetupSteps,
 } from '../../db/repos'
+import { dbGetAllSettings, dbGetSetting, dbSetSetting } from '../../db/settings'
 import { dbListTeamsByRepo } from '../../db/teams'
 import type { Repo } from '../../types'
 
@@ -71,24 +72,15 @@ export async function handleV2Repos(
 	const method = req.method
 
 	if (path === '/v2/config/settings' && method === 'GET') {
-		const config = await loadConfig()
-		return Response.json(
-			{ autoDetect: config.autoDetect ?? false },
-			{ headers },
-		)
+		return Response.json(dbGetAllSettings(), { headers })
 	}
 
 	if (path === '/v2/config/settings' && method === 'PATCH') {
 		const body = await req.json()
-		const config = await loadConfig()
-		if (typeof body.autoDetect === 'boolean') {
-			config.autoDetect = body.autoDetect
+		for (const [key, value] of Object.entries(body)) {
+			dbSetSetting(key, String(value))
 		}
-		await saveConfig(config)
-		return Response.json(
-			{ autoDetect: config.autoDetect ?? false },
-			{ headers },
-		)
+		return Response.json(dbGetAllSettings(), { headers })
 	}
 
 	if (path === '/v2/config/list-directories' && method === 'GET') {
@@ -123,9 +115,8 @@ export async function handleV2Repos(
 		if (typeof repo === 'string')
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
-		const config = await loadConfig()
 		if (
-			config.autoDetect &&
+			dbGetSetting('autoDetect') === 'true' &&
 			!existsSync(join(repo.path, '.grove', 'setup.json'))
 		) {
 			triggerDetection(repo)
@@ -139,9 +130,8 @@ export async function handleV2Repos(
 		if (typeof repo === 'string')
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
-		const config = await loadConfig()
 		if (
-			config.autoDetect &&
+			dbGetSetting('autoDetect') === 'true' &&
 			!existsSync(join(repo.path, '.grove', 'setup.json'))
 		) {
 			triggerDetection(repo)

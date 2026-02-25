@@ -222,7 +222,6 @@ export async function handleV2Teams(
 				spawnDeveloper,
 				spawnQaAgent,
 				spawnReviewerAgent,
-				spawnEnvAgent,
 			} = await import('../../agents/specialists')
 			let agent: Awaited<ReturnType<typeof spawnDeveloper>> | undefined
 			switch (body.role) {
@@ -237,9 +236,6 @@ export async function handleV2Teams(
 					break
 				case 'reviewer':
 					agent = await spawnReviewerAgent(team)
-					break
-				case 'env':
-					agent = await spawnEnvAgent(team)
 					break
 				default:
 					return Response.json(

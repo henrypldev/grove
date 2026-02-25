@@ -1,6 +1,4 @@
-import { allocatePort } from '../api/ports'
 import { generateId, log } from '../config'
-import { dbUpdateTeamPort } from '../db/teams'
 import type { Team } from '../types'
 import { createGroveTools } from './grove-tools'
 import type { PersistentAgentResult } from './runner'
@@ -169,56 +167,3 @@ export async function spawnReviewerAgent(
 	})
 }
 
-const ENV_PROMPT = (team: Team, port: number) => `
-You are the Environment agent for team ${team.id}. You ONLY manage the dev server. Do NOT explore the codebase or work on the task.
-Worktree: ${team.worktreePath}
-Assigned port: ${port}
-
-IMPORTANT: Do NOT read any files besides package.json and app.json/app.config.js/app.config.ts. Do NOT investigate the task. You are a dev server manager, nothing else.
-
-## Initial setup — do these steps exactly, nothing more:
-1. Read package.json to detect the framework:
-   - If "expo" is in dependencies → Expo
-   - If "next" is in dependencies → Next.js
-   - If "vite" is in dependencies → Vite
-   - Otherwise → unknown
-2. If Expo: read app.json (or app.config.js/app.config.ts if app.json doesn't exist)
-3. If Expo: run \`npx @expo/fingerprint --json\` and extract the hash
-4. If Expo: update app.json to set expo.name to "Grove-{first 8 chars of hash}"
-5. Start the dev server:
-   - Expo: \`npx expo start --port ${port}\`
-   - Next.js: \`npx next dev --port ${port}\`
-   - Vite: \`npx vite --port ${port}\`
-6. Post: post_event("env:ready", { "framework": "DETECTED", "port": ${port}, "fingerprint": "HASH_OR_NULL" })
-
-Then STOP. Do not do anything else.
-
-## On follow-up messages
-- "dev:complete" or fingerprint check: re-run \`npx @expo/fingerprint --json\`, compare to baseline hash.
-  If changed: post_event("env:build-required", { "oldFingerprint": "...", "newFingerprint": "..." })
-  Then post_event("agent:message", { "text": "@pm native dependencies changed — a new build is required." })
-  If unchanged: do nothing.
-- If asked to build: run \`npx expo run:ios\` or \`npx expo run:android\`.
-- If asked about conflicts: use the check_conflicts tool and report results.
-- For anything else: ignore it. You are not a developer.
-`
-
-export async function spawnEnvAgent(
-	team: Team,
-): Promise<PersistentAgentResult> {
-	const port = allocatePort()
-	if (!port) throw new Error('No available ports in pool (8082-8099)')
-	dbUpdateTeamPort(team.id, port)
-	log('agent', 'spawning env agent', { teamId: team.id, port })
-	const agentId = generateId()
-	return spawnPersistentAgent({
-		agentId,
-		teamId: team.id,
-		role: 'env',
-		prompt: ENV_PROMPT(team, port),
-		cwd: team.worktreePath,
-		maxBudgetUsd: 5,
-		allowedTools: ['mcp__grove__*', 'Bash', 'Read', 'Edit'],
-		mcpTools: createGroveTools(team.id, agentId),
-	})
-}

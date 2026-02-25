@@ -1,6 +1,6 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { computeDiff, getHeadSha } from '../api/diff'
-import { registerTeamServe, unregisterTeamServe } from '../api/tailscale-serve'
+import { unregisterTeamServe } from '../api/tailscale-serve'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
 import {
@@ -14,13 +14,12 @@ import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
 import { respawnPm, spawnPm } from './pm'
 import {
 	spawnDeveloper,
-	spawnEnvAgent,
 	spawnQaAgent,
 	spawnReviewerAgent,
 	spawnTeamLead,
 } from './specialists'
 
-const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer|env)\b/g
+const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer)\b/g
 
 const devBaseCommit = new Map<string, string>()
 
@@ -66,24 +65,6 @@ export async function onNewTeam(
 	})
 
 	subscribeToTeamEvents(team.id, async event => {
-		if (event.type === 'env:ready') {
-			let payload: { port?: number }
-			try {
-				payload =
-					typeof event.payload === 'string'
-						? JSON.parse(event.payload)
-						: event.payload
-			} catch {
-				payload = {}
-			}
-			if (payload.port) {
-				dbUpdateTeamPort(team.id, payload.port)
-				registerTeamServe(team.id, payload.port)
-			}
-		}
-	})
-
-	subscribeToTeamEvents(team.id, async event => {
 		if (event.type === 'story:complete') {
 			log('orchestrator', 'story complete, cycling dev agent', {
 				teamId: team.id,
@@ -110,12 +91,6 @@ export async function onNewTeam(
 				text: `@pm done. ${payload.summary ?? ''}`,
 				diff: diff ?? undefined,
 			})
-			const envAgent = getAgent(team.id, 'env')
-			if (envAgent) {
-				envAgent.queue.push(
-					'dev:complete — please re-check the fingerprint for native dependency changes.',
-				)
-			}
 		}
 		if (event.type === 'dev:pr-created') {
 			let payload: { url?: string }
@@ -276,5 +251,4 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 		await spawnDeveloper(team)
 	} else if (role === 'qa') await spawnQaAgent(team)
 	else if (role === 'reviewer') await spawnReviewerAgent(team)
-	else if (role === 'env') await spawnEnvAgent(team)
 }

@@ -54,7 +54,6 @@ export type AgentRole =
 	| 'dev'
 	| 'qa'
 	| 'reviewer'
-	| 'env'
 export type AgentStatus =
 	| 'idle'
 	| 'planning'

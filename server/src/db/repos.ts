@@ -49,6 +49,18 @@ export function dbUpdateRepoSetupSteps(
 	return result.changes > 0
 }
 
+export function dbUpdateRepoEnvVars(
+	id: string,
+	envVars: Repo['envVars'],
+): boolean {
+	const result = getDb()
+		.update(repos)
+		.set({ envVars: envVars ? JSON.stringify(envVars) : null })
+		.where(eq(repos.id, id))
+		.run() as unknown as { changes: number }
+	return result.changes > 0
+}
+
 export function dbUpdateRepoFingerprint(
 	id: string,
 	fingerprint: string,

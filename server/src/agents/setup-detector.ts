@@ -1,7 +1,11 @@
 import { unstable_v2_prompt } from '@anthropic-ai/claude-agent-sdk'
 import { log } from '../config'
-import { dbUpdateRepoFingerprint, dbUpdateRepoSetupSteps } from '../db/repos'
-import type { SetupStep } from '../types'
+import {
+	dbUpdateRepoEnvVars,
+	dbUpdateRepoFingerprint,
+	dbUpdateRepoSetupSteps,
+} from '../db/repos'
+import type { EnvVar, SetupStep } from '../types'
 
 const SETUP_DETECTOR_PROMPT = (
 	repoPath: string,
@@ -26,12 +30,20 @@ Do these steps exactly:
    - Run: npx @expo/fingerprint --json
    - Extract the hash from the output
    - Check if ios/ and android/ directories exist
-6. Output ONLY a JSON object in this exact format (no other text):
+6. Detect environment variables:
+   - Look for .env* files (e.g., .env, .env.local, .env.example) in the project root
+   - If .env* files exist: parse them for KEY=VALUE pairs. For each, record { "key": "KEY", "value": "VALUE", "filePath": ".env" }
+   - If NO .env* files exist: search source files (*.ts, *.tsx, *.js, *.jsx) for process.env.VARIABLE_NAME references. For each unique variable found, record { "key": "VARIABLE_NAME", "value": "", "filePath": "" }
+   - Skip common built-in vars: NODE_ENV, PORT, HOME, PATH, CI
+7. Output ONLY a JSON object in this exact format (no other text):
 
 {
   "steps": [
     { "name": "Install dependencies", "run": "bun install" },
     { "name": "Start dev server", "run": "bun run dev --port {{PORT}}", "background": true }
+  ],
+  "envVars": [
+    { "key": "DATABASE_URL", "value": "postgres://...", "filePath": ".env" }
   ],
   "fingerprint": "abc123...",
   "needsNativeBuild": false
@@ -39,6 +51,7 @@ Do these steps exactly:
 
 Rules:
 - "steps" is required, always an array of SetupStep objects
+- "envVars" is optional, array of { key, value, filePath } objects. Omit if no env vars found.
 - "fingerprint" is optional, only for Expo/RN projects (string or null)
 - "needsNativeBuild" is optional, true if Expo project is missing ios/ or android/ directories
 - The dev server step MUST have "background": true
@@ -48,6 +61,7 @@ Rules:
 
 export interface DetectionResult {
 	steps: SetupStep[]
+	envVars?: EnvVar[]
 	fingerprint?: string | null
 	needsNativeBuild?: boolean
 }
@@ -79,6 +93,9 @@ export async function detectSetupSteps(
 		}
 
 		dbUpdateRepoSetupSteps(repoId, parsed.steps)
+		if (parsed.envVars && parsed.envVars.length > 0) {
+			dbUpdateRepoEnvVars(repoId, parsed.envVars)
+		}
 		if (parsed.fingerprint) {
 			dbUpdateRepoFingerprint(
 				repoId,

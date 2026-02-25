@@ -19,8 +19,7 @@
 		"check:fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
 		"release": "bun scripts/release.ts",
-		"test:server": "bun test server/src/",
-		"test:agent": "bun run server/agent-test/loop.ts"
+		"test": "bun test server/src/"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.3.12",

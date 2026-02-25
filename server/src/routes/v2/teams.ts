@@ -10,11 +10,7 @@ import {
 import { createWorktree } from '../../api/worktrees'
 import { generateId, getTerminalHost } from '../../config'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
-import {
-	dbInsertEvent,
-	dbListEventsSince,
-	subscribeToTeamEvents,
-} from '../../db/events'
+import { dbInsertEvent, dbListEventsSince } from '../../db/events'
 import { dbGetPlan } from '../../db/plans'
 import { dbGetRepo } from '../../db/repos'
 import {
@@ -363,44 +359,6 @@ export async function handleV2Teams(
 		const since = Number(url.searchParams.get('since') ?? '0')
 		const events = dbListEventsSince(eventsMatch.id, since)
 		return Response.json(events, { headers })
-	}
-
-	const streamMatch = matchRoute(path, '/v2/teams/:id/stream')
-	if (streamMatch && method === 'GET') {
-		const team = dbGetTeam(streamMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		const since = Number(url.searchParams.get('since') ?? '-1')
-		const enc = new TextEncoder()
-		const stream = new ReadableStream({
-			start(controller) {
-				controller.enqueue(enc.encode('data: {"type":"connected"}\n\n'))
-				if (since >= 0) {
-					for (const event of dbListEventsSince(streamMatch.id, since)) {
-						controller.enqueue(enc.encode(`data: ${JSON.stringify(event)}\n\n`))
-					}
-				}
-				const unsubscribe = subscribeToTeamEvents(streamMatch.id, event => {
-					try {
-						controller.enqueue(enc.encode(`data: ${JSON.stringify(event)}\n\n`))
-					} catch {}
-				})
-				req.signal.addEventListener('abort', () => {
-					unsubscribe()
-				})
-			},
-		})
-		return new Response(stream, {
-			headers: {
-				'Content-Type': 'text/event-stream',
-				'Cache-Control': 'no-cache',
-				Connection: 'keep-alive',
-				'Access-Control-Allow-Origin': '*',
-			},
-		})
 	}
 
 	const plansMatch = matchRoute(path, '/v2/teams/:id/plans/:type')

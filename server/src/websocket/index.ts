@@ -1,8 +1,9 @@
 import type { ServerWebSocket } from 'bun'
 import {
 	dbGetEventsSinceId,
-	dbGetLatestEventId,
 	dbListEventsSince,
+	subscribeToGlobalEvents,
+	subscribeToTeamEvents,
 } from '../db/events'
 import type { TeamEvent, WsClientMessage, WsServerMessage } from '../types'
 
@@ -13,14 +14,15 @@ interface WsClientData {
 interface WsClient {
 	ws: ServerWebSocket<WsClientData>
 	deviceType: 'mac' | 'mobile' | null
-	subscribedTeams: Set<string>
+	channels: Set<string>
 }
 
 const clients = new Map<string, WsClient>()
+const teamUnsubscribers = new Map<string, () => void>()
 
-export function broadcast(teamId: string, message: WsServerMessage) {
+export function broadcastToChannel(channel: string, message: WsServerMessage) {
 	for (const client of clients.values()) {
-		if (client.subscribedTeams.has(teamId)) {
+		if (client.channels.has(channel)) {
 			try {
 				client.ws.send(JSON.stringify(message))
 			} catch {}
@@ -36,11 +38,39 @@ export function broadcastAll(message: WsServerMessage) {
 	}
 }
 
+function hasSubscribers(channel: string): boolean {
+	for (const client of clients.values()) {
+		if (client.channels.has(channel)) return true
+	}
+	return false
+}
+
+function ensureTeamListener(teamId: string) {
+	if (teamUnsubscribers.has(teamId)) return
+	const unsub = subscribeToTeamEvents(teamId, (event: TeamEvent) => {
+		broadcastToChannel(`team:${teamId}`, {
+			type: 'event',
+			channel: `team:${teamId}`,
+			data: event,
+		})
+	})
+	teamUnsubscribers.set(teamId, unsub)
+}
+
+function maybeRemoveTeamListener(teamId: string) {
+	if (hasSubscribers(`team:${teamId}`)) return
+	const unsub = teamUnsubscribers.get(teamId)
+	if (unsub) {
+		unsub()
+		teamUnsubscribers.delete(teamId)
+	}
+}
+
 export const wsHandlers = {
 	open(ws: ServerWebSocket<WsClientData>) {
 		const clientId = Math.random().toString(36).slice(2)
 		ws.data = { clientId }
-		clients.set(clientId, { ws, deviceType: null, subscribedTeams: new Set() })
+		clients.set(clientId, { ws, deviceType: null, channels: new Set() })
 		ws.send(JSON.stringify({ type: 'connected' } satisfies WsServerMessage))
 	},
 
@@ -52,51 +82,63 @@ export const wsHandlers = {
 			if (msg.type === 'auth') {
 				client.deviceType = msg.payload.deviceType
 			} else if (msg.type === 'subscribe') {
-				for (const teamId of msg.payload.teamIds) {
-					client.subscribedTeams.add(teamId)
+				for (const channel of msg.channels) {
+					client.channels.add(channel)
+					if (channel.startsWith('team:')) {
+						ensureTeamListener(channel.slice(5))
+					}
+				}
+			} else if (msg.type === 'unsubscribe') {
+				for (const channel of msg.channels) {
+					client.channels.delete(channel)
+					if (channel.startsWith('team:')) {
+						maybeRemoveTeamListener(channel.slice(5))
+					}
 				}
 			} else if (msg.type === 'replay') {
-				const events = dbListEventsSince(msg.payload.teamId, msg.payload.since)
-				ws.send(
-					JSON.stringify({
-						type: 'replay:batch',
-						events,
-					} satisfies WsServerMessage),
-				)
+				const channel = msg.channel
+				if (channel.startsWith('team:')) {
+					const teamId = channel.slice(5)
+					const events = dbGetEventsSinceId(msg.sinceId).filter(
+						e => e.teamId === teamId,
+					)
+					ws.send(
+						JSON.stringify({
+							type: 'replay:batch',
+							channel,
+							events,
+						} satisfies WsServerMessage),
+					)
+				}
+			} else if (msg.type === 'ping') {
+				ws.send(JSON.stringify({ type: 'pong' } satisfies WsServerMessage))
 			}
 		} catch {}
 	},
 
 	close(ws: ServerWebSocket<WsClientData>) {
+		const client = clients.get(ws.data.clientId)
+		if (client) {
+			for (const channel of client.channels) {
+				if (channel.startsWith('team:')) {
+					client.channels.delete(channel)
+					maybeRemoveTeamListener(channel.slice(5))
+				}
+			}
+		}
 		clients.delete(ws.data.clientId)
 	},
 }
 
-let lastSeenEventId = 0
+let globalUnsub: (() => void) | null = null
 
-export function startEventPoller() {
-	lastSeenEventId = dbGetLatestEventId()
-	setInterval(() => {
-		const newEvents = dbGetEventsSinceId(lastSeenEventId)
-		if (newEvents.length === 0) return
-		lastSeenEventId = newEvents[newEvents.length - 1].id
-
-		const byTeam = new Map<string, TeamEvent[]>()
-		for (const event of newEvents) {
-			const list = byTeam.get(event.teamId) ?? []
-			list.push(event)
-			byTeam.set(event.teamId, list)
-		}
-		for (const [teamId, events] of byTeam) {
-			for (const event of events) {
-				broadcast(teamId, {
-					type: 'agent:event',
-					teamId: event.teamId,
-					agentId: event.agentId ?? '',
-					role: 'dev',
-					event: JSON.parse(event.payload),
-				})
-			}
-		}
-	}, 150)
+export function initWebSocketBridge() {
+	if (globalUnsub) return
+	globalUnsub = subscribeToGlobalEvents(event => {
+		broadcastToChannel('global', {
+			type: 'event',
+			channel: 'global',
+			data: event as unknown as TeamEvent,
+		})
+	})
 }

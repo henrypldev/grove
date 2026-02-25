@@ -10,7 +10,7 @@ import { handleV2Repos } from './routes/v2/repos'
 import { handleV2Teams, setTeamCreatedHook } from './routes/v2/teams'
 import { handleV2Usage } from './routes/v2/usage'
 import { cleanupStaleSessions } from './terminal/ttyd'
-import { startEventPoller, wsHandlers } from './websocket'
+import { initWebSocketBridge, wsHandlers } from './websocket'
 
 export { setLogsEnabled }
 
@@ -20,7 +20,7 @@ export async function startServer(port: number) {
 	setTeamCreatedHook(onNewTeam)
 	log('server', 'starting up')
 	await cleanupStaleSessions()
-	startEventPoller()
+	initWebSocketBridge()
 	startPortPoller()
 
 	setInterval(async () => {

@@ -102,7 +102,10 @@ export async function handleV2Repos(
 		if (typeof repo === 'string')
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
-		if (!existsSync(join(repo.path, '.grove', 'setup.json'))) {
+		if (
+			body.autoDetect &&
+			!existsSync(join(repo.path, '.grove', 'setup.json'))
+		) {
 			triggerDetection(repo)
 		}
 		return Response.json(withSetupFile(repo), { headers })
@@ -114,7 +117,10 @@ export async function handleV2Repos(
 		if (typeof repo === 'string')
 			return Response.json({ error: repo }, { status: 400, headers })
 		dbInsertRepo(repo)
-		if (!existsSync(join(repo.path, '.grove', 'setup.json'))) {
+		if (
+			body.autoDetect &&
+			!existsSync(join(repo.path, '.grove', 'setup.json'))
+		) {
 			triggerDetection(repo)
 		}
 		return Response.json(withSetupFile(repo), { headers })

@@ -79,6 +79,7 @@ interface Config {
 	webhookUrl?: string
 	cloneDirectory?: string
 	pushTokens?: PushToken[]
+	autoDetect?: boolean
 }
 
 interface SessionsState {

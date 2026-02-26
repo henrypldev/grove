@@ -1,8 +1,11 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
+import { dbGetNote, dbUpsertNote } from '../db/agent-notes'
+import { dbInsertTasks, dbListTasks, dbUpdateTask } from '../db/agent-tasks'
 import { dbUpdateAgentStatus } from '../db/agents'
+import { dbGetDesignDoc, dbUpsertDesignDoc } from '../db/design-docs'
 import { dbInsertEvent, dbListEventsSince } from '../db/events'
-import { dbGetPlan, dbInsertPlan } from '../db/plans'
+import { dbGetPrd, dbUpsertPrd } from '../db/prds'
 import { dbGetTeam, dbListTeams } from '../db/teams'
 
 interface QuestionOption {
@@ -110,89 +113,161 @@ export function createGroveTools(teamId: string, agentId: string) {
 				},
 			),
 			tool(
-				'save_plan',
-				'Store a PRD or technical plan in the database',
+				'save_prd',
+				'Store a PRD in the database',
 				{
-					type: z
-						.enum(['prd', 'technical', 'stories', 'progress'])
-						.describe('Plan type'),
-					content: z.string().describe('The full plan content in markdown'),
+					content: z.string().describe('The full PRD content in markdown'),
 				},
-				async ({ type, content }) => {
-					dbInsertPlan(teamId, agentId, type, content)
+				async ({ content }) => {
+					dbUpsertPrd(teamId, agentId, content)
+					dbInsertEvent(teamId, agentId, 'prd:ready', {})
 					return {
-						content: [{ type: 'text' as const, text: `saved ${type} plan` }],
+						content: [{ type: 'text' as const, text: 'saved prd' }],
+					}
+				},
+			),
+			tool('get_prd', 'Retrieve the PRD for this team', {}, async () => {
+				const prd = dbGetPrd(teamId)
+				if (!prd) {
+					return {
+						content: [{ type: 'text' as const, text: 'no prd found' }],
+					}
+				}
+				return { content: [{ type: 'text' as const, text: prd.content }] }
+			}),
+			tool(
+				'save_design_doc',
+				'Store a technical design doc in the database',
+				{
+					content: z
+						.string()
+						.describe('The full design doc content in markdown'),
+				},
+				async ({ content }) => {
+					dbUpsertDesignDoc(teamId, agentId, content)
+					dbInsertEvent(teamId, agentId, 'design_doc:ready', {})
+					return {
+						content: [{ type: 'text' as const, text: 'saved design doc' }],
 					}
 				},
 			),
 			tool(
-				'get_plan',
-				'Retrieve the latest plan of a given type',
-				{
-					type: z
-						.enum(['prd', 'technical', 'stories', 'progress'])
-						.describe('Plan type to retrieve'),
-				},
-				async ({ type }) => {
-					const plan = dbGetPlan(teamId, type)
-					if (!plan) {
+				'get_design_doc',
+				'Retrieve the technical design doc for this team',
+				{},
+				async () => {
+					const doc = dbGetDesignDoc(teamId)
+					if (!doc) {
 						return {
-							content: [
-								{ type: 'text' as const, text: `no ${type} plan found` },
-							],
+							content: [{ type: 'text' as const, text: 'no design doc found' }],
 						}
 					}
-					return { content: [{ type: 'text' as const, text: plan.content }] }
+					return { content: [{ type: 'text' as const, text: doc.content }] }
 				},
 			),
 			tool(
-				'append_progress',
-				'Append a progress entry for the current task. Accumulates across tasks.',
+				'create_tasks',
+				'Create tasks for this team',
+				{
+					tasks: z
+						.array(
+							z.object({
+								id_string: z.string().describe('Task ID (e.g. "1", "2")'),
+								title: z.string().describe('Task title'),
+								priority: z.number().describe('Priority (lower = higher)'),
+							}),
+						)
+						.describe('Array of tasks to create'),
+				},
+				async ({ tasks }) => {
+					dbInsertTasks(
+						teamId,
+						tasks.map(t => ({
+							idString: t.id_string,
+							title: t.title,
+							priority: t.priority,
+						})),
+					)
+					return {
+						content: [
+							{
+								type: 'text' as const,
+								text: `created ${tasks.length} tasks`,
+							},
+						],
+					}
+				},
+			),
+			tool('get_tasks', 'Get all tasks for this team', {}, async () => {
+				const tasks = dbListTasks(teamId)
+				return {
+					content: [{ type: 'text' as const, text: JSON.stringify(tasks) }],
+				}
+			}),
+			tool(
+				'update_task',
+				'Update a task by its ID string',
+				{
+					id_string: z.string().describe('Task ID (e.g. "1", "2")'),
+					status: z
+						.enum(['pending', 'in_progress', 'complete', 'skipped'])
+						.optional()
+						.describe('New status'),
+					blocked_by: z
+						.array(z.string())
+						.optional()
+						.describe('Array of task ID strings this task is blocked by'),
+				},
+				async ({ id_string, status, blocked_by }) => {
+					dbUpdateTask(teamId, id_string, {
+						status: status ?? undefined,
+						blockedBy: blocked_by ?? undefined,
+					})
+					return {
+						content: [
+							{ type: 'text' as const, text: `updated task ${id_string}` },
+						],
+					}
+				},
+			),
+			tool(
+				'save_note',
+				'Store a note (e.g. progress log) in the database',
+				{
+					content: z.string().describe('The note content in markdown'),
+				},
+				async ({ content }) => {
+					dbUpsertNote(teamId, agentId, content)
+					return {
+						content: [{ type: 'text' as const, text: 'saved note' }],
+					}
+				},
+			),
+			tool('get_notes', 'Retrieve the notes for this team', {}, async () => {
+				const note = dbGetNote(teamId)
+				if (!note) {
+					return {
+						content: [{ type: 'text' as const, text: 'no notes found' }],
+					}
+				}
+				return { content: [{ type: 'text' as const, text: note.content }] }
+			}),
+			tool(
+				'append_note',
+				'Append an entry to the team notes. Accumulates across tasks.',
 				{
 					entry: z
 						.string()
 						.describe(
-							'Progress entry in markdown (## task title, changes, learnings, gotchas)',
+							'Note entry in markdown (## task title, changes, learnings, gotchas)',
 						),
 				},
 				async ({ entry }) => {
-					const existing = dbGetPlan(teamId, 'progress')
+					const existing = dbGetNote(teamId)
 					const content = existing ? `${existing.content}\n\n${entry}` : entry
-					dbInsertPlan(teamId, agentId, 'progress', content)
+					dbUpsertNote(teamId, agentId, content)
 					return {
-						content: [{ type: 'text' as const, text: 'progress updated' }],
-					}
-				},
-			),
-			tool(
-				'update_story',
-				'Update the status of a single task in the tasks plan',
-				{
-					id: z.string().describe('Task ID (e.g. "1", "2")'),
-					status: z
-						.enum(['pending', 'in_progress', 'complete', 'skipped'])
-						.describe('New status'),
-				},
-				async ({ id, status }) => {
-					const plan = dbGetPlan(teamId, 'stories')
-					if (!plan) {
-						return {
-							content: [{ type: 'text' as const, text: 'no tasks plan found' }],
-						}
-					}
-					const stories = JSON.parse(plan.content)
-					const story = stories.find((s: { id: string }) => s.id === id)
-					if (!story) {
-						return {
-							content: [
-								{ type: 'text' as const, text: `task ${id} not found` },
-							],
-						}
-					}
-					story.status = status
-					dbInsertPlan(teamId, agentId, 'stories', JSON.stringify(stories))
-					return {
-						content: [{ type: 'text' as const, text: `${id} → ${status}` }],
+						content: [{ type: 'text' as const, text: 'note updated' }],
 					}
 				},
 			),

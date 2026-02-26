@@ -101,12 +101,45 @@ export const usage = sqliteTable(
 	],
 )
 
-export const plans = sqliteTable('plans', {
+export const prds = sqliteTable('prds', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	teamId: text('team_id')
 		.notNull()
 		.references(() => teams.id),
-	type: text('type').notNull(),
+	agentId: text('agent_id').notNull(),
+	content: text('content').notNull(),
+	createdAt: integer('created_at').notNull(),
+})
+
+export const designDocs = sqliteTable('design_docs', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	teamId: text('team_id')
+		.notNull()
+		.references(() => teams.id),
+	agentId: text('agent_id').notNull(),
+	content: text('content').notNull(),
+	createdAt: integer('created_at').notNull(),
+})
+
+export const agentTasks = sqliteTable('agent_tasks', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	teamId: text('team_id')
+		.notNull()
+		.references(() => teams.id),
+	agentId: text('agent_id').references(() => agents.id),
+	idString: text('id_string').notNull(),
+	title: text('title').notNull(),
+	priority: integer('priority').notNull(),
+	status: text('status').notNull().default('pending'),
+	blockedBy: text('blocked_by'),
+	createdAt: integer('created_at').notNull(),
+})
+
+export const agentNotes = sqliteTable('agent_notes', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	teamId: text('team_id')
+		.notNull()
+		.references(() => teams.id),
 	agentId: text('agent_id').notNull(),
 	content: text('content').notNull(),
 	createdAt: integer('created_at').notNull(),

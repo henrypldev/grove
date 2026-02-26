@@ -67,8 +67,8 @@ export async function onNewTeam(
 	})
 
 	subscribeToTeamEvents(team.id, async event => {
-		if (event.type === 'story:complete') {
-			log('orchestrator', 'story complete, cycling dev agent', {
+		if (event.type === 'task:complete') {
+			log('orchestrator', 'task complete, cycling dev agent', {
 				teamId: team.id,
 			})
 			closeAgent(team.id, 'dev')

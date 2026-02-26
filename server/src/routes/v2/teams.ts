@@ -9,9 +9,12 @@ import {
 } from '../../api/setup-v2'
 import { createWorktree } from '../../api/worktrees'
 import { generateId, getTerminalHost } from '../../config'
+import { dbGetNote } from '../../db/agent-notes'
+import { dbListTasks } from '../../db/agent-tasks'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
+import { dbGetDesignDoc } from '../../db/design-docs'
 import { dbInsertEvent, dbListEventsSince } from '../../db/events'
-import { dbGetPlan } from '../../db/plans'
+import { dbGetPrd } from '../../db/prds'
 import { dbGetRepo } from '../../db/repos'
 import {
 	dbArchiveTeam,
@@ -373,24 +376,40 @@ export async function handleV2Teams(
 		return Response.json(events, { headers })
 	}
 
-	const plansMatch = matchRoute(path, '/v2/teams/:id/plans/:type')
-	if (plansMatch && method === 'GET') {
-		const team = dbGetTeam(plansMatch.id)
-		if (!team)
+	const prdMatch = matchRoute(path, '/v2/teams/:id/prd')
+	if (prdMatch && method === 'GET') {
+		const prd = dbGetPrd(prdMatch.id)
+		if (!prd)
+			return Response.json({ error: 'PRD not found' }, { status: 404, headers })
+		return Response.json({ content: prd.content }, { headers })
+	}
+
+	const designDocMatch = matchRoute(path, '/v2/teams/:id/design-doc')
+	if (designDocMatch && method === 'GET') {
+		const doc = dbGetDesignDoc(designDocMatch.id)
+		if (!doc)
 			return Response.json(
-				{ error: 'Team not found' },
+				{ error: 'Design doc not found' },
 				{ status: 404, headers },
 			)
-		const plan = dbGetPlan(plansMatch.id, plansMatch.type)
-		if (!plan)
+		return Response.json({ content: doc.content }, { headers })
+	}
+
+	const tasksMatch = matchRoute(path, '/v2/teams/:id/tasks')
+	if (tasksMatch && method === 'GET') {
+		const tasks = dbListTasks(tasksMatch.id)
+		return Response.json(tasks, { headers })
+	}
+
+	const notesMatch = matchRoute(path, '/v2/teams/:id/notes')
+	if (notesMatch && method === 'GET') {
+		const note = dbGetNote(notesMatch.id)
+		if (!note)
 			return Response.json(
-				{ error: 'Plan not found' },
+				{ error: 'Notes not found' },
 				{ status: 404, headers },
 			)
-		return Response.json(
-			{ type: plansMatch.type, content: plan.content },
-			{ headers },
-		)
+		return Response.json({ content: note.content }, { headers })
 	}
 
 	const setupRetryMatch = matchRoute(path, '/v2/teams/:id/setup/retry')

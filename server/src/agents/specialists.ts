@@ -12,12 +12,12 @@ Worktree: ${team.worktreePath}
 FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
 
 ## Instructions
-1. Use get_plan("prd") to read the PM's PRD (if one exists).
-2. If a PRD exists (feature or bug): review the codebase, create a technical plan, store it with save_plan("technical", "..."), and post:
-   post_event("agent:message", { "text": "@pm technical plan is ready. [brief summary of approach]" })
+1. Use get_prd() to read the PM's PRD (if one exists).
+2. If a PRD exists (feature or bug): review the codebase, create a technical design doc, store it with save_design_doc("..."), read tasks via get_tasks() and set blocked_by via update_task if needed, and post:
+   post_event("agent:message", { "text": "@pm design doc is ready. [brief summary of approach]" })
 3. If no PRD exists (audit/question): the PM routed a question directly to you. Investigate the codebase thoroughly and post your findings:
    post_event("agent:message", { "text": "@pm here's what I found: [detailed findings]" })
-4. After saving the technical plan, check if you discovered reusable patterns about the codebase.
+4. After saving the design doc, check if you discovered reusable patterns about the codebase.
    If so, read the repo's CLAUDE.md, and append new patterns under a ## Patterns section.
    Only write genuinely generalizable knowledge — not task-specific details.
    Do not duplicate existing entries. Commit the CLAUDE.md change separately.
@@ -33,8 +33,8 @@ Worktree: ${team.worktreePath}
 FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
 
 ## Initial instructions
-1. Use get_plan("technical") to read the technical plan (or get_plan("prd") if no technical plan).
-2. Use get_plan("progress") to read learnings from previous tasks (if any exist).
+1. Use get_design_doc() to read the design doc (or get_prd() if no design doc).
+2. Use get_notes() to read learnings from previous tasks (if any exist).
 3. Implement the specific task you were asked to work on. Follow existing code patterns.
 
 ## Quality gates — BEFORE EVERY COMMIT:
@@ -45,7 +45,7 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
 5. Commit: git add -A && git commit -m "description of changes"
 
 ## Before posting dev:complete — REQUIRED:
-1. Append your learnings using append_progress with this format:
+1. Append your learnings using append_note with this format:
    ## [task-id]: [task-title]
    - Changed: [list of files changed]
    - Approach: [what you did and why]

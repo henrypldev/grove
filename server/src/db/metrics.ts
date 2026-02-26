@@ -23,7 +23,7 @@ export function dbGetMetrics() {
 		db
 			.select({ count: sql<number>`count(*)` })
 			.from(agentTasks)
-			.where(eq(agentTasks.status, 'completed'))
+			.where(eq(agentTasks.status, 'complete'))
 			.get()?.count ?? 0
 
 	const eventRows = db

@@ -4,6 +4,7 @@ import { unregisterTeamServe } from '../api/tailscale-serve'
 import { deleteWorktree } from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
+import { dbGetTeamDependencies } from '../db/team-dependencies'
 import {
 	dbGetTeam,
 	dbUpdateTeamPort,
@@ -250,10 +251,63 @@ async function killPort(port: number) {
 	} catch {}
 }
 
+const pendingDevSpawns = new Map<string, Team>()
+const depWatchers = new Map<string, Set<string>>()
+
+function watchTeamForCompletion(depTeamId: string, blockedTeamId: string) {
+	if (!depWatchers.has(depTeamId)) {
+		depWatchers.set(depTeamId, new Set())
+		subscribeToTeamEvents(depTeamId, async event => {
+			if (event.type !== 'pm:summary') return
+			const blocked = depWatchers.get(depTeamId)
+			if (!blocked) return
+			depWatchers.delete(depTeamId)
+			for (const teamId of blocked) {
+				const team = pendingDevSpawns.get(teamId)
+				if (!team) continue
+				const deps = dbGetTeamDependencies(teamId)
+				const stillBlocked = deps.some(d => {
+					const t = dbGetTeam(d.dependsOnTeamId)
+					return t && t.status !== 'idle' && t.status !== 'done'
+				})
+				if (!stillBlocked) {
+					pendingDevSpawns.delete(teamId)
+					log('orchestrator', 'dependencies satisfied, spawning dev', {
+						teamId,
+					})
+					const sha = await getHeadSha(team.worktreePath)
+					if (sha) devBaseCommit.set(teamId, sha)
+					await spawnDeveloper(team)
+				}
+			}
+		})
+	}
+	depWatchers.get(depTeamId)?.add(blockedTeamId)
+}
+
 async function spawnSpecialist(team: Team, role: AgentRole) {
 	log('orchestrator', `spawning specialist ${role}`, { teamId: team.id })
 	if (role === 'team-lead') await spawnTeamLead(team)
 	else if (role === 'dev') {
+		const deps = dbGetTeamDependencies(team.id)
+		const unsatisfied = deps.filter(d => {
+			const depTeam = dbGetTeam(d.dependsOnTeamId)
+			return depTeam && depTeam.status !== 'idle' && depTeam.status !== 'done'
+		})
+		if (unsatisfied.length > 0) {
+			log('orchestrator', 'dev blocked by dependencies', {
+				teamId: team.id,
+				deps: unsatisfied.map(d => d.dependsOnTeamId),
+			})
+			pendingDevSpawns.set(team.id, team)
+			for (const dep of unsatisfied) {
+				watchTeamForCompletion(dep.dependsOnTeamId, team.id)
+			}
+			dbInsertEvent(team.id, null, 'agent:message', {
+				text: '@pm Dev work is waiting for dependent teams to complete.',
+			})
+			return
+		}
 		const sha = await getHeadSha(team.worktreePath)
 		if (sha) devBaseCommit.set(team.id, sha)
 		await spawnDeveloper(team)

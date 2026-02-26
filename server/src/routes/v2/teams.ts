@@ -16,6 +16,7 @@ import { dbGetDesignDoc } from '../../db/design-docs'
 import { dbInsertEvent, dbListEventsSince } from '../../db/events'
 import { dbGetPrd } from '../../db/prds'
 import { dbGetRepo } from '../../db/repos'
+import { dbInsertTeamDependency } from '../../db/team-dependencies'
 import {
 	dbArchiveTeam,
 	dbGetTeam,
@@ -23,6 +24,7 @@ import {
 	dbListTeams,
 	dbUpdateTeamTitle,
 } from '../../db/teams'
+import { parseBatchTasks } from '../../parse-batch-tasks'
 import type { Team } from '../../types'
 
 const IMAGE_TYPES = new Set([
@@ -133,41 +135,101 @@ export async function handleV2Teams(
 				{ status: 404, headers },
 			)
 
-		const teamId = generateId()
-		const branch = `grove-team-${teamId}`
-		const worktree = await createWorktree(repoId, branch, 'main')
-		if (typeof worktree === 'string') {
-			return Response.json({ error: worktree }, { status: 400, headers })
+		const batch = parseBatchTasks(task)
+
+		if (!batch) {
+			const teamId = generateId()
+			const branch = `grove-team-${teamId}`
+			const worktree = await createWorktree(repoId, branch, 'main')
+			if (typeof worktree === 'string') {
+				return Response.json({ error: worktree }, { status: 400, headers })
+			}
+
+			const now = Date.now()
+			const team: Team = {
+				id: teamId,
+				repoId,
+				worktreePath: worktree.path,
+				task,
+				title: null,
+				status: 'planning',
+				pmSummary: null,
+				port: null,
+				prUrl: null,
+				createdAt: now,
+				updatedAt: now,
+			}
+			dbInsertTeam(team)
+
+			const taskText = task
+			import('../../agents/title').then(({ generateTeamTitle }) =>
+				generateTeamTitle(taskText).then(title =>
+					dbUpdateTeamTitle(teamId, title),
+				),
+			)
+
+			startTeamSetup(teamId, worktree.path, repo.setupSteps)
+
+			if (onTeamCreated) await onTeamCreated(team, contentBlocks)
+
+			return Response.json(team, { headers })
 		}
 
-		const now = Date.now()
-		const team: Team = {
-			id: teamId,
-			repoId,
-			worktreePath: worktree.path,
-			task,
-			title: null,
-			status: 'planning',
-			pmSummary: null,
-			port: null,
-			prUrl: null,
-			createdAt: now,
-			updatedAt: now,
+		// Batch mode: create multiple teams
+		const createdTeams: Team[] = []
+		for (const parsed of batch.tasks) {
+			const fullTask = parsed.task
+			const teamId = generateId()
+			const branch = `grove-team-${teamId}`
+			const worktree = await createWorktree(repoId, branch, 'main')
+			if (typeof worktree === 'string') {
+				return Response.json({ error: worktree }, { status: 400, headers })
+			}
+
+			const now = Date.now()
+			const team: Team = {
+				id: teamId,
+				repoId,
+				worktreePath: worktree.path,
+				task: fullTask,
+				title: null,
+				status: 'planning',
+				pmSummary: null,
+				port: null,
+				prUrl: null,
+				createdAt: now,
+				updatedAt: now,
+			}
+			dbInsertTeam(team)
+
+			import('../../agents/title').then(({ generateTeamTitle }) =>
+				generateTeamTitle(fullTask).then(title =>
+					dbUpdateTeamTitle(teamId, title),
+				),
+			)
+
+			startTeamSetup(teamId, worktree.path, repo.setupSteps)
+			createdTeams.push(team)
 		}
-		dbInsertTeam(team)
 
-		const taskText = task
-		import('../../agents/title').then(({ generateTeamTitle }) =>
-			generateTeamTitle(taskText).then(title =>
-				dbUpdateTeamTitle(teamId, title),
-			),
-		)
+		// Insert dependencies (now all team IDs exist)
+		for (let i = 0; i < batch.tasks.length; i++) {
+			for (const depIdx of batch.tasks[i].dependsOn) {
+				if (depIdx >= 1 && depIdx <= createdTeams.length) {
+					dbInsertTeamDependency(
+						createdTeams[i].id,
+						createdTeams[depIdx - 1].id,
+					)
+				}
+			}
+		}
 
-		startTeamSetup(teamId, worktree.path, repo.setupSteps)
+		// Trigger onTeamCreated for each
+		for (const team of createdTeams) {
+			if (onTeamCreated) await onTeamCreated(team, contentBlocks)
+		}
 
-		if (onTeamCreated) await onTeamCreated(team, contentBlocks)
-
-		return Response.json(team, { headers })
+		return Response.json({ teams: createdTeams }, { headers })
 	}
 
 	const teamMatch = matchRoute(path, '/v2/teams/:id')

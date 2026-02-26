@@ -135,6 +135,19 @@ export const agentTasks = sqliteTable('agent_tasks', {
 	createdAt: integer('created_at').notNull(),
 })
 
+export const teamDependencies = sqliteTable(
+	'team_dependencies',
+	{
+		teamId: text('team_id')
+			.notNull()
+			.references(() => teams.id),
+		dependsOnTeamId: text('depends_on_team_id')
+			.notNull()
+			.references(() => teams.id),
+	},
+	table => [index('idx_team_deps_team').on(table.teamId)],
+)
+
 export const agentNotes = sqliteTable('agent_notes', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	teamId: text('team_id')

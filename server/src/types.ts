@@ -118,6 +118,11 @@ export interface PmReport {
 	createdAt: number
 }
 
+export interface TeamDependency {
+	teamId: string
+	dependsOnTeamId: string
+}
+
 export type WsClientMessage =
 	| { type: 'auth'; payload: { deviceType: 'mac' | 'mobile' } }
 	| { type: 'subscribe'; channels: string[] }

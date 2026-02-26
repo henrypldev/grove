@@ -1,4 +1,5 @@
 import type {
+	CanUseTool,
 	PostToolUseFailureHookInput,
 	PostToolUseHookInput,
 	PreToolUseHookInput,
@@ -40,6 +41,7 @@ export interface AgentRunOptions {
 	cwd: string
 	maxBudgetUsd?: number
 	allowedTools?: string[]
+	canUseTool?: CanUseTool
 	mcpTools?: ReturnType<typeof createGroveTools>
 	onDone?: (agentId: string) => void
 	onError?: (agentId: string, error: unknown) => void
@@ -94,6 +96,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 			permissionMode: 'bypassPermissions',
 			...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
 			...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+			...(opts.canUseTool ? { canUseTool: opts.canUseTool } : {}),
 			hooks: buildHooks(agent, pending),
 		} as any)
 
@@ -149,6 +152,7 @@ export async function spawnPersistentAgent(
 		permissionMode: 'bypassPermissions',
 		...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
 		...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+		...(opts.canUseTool ? { canUseTool: opts.canUseTool } : {}),
 		hooks: buildHooks(agent, pending),
 	} as any)
 

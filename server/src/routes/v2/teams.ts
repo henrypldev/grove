@@ -330,8 +330,20 @@ export async function handleV2Teams(
 				}
 			}
 		} else {
-			const body = (await req.json()) as { text?: string }
+			const body = (await req.json()) as {
+				text?: string
+				answers?: Record<string, string>
+			}
 			text = body.text
+			if (body.answers) {
+				const { resolveUserReply } = await import('../../agents/grove-tools')
+				if (resolveUserReply(team.id, body.answers)) {
+					const event = dbInsertEvent(team.id, null, 'user:answers', {
+						answers: body.answers,
+					})
+					return Response.json(event, { headers })
+				}
+			}
 		}
 
 		if (!text)

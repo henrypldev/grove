@@ -5,14 +5,51 @@ import { dbInsertEvent, dbListEventsSince } from '../db/events'
 import { dbGetPlan, dbInsertPlan } from '../db/plans'
 import { dbGetTeam, dbListTeams } from '../db/teams'
 
-const pendingUserReplies = new Map<string, (answer: string) => void>()
+interface QuestionOption {
+	label: string
+	description: string
+}
 
-export function resolveUserReply(teamId: string, answer: string): boolean {
+interface Question {
+	question: string
+	header: string
+	options: QuestionOption[]
+	multiSelect: boolean
+}
+
+const pendingUserReplies = new Map<
+	string,
+	(answers: Record<string, string>) => void
+>()
+
+export function resolveUserReply(
+	teamId: string,
+	answers: Record<string, string> | string,
+): boolean {
 	const resolve = pendingUserReplies.get(teamId)
 	if (!resolve) return false
 	pendingUserReplies.delete(teamId)
-	resolve(answer)
+	if (typeof answers === 'string') {
+		resolve({ _raw: answers })
+	} else {
+		resolve(answers)
+	}
 	return true
+}
+
+export function waitForUserReply(
+	teamId: string,
+	agentId: string,
+	questions: Question[],
+): Promise<Record<string, string>> {
+	dbInsertEvent(teamId, agentId, 'pm:questions', { questions })
+	dbUpdateAgentStatus(agentId, 'waiting')
+	return new Promise<Record<string, string>>(resolve => {
+		pendingUserReplies.set(teamId, (answers: Record<string, string>) => {
+			dbUpdateAgentStatus(agentId, 'working')
+			resolve(answers)
+		})
+	})
 }
 
 function parseConflictFiles(mergeTreeOutput: string): string[] {
@@ -157,24 +194,6 @@ export function createGroveTools(teamId: string, agentId: string) {
 					return {
 						content: [{ type: 'text' as const, text: `${id} → ${status}` }],
 					}
-				},
-			),
-			tool(
-				'ask_user',
-				'Ask the user clarifying questions before writing a PRD. Returns the user reply as a string.',
-				{
-					questions: z
-						.array(z.string())
-						.describe('List of clarifying questions to ask the user'),
-				},
-				async ({ questions }) => {
-					dbInsertEvent(teamId, agentId, 'pm:questions', { questions })
-					dbUpdateAgentStatus(agentId, 'waiting')
-					const answer = await new Promise<string>(resolve => {
-						pendingUserReplies.set(teamId, resolve)
-					})
-					dbUpdateAgentStatus(agentId, 'working')
-					return { content: [{ type: 'text' as const, text: answer }] }
 				},
 			),
 			tool(

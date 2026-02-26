@@ -1,8 +1,42 @@
+import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
-import { createGroveTools } from './grove-tools'
+import { createGroveTools, waitForUserReply } from './grove-tools'
 import type { PersistentAgentResult } from './runner'
 import { spawnPersistentAgent } from './runner'
+
+function buildPmCanUseTool(teamId: string, agentId: string): CanUseTool {
+	return async (toolName, input) => {
+		if (toolName !== 'AskUserQuestion') {
+			return { behavior: 'allow', updatedInput: input }
+		}
+		const questions = input.questions as {
+			question: string
+			header: string
+			options: { label: string; description: string }[]
+			multiSelect: boolean
+		}[]
+		if (!questions?.length) {
+			return { behavior: 'allow', updatedInput: input }
+		}
+		const answers = await waitForUserReply(teamId, agentId, questions)
+		if (answers._raw) {
+			const rawText = answers._raw
+			const mapped: Record<string, string> = {}
+			for (const q of questions) {
+				mapped[q.question] = rawText
+			}
+			return {
+				behavior: 'allow',
+				updatedInput: { ...input, answers: mapped },
+			}
+		}
+		return {
+			behavior: 'allow',
+			updatedInput: { ...input, answers },
+		}
+	}
+}
 
 const PM_PROMPT = (team: Team) => `
 You are a non-technical PM for team ${team.id}, you do NOT plan or write anything technical, including the files needed to be changed.
@@ -20,8 +54,7 @@ When you mention @team-lead, @dev, @qa, or @reviewer in an agent:message, the se
 1. Analyse the task. Decide if this is a FEATURE, BUG FIX, or QUESTION/AUDIT.
 
 2. For FEATURE:
-   a. If the task has ambiguities or unclear scope, call ask_user with clarifying questions. The user may answer or tell you to just proceed — either way, continue.
-      Skip ask_user if the task is already specific and well-defined.
+   a. ALWAYS use the AskUserQuestion tool with 2-5 clarifying questions before writing a PRD. Do NOT skip this step. Do NOT ask questions via post_event — you MUST use AskUserQuestion. The user may answer your questions or tell you to just proceed — either way, continue to the next step.
    b. Write a PRD using save_plan("prd", "...your PRD...").
    c. Break the PRD into tasks. Save as JSON array:
       save_plan("stories", '[{"id":"1","title":"...","priority":1,"status":"pending"},...]')
@@ -138,6 +171,7 @@ export async function spawnPm(
 		cwd: team.worktreePath,
 		maxBudgetUsd: 10,
 		allowedTools: ['mcp__grove__*'],
+		canUseTool: buildPmCanUseTool(team.id, agentId),
 		mcpTools,
 		onDone: callbacks.onDone,
 		onError: callbacks.onError,
@@ -162,6 +196,7 @@ export async function respawnPm(
 		cwd: team.worktreePath,
 		maxBudgetUsd: 10,
 		allowedTools: ['mcp__grove__*'],
+		canUseTool: buildPmCanUseTool(team.id, agentId),
 		mcpTools,
 		onDone: callbacks.onDone,
 		onError: callbacks.onError,

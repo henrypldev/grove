@@ -1,6 +1,7 @@
 import { isPortActive } from '../../api/ports'
 import { dbListAgentsByTeam } from '../../db/agents'
 import { dbGetLatestEventByType } from '../../db/events'
+import { dbGetMetrics } from '../../db/metrics'
 import { dbListTeams } from '../../db/teams'
 
 export async function handleV2Dashboard(
@@ -56,7 +57,8 @@ export async function handleV2Dashboard(
 				lastCommit,
 			}
 		})
-		return Response.json(dashboard, { headers })
+		const metrics = dbGetMetrics()
+		return Response.json({ teams: dashboard, metrics }, { headers })
 	}
 
 	if (path === '/v2/conflicts' && method === 'GET') {

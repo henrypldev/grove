@@ -4,6 +4,16 @@ import { dbInsertAgent } from '../../../db/agents'
 import { dbInsertRepo } from '../../../db/repos'
 import { dbInsertTeam } from '../../../db/teams'
 
+mock.module('@anthropic-ai/claude-agent-sdk', () => ({
+	query: () => {
+		const gen = (async function* () {})()
+		return Object.assign(gen, { close: () => {} })
+	},
+	unstable_v2_prompt: async () => ({ type: 'result', subtype: 'success' }),
+	createSdkMcpServer: (opts: any) => opts,
+	tool: (...args: any[]) => args,
+}))
+
 mock.module('../../../api/worktrees', () => ({
 	createWorktree: async (_repoId: string, _branch: string, _base: string) => ({
 		path: '/tmp/fake-worktree',

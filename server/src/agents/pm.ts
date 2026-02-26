@@ -1,4 +1,4 @@
-import type { CanUseTool } from '@anthropic-ai/claude-agent-sdk'
+import type { CanUseTool, SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
 import type { Agent, Team } from '../types'
 import { createGroveTools, waitForUserReply } from './grove-tools'
@@ -152,7 +152,7 @@ ${userMessage}
 type Callbacks = {
 	onDone: () => void
 	onError: () => void
-	contentBlocks?: unknown[]
+	contentBlocks?: SDKUserMessage['message']['content']
 }
 
 export async function spawnPm(

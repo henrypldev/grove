@@ -1,7 +1,8 @@
 import { generateId, log } from '../config'
-import type { Agent, Team } from '../types'
+import type { Team } from '../types'
 import { createGroveTools } from './grove-tools'
-import { spawnAgent } from './runner'
+import type { PersistentAgentResult } from './runner'
+import { spawnPersistentAgent } from './runner'
 
 const TEAM_LEAD_PROMPT = (team: Team) => `
 You are the Team Lead for team ${team.id}. Your role is architecture, system design, and codebase audits.
@@ -104,10 +105,12 @@ FORMATTING RULE: All "text" values in post_event("agent:message") must be writte
 Approve unless there are critical or security issues.
 `
 
-export async function spawnTeamLead(team: Team): Promise<Agent> {
+export async function spawnTeamLead(
+	team: Team,
+): Promise<PersistentAgentResult> {
 	log('agent', 'spawning team lead', { teamId: team.id })
 	const agentId = generateId()
-	return spawnAgent({
+	return spawnPersistentAgent({
 		agentId,
 		teamId: team.id,
 		role: 'team-lead',
@@ -118,10 +121,12 @@ export async function spawnTeamLead(team: Team): Promise<Agent> {
 	})
 }
 
-export async function spawnDeveloper(team: Team): Promise<Agent> {
+export async function spawnDeveloper(
+	team: Team,
+): Promise<PersistentAgentResult> {
 	log('agent', 'spawning developer', { teamId: team.id })
 	const agentId = generateId()
-	return spawnAgent({
+	return spawnPersistentAgent({
 		agentId,
 		teamId: team.id,
 		role: 'dev',
@@ -132,10 +137,10 @@ export async function spawnDeveloper(team: Team): Promise<Agent> {
 	})
 }
 
-export async function spawnQaAgent(team: Team): Promise<Agent> {
+export async function spawnQaAgent(team: Team): Promise<PersistentAgentResult> {
 	log('agent', 'spawning QA', { teamId: team.id })
 	const agentId = generateId()
-	return spawnAgent({
+	return spawnPersistentAgent({
 		agentId,
 		teamId: team.id,
 		role: 'qa',
@@ -146,10 +151,12 @@ export async function spawnQaAgent(team: Team): Promise<Agent> {
 	})
 }
 
-export async function spawnReviewerAgent(team: Team): Promise<Agent> {
+export async function spawnReviewerAgent(
+	team: Team,
+): Promise<PersistentAgentResult> {
 	log('agent', 'spawning reviewer', { teamId: team.id })
 	const agentId = generateId()
-	return spawnAgent({
+	return spawnPersistentAgent({
 		agentId,
 		teamId: team.id,
 		role: 'reviewer',

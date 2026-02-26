@@ -1,9 +1,10 @@
+import type { Query } from '@anthropic-ai/claude-agent-sdk'
 import type { MessageQueue } from './message-queue'
 
 export interface RegisteredAgent {
 	agentId: string
 	queue: MessageQueue
-	session: { close(): void }
+	query: Query
 }
 
 const registry = new Map<string, Map<string, RegisteredAgent>>()
@@ -39,7 +40,7 @@ export function closeAgent(teamId: string, role: string) {
 	const entry = team.get(role)
 	if (entry) {
 		entry.queue.close()
-		entry.session.close()
+		entry.query.close()
 		team.delete(role)
 	}
 	if (team.size === 0) registry.delete(teamId)
@@ -50,7 +51,7 @@ export function closeAllAgents(teamId: string) {
 	if (!team) return
 	for (const entry of team.values()) {
 		entry.queue.close()
-		entry.session.close()
+		entry.query.close()
 	}
 	registry.delete(teamId)
 }

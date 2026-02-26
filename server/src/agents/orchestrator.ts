@@ -275,6 +275,7 @@ function watchTeamForCompletion(depTeamId: string, blockedTeamId: string) {
 					log('orchestrator', 'dependencies satisfied, spawning dev', {
 						teamId,
 					})
+					await mergeDependencyBranches(team)
 					const sha = await getHeadSha(team.worktreePath)
 					if (sha) devBaseCommit.set(teamId, sha)
 					await spawnDeveloper(team)
@@ -283,6 +284,30 @@ function watchTeamForCompletion(depTeamId: string, blockedTeamId: string) {
 		})
 	}
 	depWatchers.get(depTeamId)?.add(blockedTeamId)
+}
+
+async function mergeDependencyBranches(team: Team) {
+	const deps = dbGetTeamDependencies(team.id)
+	for (const dep of deps) {
+		const depTeam = dbGetTeam(dep.dependsOnTeamId)
+		if (!depTeam) continue
+		const depBranch = `grove-team-${dep.dependsOnTeamId}`
+		log('orchestrator', 'merging dependency branch', {
+			teamId: team.id,
+			depBranch,
+		})
+		const result =
+			await Bun.$`git -C ${team.worktreePath} merge ${depBranch} --no-edit`
+				.quiet()
+				.nothrow()
+		if (result.exitCode !== 0) {
+			log('orchestrator', 'dependency merge failed', {
+				teamId: team.id,
+				depBranch,
+				stderr: result.stderr.toString(),
+			})
+		}
+	}
 }
 
 async function spawnSpecialist(team: Team, role: AgentRole) {

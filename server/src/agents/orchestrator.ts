@@ -333,6 +333,7 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 			})
 			return
 		}
+		if (deps.length > 0) await mergeDependencyBranches(team)
 		const sha = await getHeadSha(team.worktreePath)
 		if (sha) devBaseCommit.set(team.id, sha)
 		await spawnDeveloper(team)

@@ -10,6 +10,15 @@ export interface SetupStep {
 	background?: boolean
 }
 
+export interface Script {
+	id: string
+	repoId: string
+	name: string
+	run: string
+	background?: boolean
+	createdAt: number
+}
+
 export interface Repo {
 	id: string
 	path: string

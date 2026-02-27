@@ -1,16 +1,12 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { computeDiff, getHeadSha } from '../api/diff'
+import { clearTeamPort, getTeamPort } from '../api/ports'
 import { unregisterTeamServe } from '../api/tailscale-serve'
 import { deleteWorktree } from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
 import { dbGetTeamDependencies } from '../db/team-dependencies'
-import {
-	dbGetTeam,
-	dbUpdateTeamPort,
-	dbUpdateTeamPrUrl,
-	dbUpdateTeamStatus,
-} from '../db/teams'
+import { dbGetTeam, dbUpdateTeamPrUrl, dbUpdateTeamStatus } from '../db/teams'
 import type { AgentRole, Team } from '../types'
 import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
 import { resolveUserReply } from './grove-tools'
@@ -225,10 +221,11 @@ export async function closeTeam(teamId: string) {
 	log('orchestrator', 'closing team', { teamId })
 	const team = dbGetTeam(teamId)
 	closeAllAgents(teamId)
-	if (team?.port) {
-		unregisterTeamServe(teamId, team.port)
-		await killPort(team.port)
-		dbUpdateTeamPort(teamId, null)
+	const port = getTeamPort(teamId)
+	if (port) {
+		unregisterTeamServe(teamId, port)
+		await killPort(port)
+		clearTeamPort(teamId)
 	}
 	dbUpdateTeamStatus(teamId, 'done')
 	if (team) {

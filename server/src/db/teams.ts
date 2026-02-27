@@ -40,7 +40,6 @@ export function dbInsertTeam(team: Team): void {
 			title: team.title,
 			status: team.status,
 			pmSummary: team.pmSummary,
-			port: team.port,
 			prUrl: team.prUrl,
 			createdAt: team.createdAt,
 			updatedAt: team.updatedAt,
@@ -81,19 +80,6 @@ export function dbUpdateTeamStatus(
 	})
 }
 
-export function dbUpdateTeamPort(id: string, port: number | null): void {
-	getDb()
-		.update(teams)
-		.set({ port, updatedAt: Date.now() })
-		.where(eq(teams.id, id))
-		.run()
-	broadcastToChannel('global', {
-		type: 'team:update',
-		channel: 'global',
-		data: { id, port },
-	})
-}
-
 export function dbUpdateTeamPrUrl(id: string, prUrl: string): void {
 	getDb()
 		.update(teams)
@@ -120,7 +106,6 @@ function toTeam(row: typeof teams.$inferSelect): Team {
 		title: row.title,
 		status: row.status as TeamStatus,
 		pmSummary: row.pmSummary,
-		port: row.port,
 		prUrl: row.prUrl,
 		createdAt: row.createdAt,
 		updatedAt: row.updatedAt,

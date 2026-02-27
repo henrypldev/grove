@@ -1,7 +1,7 @@
 import { log } from '../config'
 import { dbInsertEvent } from '../db/events'
-import { dbGetTeam } from '../db/teams'
 import type { Script } from '../types'
+import { getTeamPort } from './ports'
 
 interface ActiveScript {
 	teamId: string
@@ -68,8 +68,7 @@ export async function runScript(
 
 	let command = script.run
 	if (command.includes('{{PORT}}')) {
-		const team = dbGetTeam(teamId)
-		const port = team?.port
+		const port = getTeamPort(teamId)
 		if (port) {
 			command = command.replaceAll('{{PORT}}', String(port))
 		}

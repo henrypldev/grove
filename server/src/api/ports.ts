@@ -1,17 +1,31 @@
-import { dbListTeams } from '../db/teams'
+const teamPorts = new Map<string, number>()
 
-const PORT_MIN = 8082
-const PORT_MAX = 8099
+export function setTeamPort(teamId: string, port: number) {
+	teamPorts.set(teamId, port)
+}
 
-export function allocatePort(): number | null {
-	const teams = dbListTeams()
-	const usedPorts = new Set(
-		teams.map(t => t.port).filter((p): p is number => p !== null),
-	)
-	for (let port = PORT_MIN; port <= PORT_MAX; port++) {
-		if (!usedPorts.has(port)) return port
+export function getTeamPort(teamId: string): number | null {
+	return teamPorts.get(teamId) ?? null
+}
+
+export function clearTeamPort(teamId: string) {
+	teamPorts.delete(teamId)
+}
+
+export async function allocatePort(): Promise<number | null> {
+	try {
+		const server = Bun.serve({
+			port: 0,
+			fetch() {
+				return new Response()
+			},
+		})
+		const port = server.port
+		server.stop(true)
+		return port
+	} catch {
+		return null
 	}
-	return null
 }
 
 const activePorts = new Set<number>()
@@ -37,8 +51,7 @@ async function isPortListening(port: number): Promise<boolean> {
 }
 
 async function pollPorts() {
-	const teams = dbListTeams()
-	const ports = teams.map(t => t.port).filter((p): p is number => p !== null)
+	const ports = [...teamPorts.values()]
 	const results = await Promise.all(
 		ports.map(async port => ({ port, alive: await isPortListening(port) })),
 	)

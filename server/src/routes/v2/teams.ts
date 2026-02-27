@@ -1,5 +1,5 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
-import { isPortActive } from '../../api/ports'
+import { getTeamPort, isPortActive } from '../../api/ports'
 import { runScript, stopScript } from '../../api/scripts'
 import {
 	cancelTeamSetup,
@@ -156,7 +156,6 @@ export async function handleV2Teams(
 				title: null,
 				status: 'planning',
 				pmSummary: null,
-				port: null,
 				prUrl: null,
 				createdAt: now,
 				updatedAt: now,
@@ -197,7 +196,6 @@ export async function handleV2Teams(
 				title: null,
 				status: 'planning',
 				pmSummary: null,
-				port: null,
 				prUrl: null,
 				createdAt: now,
 				updatedAt: now,
@@ -244,12 +242,13 @@ export async function handleV2Teams(
 					{ status: 404, headers },
 				)
 			const agents = dbListAgentsByTeam(teamMatch.id)
-			const portAlive = team.port && isPortActive(team.port)
+			const port = getTeamPort(teamMatch.id)
+			const portAlive = port && isPortActive(port)
 			const devUrl = portAlive
-				? `https://${await getTerminalHost()}:${team.port}`
+				? `https://${await getTerminalHost()}:${port}`
 				: null
 			return Response.json(
-				{ ...team, port: portAlive ? team.port : null, devUrl, agents },
+				{ ...team, port: portAlive ? port : null, devUrl, agents },
 				{ headers },
 			)
 		}

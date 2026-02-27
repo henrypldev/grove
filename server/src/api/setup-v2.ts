@@ -1,9 +1,8 @@
 import { join } from 'node:path'
 import { log } from '../config'
 import { dbInsertEvent } from '../db/events'
-import { dbGetTeam, dbUpdateTeamPort } from '../db/teams'
 import type { SetupStep } from '../types'
-import { allocatePort } from './ports'
+import { allocatePort, setTeamPort } from './ports'
 
 interface SetupConfig {
 	setup: SetupStep[]
@@ -240,10 +239,9 @@ export async function startTeamSetup(
 	const needsPort = steps.some(s => s.run.includes('{{PORT}}'))
 	let port: number | undefined
 	if (needsPort) {
-		const team = dbGetTeam(teamId)
-		port = team?.port ?? allocatePort() ?? undefined
-		if (port && !team?.port) {
-			dbUpdateTeamPort(teamId, port)
+		port = (await allocatePort()) ?? undefined
+		if (port) {
+			setTeamPort(teamId, port)
 			log('setup', 'allocated port', { teamId, port })
 		}
 	}

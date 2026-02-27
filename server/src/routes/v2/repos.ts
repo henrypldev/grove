@@ -44,6 +44,7 @@ function triggerDetection(repo: Repo) {
 				emitGlobalEvent('repo:setup-detected', {
 					repoId: repo.id,
 					steps: result.steps,
+					scripts: result.scripts ?? [],
 					envVars: result.envVars ?? [],
 					fingerprint: result.fingerprint ?? null,
 					needsNativeBuild: result.needsNativeBuild ?? false,

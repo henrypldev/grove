@@ -1,10 +1,11 @@
 import { unstable_v2_prompt } from '@anthropic-ai/claude-agent-sdk'
-import { log } from '../config'
+import { generateId, log } from '../config'
 import {
 	dbUpdateRepoEnvVars,
 	dbUpdateRepoFingerprint,
 	dbUpdateRepoSetupSteps,
 } from '../db/repos'
+import { dbInsertScript } from '../db/scripts'
 import type { EnvVar, SetupStep } from '../types'
 
 const SETUP_DETECTOR_PROMPT = (
@@ -30,18 +31,24 @@ Do these steps exactly:
    - Run: npx @expo/fingerprint --json
    - Extract the hash from the output
    - Check if ios/ and android/ directories exist
-6. Detect environment variables:
+6. Extract useful on-demand scripts from package.json:
+   - Look at all scripts in package.json
+   - Pick ones useful to run on-demand: test, build, lint, typecheck, migrate, seed, format, etc.
+   - Skip dev/start scripts (those are already setup steps)
+   - Use "{pm} run {script}" format for each
+7. Detect environment variables:
    - Look for .env* files (e.g., .env, .env.local, .env.example) in the project root
    - If .env* files exist: parse them for KEY=VALUE pairs. For each, record { "key": "KEY", "value": "VALUE", "filePath": ".env" }
    - If NO .env* files exist: search source files (*.ts, *.tsx, *.js, *.jsx) for process.env.VARIABLE_NAME references. For each unique variable found, record { "key": "VARIABLE_NAME", "value": "", "filePath": "" }
    - Skip common built-in vars: NODE_ENV, PORT, HOME, PATH, CI
-7. Output ONLY a JSON object in this exact format (no other text):
+8. Output ONLY a JSON object in this exact format (no other text):
 
 {
   "steps": [
     { "name": "Install dependencies", "run": "bun install" },
     { "name": "Start dev server", "run": "bun run dev --port {{PORT}}", "background": true }
   ],
+  "scripts": [],
   "envVars": [
     { "key": "DATABASE_URL", "value": "postgres://...", "filePath": ".env" }
   ],
@@ -51,6 +58,7 @@ Do these steps exactly:
 
 Rules:
 - "steps" is required, always an array of SetupStep objects
+- "scripts" is optional, array of { name, run } objects for on-demand scripts. Omit if none found.
 - "envVars" is optional, array of { key, value, filePath } objects. Omit if no env vars found.
 - "fingerprint" is optional, only for Expo/RN projects (string or null)
 - "needsNativeBuild" is optional, true if Expo project is missing ios/ or android/ directories
@@ -61,6 +69,7 @@ Rules:
 
 export interface DetectionResult {
 	steps: SetupStep[]
+	scripts?: { name: string; run: string }[]
 	envVars?: EnvVar[]
 	fingerprint?: string | null
 	needsNativeBuild?: boolean
@@ -94,6 +103,17 @@ export async function detectSetupSteps(
 		}
 
 		dbUpdateRepoSetupSteps(repoId, parsed.steps)
+		if (parsed.scripts && parsed.scripts.length > 0) {
+			for (const s of parsed.scripts) {
+				dbInsertScript({
+					id: generateId(),
+					repoId,
+					name: s.name,
+					run: s.run,
+					createdAt: Date.now(),
+				})
+			}
+		}
 		if (parsed.envVars && parsed.envVars.length > 0) {
 			dbUpdateRepoEnvVars(repoId, parsed.envVars)
 		}

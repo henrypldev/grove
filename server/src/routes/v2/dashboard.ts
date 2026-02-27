@@ -1,4 +1,4 @@
-import { isPortActive } from '../../api/ports'
+import { getTeamPort, isPortActive } from '../../api/ports'
 import { dbListAgentsByTeam } from '../../db/agents'
 import { dbGetLatestEventByType } from '../../db/events'
 import { dbGetMetrics } from '../../db/metrics'
@@ -40,12 +40,13 @@ export async function handleV2Dashboard(
 				lastCommit = log.stdout.toString().trim()
 			} catch {}
 
+			const port = getTeamPort(team.id)
 			return {
 				id: team.id,
 				title: team.title,
 				status: team.status,
 				repoId: team.repoId,
-				port: team.port && isPortActive(team.port) ? team.port : null,
+				port: port && isPortActive(port) ? port : null,
 				agents: agents.map(a => ({
 					id: a.id,
 					role: a.role,

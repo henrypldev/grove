@@ -18,6 +18,17 @@ export const repos = sqliteTable('repos', {
 	addedAt: integer('added_at').notNull(),
 })
 
+export const scripts = sqliteTable('scripts', {
+	id: text('id').primaryKey(),
+	repoId: text('repo_id')
+		.notNull()
+		.references(() => repos.id),
+	name: text('name').notNull(),
+	run: text('run').notNull(),
+	background: integer('background'),
+	createdAt: integer('created_at').notNull(),
+})
+
 export const teams = sqliteTable('teams', {
 	id: text('id').primaryKey(),
 	repoId: text('repo_id')

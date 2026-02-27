@@ -1,5 +1,6 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { isPortActive } from '../../api/ports'
+import { runScript, stopScript } from '../../api/scripts'
 import {
 	cancelTeamSetup,
 	retryTeamSetup,
@@ -16,6 +17,7 @@ import { dbGetDesignDoc } from '../../db/design-docs'
 import { dbInsertEvent, dbListEventsSince } from '../../db/events'
 import { dbGetPrd } from '../../db/prds'
 import { dbGetRepo } from '../../db/repos'
+import { dbGetScript } from '../../db/scripts'
 import { dbInsertTeamDependency } from '../../db/team-dependencies'
 import {
 	dbArchiveTeam,
@@ -537,6 +539,45 @@ export async function handleV2Teams(
 				{ status: 400, headers },
 			)
 		const error = startTeamStep(setupStartMatch.id, body.step)
+		if (error) return Response.json({ error }, { status: 400, headers })
+		return Response.json({ success: true }, { headers })
+	}
+
+	const scriptRunMatch = matchRoute(
+		path,
+		'/v2/teams/:teamId/scripts/:scriptId/run',
+	)
+	if (scriptRunMatch && method === 'POST') {
+		const team = dbGetTeam(scriptRunMatch.teamId)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const script = dbGetScript(scriptRunMatch.scriptId)
+		if (!script)
+			return Response.json(
+				{ error: 'Script not found' },
+				{ status: 404, headers },
+			)
+		const error = await runScript(
+			scriptRunMatch.teamId,
+			team.worktreePath,
+			script,
+		)
+		if (error) return Response.json({ error }, { status: 400, headers })
+		return Response.json({ success: true }, { headers })
+	}
+
+	const scriptStopMatch = matchRoute(path, '/v2/teams/:id/scripts/stop')
+	if (scriptStopMatch && method === 'POST') {
+		const team = dbGetTeam(scriptStopMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		const error = stopScript(scriptStopMatch.id)
 		if (error) return Response.json({ error }, { status: 400, headers })
 		return Response.json({ success: true }, { headers })
 	}

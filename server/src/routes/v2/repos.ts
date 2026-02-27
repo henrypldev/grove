@@ -27,6 +27,13 @@ import {
 	dbListRepos,
 	dbUpdateRepoSetupSteps,
 } from '../../db/repos'
+import {
+	dbDeleteScript,
+	dbGetScript,
+	dbInsertScript,
+	dbListScriptsByRepo,
+	dbUpdateScript,
+} from '../../db/scripts'
 import { dbListTeamsByRepo } from '../../db/teams'
 import type { Repo } from '../../types'
 
@@ -314,6 +321,78 @@ export async function handleV2Repos(
 
 		triggerDetection(repo)
 		return Response.json({ detecting: true }, { headers })
+	}
+
+	const scriptsMatch = matchRoute(path, '/v2/repos/:id/scripts')
+	if (scriptsMatch) {
+		const repo = dbGetRepo(scriptsMatch.id)
+		if (!repo)
+			return Response.json(
+				{ error: 'Repo not found' },
+				{ status: 404, headers },
+			)
+
+		if (method === 'GET') {
+			return Response.json(dbListScriptsByRepo(scriptsMatch.id), { headers })
+		}
+
+		if (method === 'POST') {
+			const body = await req.json()
+			if (!body.name || !body.run)
+				return Response.json(
+					{ error: 'Missing name or run' },
+					{ status: 400, headers },
+				)
+			const { generateId } = await import('../../config')
+			const script = {
+				id: generateId(),
+				repoId: scriptsMatch.id,
+				name: body.name,
+				run: body.run,
+				background: body.background || undefined,
+				createdAt: Date.now(),
+			}
+			dbInsertScript(script)
+			return Response.json(script, { headers })
+		}
+	}
+
+	const scriptMatch = matchRoute(path, '/v2/scripts/:id')
+	if (scriptMatch) {
+		const script = dbGetScript(scriptMatch.id)
+		if (!script)
+			return Response.json(
+				{ error: 'Script not found' },
+				{ status: 404, headers },
+			)
+
+		if (method === 'PUT') {
+			const body = await req.json()
+			if (!body.name || !body.run)
+				return Response.json(
+					{ error: 'Missing name or run' },
+					{ status: 400, headers },
+				)
+			dbUpdateScript(scriptMatch.id, {
+				name: body.name,
+				run: body.run,
+				background: body.background || undefined,
+			})
+			return Response.json(
+				{
+					...script,
+					name: body.name,
+					run: body.run,
+					background: body.background || undefined,
+				},
+				{ headers },
+			)
+		}
+
+		if (method === 'DELETE') {
+			dbDeleteScript(scriptMatch.id)
+			return Response.json({ success: true }, { headers })
+		}
 	}
 
 	return null

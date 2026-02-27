@@ -23,6 +23,7 @@ export interface Repo {
 	id: string
 	path: string
 	name: string
+	framework?: string
 	envVars?: EnvVar[]
 	setupSteps?: SetupStep[]
 	fingerprint?: string

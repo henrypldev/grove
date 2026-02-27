@@ -14,6 +14,7 @@ export const repos = sqliteTable('repos', {
 	envVars: text('env_vars'),
 	setupSteps: text('setup_steps'),
 	fingerprint: text('fingerprint'),
+	framework: text('framework'),
 	needsNativeBuild: integer('needs_native_build'),
 	addedAt: integer('added_at').notNull(),
 })

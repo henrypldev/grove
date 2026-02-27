@@ -61,6 +61,15 @@ export function dbUpdateRepoEnvVars(
 	return result.changes > 0
 }
 
+export function dbUpdateRepoFramework(id: string, framework: string): boolean {
+	const result = getDb()
+		.update(repos)
+		.set({ framework })
+		.where(eq(repos.id, id))
+		.run() as unknown as { changes: number }
+	return result.changes > 0
+}
+
 export function dbUpdateRepoFingerprint(
 	id: string,
 	fingerprint: string,
@@ -82,6 +91,7 @@ function toRepo(row: typeof repos.$inferSelect): Repo {
 		id: row.id,
 		name: row.name,
 		path: row.path,
+		framework: row.framework ?? undefined,
 		envVars: row.envVars ? JSON.parse(row.envVars) : undefined,
 		setupSteps: row.setupSteps ? JSON.parse(row.setupSteps) : undefined,
 		fingerprint: row.fingerprint ?? undefined,

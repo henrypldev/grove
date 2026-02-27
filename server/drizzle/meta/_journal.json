@@ -43,6 +43,13 @@
       "when": 1772203544102,
       "tag": "0005_majestic_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1772211494203,
+      "tag": "0006_ordinary_madame_masque",
+      "breakpoints": true
     }
   ]
 }

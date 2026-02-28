@@ -71,6 +71,7 @@ Rules:
 - "needsNativeBuild" is optional, true if Expo project is missing ios/ or android/ directories
 - The dev server step MUST have "background": true
 - The dev server step MUST use {{PORT}} for port assignment
+- If needsNativeBuild is true (Expo project missing ios/ or android/), do NOT include the dev server step — only include the install step. The native build process handles the dev server.
 - Output ONLY the JSON object, nothing else
 `
 

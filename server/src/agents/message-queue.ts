@@ -4,7 +4,7 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
 	private buffer: SDKUserMessage[] = []
 	private resolve: ((value: IteratorResult<SDKUserMessage>) => void) | null =
 		null
-	private closed = false
+	closed = false
 	sessionId = ''
 
 	push(text: string) {

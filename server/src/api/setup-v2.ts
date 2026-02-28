@@ -1,7 +1,9 @@
 import { join } from 'node:path'
 import { log } from '../config'
 import { dbInsertEvent } from '../db/events'
+import { dbGetRepo } from '../db/repos'
 import type { SetupStep } from '../types'
+import { rebuildExpoBuild } from './expo-build'
 import { allocatePort, setTeamPort } from './ports'
 
 interface SetupConfig {
@@ -19,6 +21,7 @@ interface SetupStepState {
 interface ActiveSetup {
 	teamId: string
 	worktreePath: string
+	repoId?: string
 	port?: number
 	steps: SetupStepState[]
 	processes: Map<number, ReturnType<typeof Bun.spawn>>
@@ -194,6 +197,20 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 	if (setup.port) {
 		dbInsertEvent(setup.teamId, null, 'env:ready', { port: setup.port })
 	}
+
+	if (setup.repoId) {
+		const repo = dbGetRepo(setup.repoId)
+		if (repo?.needsNativeBuild) {
+			try {
+				await rebuildExpoBuild(setup.teamId, setup.worktreePath)
+			} catch (err) {
+				log('setup', 'expo build trigger failed', {
+					teamId: setup.teamId,
+					err,
+				})
+			}
+		}
+	}
 }
 
 function killProcess(proc: ReturnType<typeof Bun.spawn>) {
@@ -211,6 +228,7 @@ export async function startTeamSetup(
 	teamId: string,
 	worktreePath: string,
 	repoSetupSteps?: SetupStep[],
+	repoId?: string,
 ) {
 	const configPath = join(worktreePath, '.grove', 'setup.json')
 	const file = Bun.file(configPath)
@@ -249,6 +267,7 @@ export async function startTeamSetup(
 	const setup: ActiveSetup = {
 		teamId,
 		worktreePath,
+		repoId,
 		port,
 		steps: steps.map(s => ({
 			name: s.name,
@@ -271,9 +290,10 @@ export async function retryTeamSetup(
 	teamId: string,
 	worktreePath: string,
 	repoSetupSteps?: SetupStep[],
+	repoId?: string,
 ) {
 	cleanupTeamSetup(teamId)
-	return startTeamSetup(teamId, worktreePath, repoSetupSteps)
+	return startTeamSetup(teamId, worktreePath, repoSetupSteps, repoId)
 }
 
 export function cancelTeamSetup(teamId: string) {
@@ -364,6 +384,18 @@ export function startTeamStep(
 	const proc = spawnStep(setup, stepIndex)
 	monitorBackground(setup, stepIndex, proc)
 	return null
+}
+
+export function getTeamSetupLogs(
+	teamId: string,
+): Array<{ name: string; status: string; output: string }> | null {
+	const setup = activeSetups.get(teamId)
+	if (!setup) return null
+	return setup.steps.map(s => ({
+		name: s.name,
+		status: s.status,
+		output: s.output,
+	}))
 }
 
 export function cleanupTeamSetup(teamId: string) {

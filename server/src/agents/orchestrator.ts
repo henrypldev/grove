@@ -1,10 +1,13 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { computeDiff, getHeadSha } from '../api/diff'
+import { checkFingerprintAndRebuild, stopExpoBuild } from '../api/expo-build'
 import { clearTeamPort, getTeamPort } from '../api/ports'
+import { deleteTeamDevice } from '../api/simulator'
 import { unregisterTeamServe } from '../api/tailscale-serve'
 import { deleteWorktree } from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
+import { dbGetRepo } from '../db/repos'
 import { dbGetTeamDependencies } from '../db/team-dependencies'
 import { dbGetTeam, dbUpdateTeamPrUrl, dbUpdateTeamStatus } from '../db/teams'
 import type { AgentRole, Team } from '../types'
@@ -151,7 +154,14 @@ export async function routeMessageToAgents(
 	}
 
 	if (mentions.size === 0) {
-		const pmAgent = getAgent(team.id, 'pm')
+		let pmAgent = getAgent(team.id, 'pm')
+		if (pmAgent?.queue.closed) {
+			log('orchestrator', 'pm queue closed, cleaning up zombie', {
+				teamId: team.id,
+			})
+			closeAgent(team.id, 'pm')
+			pmAgent = undefined
+		}
 		if (!pmAgent) {
 			log('orchestrator', 'pm not found, respawning', { teamId: team.id })
 			await respawnPm(team, text, pmCallbacks)
@@ -176,7 +186,14 @@ export async function routeMessageToAgents(
 
 	for (const role of mentions) {
 		if (role === 'pm') {
-			const pmAgent = getAgent(team.id, 'pm')
+			let pmAgent = getAgent(team.id, 'pm')
+			if (pmAgent?.queue.closed) {
+				log('orchestrator', 'pm queue closed, cleaning up zombie', {
+					teamId: team.id,
+				})
+				closeAgent(team.id, 'pm')
+				pmAgent = undefined
+			}
 			if (!pmAgent) {
 				log('orchestrator', 'pm not found, respawning', { teamId: team.id })
 				await respawnPm(team, text, pmCallbacks)
@@ -196,6 +213,13 @@ export async function routeMessageToAgents(
 		}
 
 		let agent = getAgent(team.id, role)
+		if (agent?.queue.closed) {
+			log('orchestrator', `${role} queue closed, cleaning up zombie`, {
+				teamId: team.id,
+			})
+			closeAgent(team.id, role)
+			agent = undefined
+		}
 		if (!agent) {
 			await spawnSpecialist(team, role as AgentRole)
 			agent = getAgent(team.id, role)
@@ -221,6 +245,8 @@ export async function closeTeam(teamId: string) {
 	log('orchestrator', 'closing team', { teamId })
 	const team = dbGetTeam(teamId)
 	closeAllAgents(teamId)
+	stopExpoBuild(teamId)
+	await deleteTeamDevice(teamId)
 	const port = getTeamPort(teamId)
 	if (port) {
 		unregisterTeamServe(teamId, port)
@@ -275,7 +301,7 @@ function watchTeamForCompletion(depTeamId: string, blockedTeamId: string) {
 					await mergeDependencyBranches(team)
 					const sha = await getHeadSha(team.worktreePath)
 					if (sha) devBaseCommit.set(teamId, sha)
-					await spawnDeveloper(team)
+					await spawnDeveloper(team, { onPostBash: makeOnPostBash(team) })
 				}
 			}
 		})
@@ -307,6 +333,22 @@ async function mergeDependencyBranches(team: Team) {
 	}
 }
 
+function makeOnPostBash(team: Team): ((command: string) => void) | undefined {
+	const repo = dbGetRepo(team.repoId)
+	if (!repo?.needsNativeBuild) return undefined
+
+	const installPattern =
+		/\b(npm install|yarn add|pnpm add|bun add|bun install|expo install)\b/
+	return (command: string) => {
+		if (installPattern.test(command)) {
+			log('orchestrator', 'detected package install, checking fingerprint', {
+				teamId: team.id,
+			})
+			checkFingerprintAndRebuild(team.id, team.worktreePath, team.repoId)
+		}
+	}
+}
+
 async function spawnSpecialist(team: Team, role: AgentRole) {
 	log('orchestrator', `spawning specialist ${role}`, { teamId: team.id })
 	if (role === 'team-lead') await spawnTeamLead(team)
@@ -333,7 +375,7 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 		if (deps.length > 0) await mergeDependencyBranches(team)
 		const sha = await getHeadSha(team.worktreePath)
 		if (sha) devBaseCommit.set(team.id, sha)
-		await spawnDeveloper(team)
+		await spawnDeveloper(team, { onPostBash: makeOnPostBash(team) })
 	} else if (role === 'qa') await spawnQaAgent(team)
 	else if (role === 'reviewer') await spawnReviewerAgent(team)
 }

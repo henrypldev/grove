@@ -211,6 +211,20 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 			}
 		}
 	}
+
+	if (setup.repoId) {
+		const repo = dbGetRepo(setup.repoId)
+		if (repo?.needsNativeBuild) {
+			try {
+				await rebuildExpoBuild(setup.teamId, setup.worktreePath)
+			} catch (err) {
+				log('setup', 'expo build trigger failed', {
+					teamId: setup.teamId,
+					err,
+				})
+			}
+		}
+	}
 }
 
 function killProcess(proc: ReturnType<typeof Bun.spawn>) {

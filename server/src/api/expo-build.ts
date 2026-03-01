@@ -1,5 +1,5 @@
 import { log } from '../config'
-import { dbInsertLog } from '../db/logs'
+import { clearTeamLogs, dbInsertLog } from '../db/logs'
 import { dbGetRepo, dbUpdateRepoFingerprint } from '../db/repos'
 import { allocatePort, getTeamPort, setTeamPort } from './ports'
 import { createTeamDevice, getTeamDeviceUdid } from './simulator'
@@ -125,6 +125,7 @@ export async function startExpoBuild(
 	}
 
 	activeBuilds.set(teamId, build)
+	clearTeamLogs(teamId)
 	log('expo', 'build started', { teamId, deviceUdid, port })
 	emitProgress(teamId, 'building')
 

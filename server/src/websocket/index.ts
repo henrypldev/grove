@@ -6,13 +6,13 @@ import {
 	type SimulatorWsData,
 } from '../api/simulator-relay'
 import {
-	dbGetEventsSinceId,
-	subscribeToGlobalEvents,
-	subscribeToTeamEvents,
-} from '../db/events'
+	dbGetActivitySinceId,
+	subscribeToGlobalActivity,
+	subscribeToTeamActivity,
+} from '../db/activity'
 import { subscribeToTeamLogs } from '../db/logs'
 import type {
-	TeamEvent,
+	TeamActivity,
 	TeamLog,
 	WsClientMessage,
 	WsServerMessage,
@@ -57,11 +57,11 @@ function hasSubscribers(channel: string): boolean {
 
 function ensureTeamListener(teamId: string) {
 	if (!teamUnsubscribers.has(teamId)) {
-		const unsub = subscribeToTeamEvents(teamId, (event: TeamEvent) => {
+		const unsub = subscribeToTeamActivity(teamId, (item: TeamActivity) => {
 			broadcastToChannel(`team:${teamId}`, {
-				type: 'event',
+				type: 'activity',
 				channel: `team:${teamId}`,
-				data: event,
+				data: item,
 			})
 		})
 		teamUnsubscribers.set(teamId, unsub)
@@ -137,14 +137,14 @@ export const wsHandlers = {
 				const channel = msg.channel
 				if (channel.startsWith('team:')) {
 					const teamId = channel.slice(5)
-					const events = dbGetEventsSinceId(msg.sinceId).filter(
+					const items = dbGetActivitySinceId(msg.sinceId).filter(
 						e => e.teamId === teamId,
 					)
 					ws.send(
 						JSON.stringify({
 							type: 'replay:batch',
 							channel,
-							events,
+							activity: items,
 						} satisfies WsServerMessage),
 					)
 				}
@@ -176,11 +176,11 @@ let globalUnsub: (() => void) | null = null
 
 export function initWebSocketBridge() {
 	if (globalUnsub) return
-	globalUnsub = subscribeToGlobalEvents(event => {
+	globalUnsub = subscribeToGlobalActivity(item => {
 		broadcastToChannel('global', {
-			type: 'event',
+			type: 'activity',
 			channel: 'global',
-			data: event as unknown as TeamEvent,
+			data: item as unknown as TeamActivity,
 		})
 	})
 }

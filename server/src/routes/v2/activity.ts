@@ -1,9 +1,9 @@
 import { popAgentTools } from '../../agents/runner'
+import { dbInsertActivity } from '../../db/activity'
 import { dbGetAgent } from '../../db/agents'
-import { dbInsertEvent } from '../../db/events'
 import { dbGetTeam } from '../../db/teams'
 
-export async function handleV2Events(
+export async function handleV2Activity(
 	req: Request,
 	url: URL,
 	headers: Record<string, string>,
@@ -11,7 +11,7 @@ export async function handleV2Events(
 	const path = url.pathname
 	const method = req.method
 
-	if (path === '/v2/events' && method === 'POST') {
+	if (path === '/v2/activity' && method === 'POST') {
 		const body = (await req.json()) as {
 			teamId: string
 			agentId: string
@@ -44,13 +44,13 @@ export async function handleV2Events(
 			}
 		}
 
-		const event = dbInsertEvent(
+		const item = dbInsertActivity(
 			body.teamId,
 			body.agentId,
 			body.type,
 			body.payload,
 		)
-		return Response.json(event, { headers })
+		return Response.json(item, { headers })
 	}
 
 	return null

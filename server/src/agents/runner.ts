@@ -7,6 +7,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
+import { dbInsertActivity, emitEphemeralActivity } from '../db/activity'
 import {
 	dbGetAgent,
 	dbIncrementAgentRetry,
@@ -15,7 +16,6 @@ import {
 	dbUpdateAgentSessionId,
 	dbUpdateAgentStatus,
 } from '../db/agents'
-import { dbInsertEvent, emitEphemeralEvent } from '../db/events'
 import { dbInsertUsage } from '../db/usage'
 import type { Agent, AgentRole, ToolCall } from '../types'
 import { registerAgent } from './agent-registry'
@@ -102,7 +102,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 			},
 		})) {
 			if (message.type !== 'user') {
-				dbInsertEvent(
+				dbInsertActivity(
 					agent.teamId,
 					agent.id,
 					`sdk:${message.type}`,
@@ -203,7 +203,7 @@ async function processMessages(
 	try {
 		for await (const message of q) {
 			if (message.type !== 'user') {
-				dbInsertEvent(
+				dbInsertActivity(
 					agent.teamId,
 					agent.id,
 					`sdk:${message.type}`,
@@ -266,10 +266,15 @@ function buildHooks(
 						})
 						const activity = activityFromToolName(h.tool_name)
 						dbUpdateAgentActivity(agent.id, activity)
-						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-							status: 'working',
-							activity,
-						})
+						emitEphemeralActivity(
+							agent.teamId,
+							agent.id,
+							'agent:status_change',
+							{
+								status: 'working',
+								activity,
+							},
+						)
 						return {}
 					},
 				],
@@ -299,10 +304,15 @@ function buildHooks(
 							}
 						}
 						dbUpdateAgentActivity(agent.id, null)
-						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-							status: 'working',
-							activity: null,
-						})
+						emitEphemeralActivity(
+							agent.teamId,
+							agent.id,
+							'agent:status_change',
+							{
+								status: 'working',
+								activity: null,
+							},
+						)
 						return {}
 					},
 				],
@@ -322,10 +332,15 @@ function buildHooks(
 							pending.delete(h.tool_use_id)
 						}
 						dbUpdateAgentActivity(agent.id, null)
-						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-							status: 'working',
-							activity: null,
-						})
+						emitEphemeralActivity(
+							agent.teamId,
+							agent.id,
+							'agent:status_change',
+							{
+								status: 'working',
+								activity: null,
+							},
+						)
 						return {}
 					},
 				],

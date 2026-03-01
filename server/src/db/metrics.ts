@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm'
 import { getDb } from './index'
-import { agents, agentTasks, events, teams } from './schema'
+import { activity, agents, agentTasks, teams } from './schema'
 
 export function dbGetMetrics() {
 	const db = getDb()
@@ -28,11 +28,11 @@ export function dbGetMetrics() {
 
 	const eventRows = db
 		.select({
-			type: events.type,
+			type: activity.type,
 			count: sql<number>`count(*)`,
 		})
-		.from(events)
-		.groupBy(events.type)
+		.from(activity)
+		.groupBy(activity.type)
 		.all()
 
 	const eventCounts: Record<string, number> = {}

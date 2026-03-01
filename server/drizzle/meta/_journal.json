@@ -57,6 +57,20 @@
       "when": 1772395483866,
       "tag": "0007_minor_squadron_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1772524800000,
+      "tag": "0008_rename_events_to_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1772397933865,
+      "tag": "0009_drop_logs_table",
+      "breakpoints": true
     }
   ]
 }

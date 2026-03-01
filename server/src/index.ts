@@ -4,8 +4,8 @@ import { startPortPoller } from './api/ports'
 import { log, setLogsEnabled } from './config'
 import { getDb } from './db'
 import { handleV1 } from './routes/v1'
+import { handleV2Activity } from './routes/v2/activity'
 import { handleV2Dashboard } from './routes/v2/dashboard'
-import { handleV2Events } from './routes/v2/events'
 import { handleV2Repos } from './routes/v2/repos'
 import { handleV2Teams, setTeamCreatedHook } from './routes/v2/teams'
 import { handleV2Usage } from './routes/v2/usage'
@@ -103,8 +103,8 @@ export async function startServer(port: number) {
 				const v2TeamsResponse = await handleV2Teams(req, url, headers)
 				if (v2TeamsResponse) return v2TeamsResponse
 
-				const v2EventsResponse = await handleV2Events(req, url, headers)
-				if (v2EventsResponse) return v2EventsResponse
+				const v2ActivityResponse = await handleV2Activity(req, url, headers)
+				if (v2ActivityResponse) return v2ActivityResponse
 
 				const v1Response = await handleV1(req, url, headers)
 				if (v1Response) return v1Response

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { dbInsertAgent } from '../agents'
 import {
-	dbGetEventsSinceId,
-	dbGetLatestEventId,
-	dbInsertEvent,
-	dbListEventsSince,
-	emitEphemeralEvent,
-	subscribeToTeamEvents,
-} from '../events'
+	dbGetActivitySinceId,
+	dbGetLatestActivityId,
+	dbInsertActivity,
+	dbListActivitySince,
+	emitEphemeralActivity,
+	subscribeToTeamActivity,
+} from '../activity'
+import { dbInsertAgent } from '../agents'
 import { dbInsertRepo } from '../repos'
 import { dbInsertTeam } from '../teams'
 import { makeTestDb } from './helpers'
@@ -44,7 +44,7 @@ const AGENT = {
 	updatedAt: 1000,
 }
 
-describe('db/events', () => {
+describe('db/activity', () => {
 	beforeEach(() => {
 		makeTestDb()
 		dbInsertRepo(REPO)
@@ -52,48 +52,48 @@ describe('db/events', () => {
 		dbInsertAgent(AGENT)
 	})
 
-	test('getLatestEventId returns 0 when empty', () => {
-		expect(dbGetLatestEventId()).toBe(0)
+	test('getLatestActivityId returns 0 when empty', () => {
+		expect(dbGetLatestActivityId()).toBe(0)
 	})
 
-	test('insertEvent returns event with numeric id', () => {
-		const ev = dbInsertEvent('t1', 'a1', 'test:event', { foo: 'bar' })
+	test('insertActivity returns item with numeric id', () => {
+		const ev = dbInsertActivity('t1', 'a1', 'test:event', { foo: 'bar' })
 		expect(typeof ev.id).toBe('number')
 		expect(ev.teamId).toBe('t1')
 		expect(ev.type).toBe('test:event')
 		expect(JSON.parse(ev.payload)).toEqual({ foo: 'bar' })
 	})
 
-	test('getLatestEventId after insert', () => {
-		dbInsertEvent('t1', 'a1', 'e', {})
-		const id = dbGetLatestEventId()
+	test('getLatestActivityId after insert', () => {
+		dbInsertActivity('t1', 'a1', 'e', {})
+		const id = dbGetLatestActivityId()
 		expect(id).toBeGreaterThan(0)
 	})
 
-	test('listEventsSince filters by time', async () => {
-		dbInsertEvent('t1', 'a1', 'e1', {})
+	test('listActivitySince filters by time', async () => {
+		dbInsertActivity('t1', 'a1', 'e1', {})
 		await Bun.sleep(2)
 		const mid = Date.now()
 		await Bun.sleep(2)
-		dbInsertEvent('t1', 'a1', 'e2', {})
-		const events = dbListEventsSince('t1', mid)
-		expect(events).toHaveLength(1)
-		expect(events[0].type).toBe('e2')
+		dbInsertActivity('t1', 'a1', 'e2', {})
+		const items = dbListActivitySince('t1', mid)
+		expect(items).toHaveLength(1)
+		expect(items[0].type).toBe('e2')
 	})
 
-	test('getEventsSinceId returns only newer', () => {
-		const e1 = dbInsertEvent('t1', 'a1', 'e1', {})
-		dbInsertEvent('t1', 'a1', 'e2', {})
-		const events = dbGetEventsSinceId(e1.id)
-		expect(events).toHaveLength(1)
-		expect(events[0].type).toBe('e2')
+	test('getActivitySinceId returns only newer', () => {
+		const e1 = dbInsertActivity('t1', 'a1', 'e1', {})
+		dbInsertActivity('t1', 'a1', 'e2', {})
+		const items = dbGetActivitySinceId(e1.id)
+		expect(items).toHaveLength(1)
+		expect(items[0].type).toBe('e2')
 	})
 
-	test('emitEphemeralEvent fires listeners without persisting', () => {
+	test('emitEphemeralActivity fires listeners without persisting', () => {
 		const received: unknown[] = []
-		const unsub = subscribeToTeamEvents('t1', ev => received.push(ev))
+		const unsub = subscribeToTeamActivity('t1', ev => received.push(ev))
 
-		emitEphemeralEvent('t1', 'a1', 'agent:status_change', {
+		emitEphemeralActivity('t1', 'a1', 'agent:status_change', {
 			status: 'working',
 			activity: 'reading files',
 		})
@@ -102,11 +102,11 @@ describe('db/events', () => {
 		const ev = received[0] as { type: string; id: number }
 		expect(ev.type).toBe('agent:status_change')
 		expect(ev.id).toBe(-1)
-		expect(dbListEventsSince('t1', 0)).toHaveLength(0)
+		expect(dbListActivitySince('t1', 0)).toHaveLength(0)
 		unsub()
 	})
 
-	test('listEventsSince filters by team', () => {
+	test('listActivitySince filters by team', () => {
 		dbInsertRepo({
 			id: 'r2',
 			name: 'r2',
@@ -138,9 +138,9 @@ describe('db/events', () => {
 			spawnedAt: 1000,
 			updatedAt: 1000,
 		})
-		dbInsertEvent('t1', 'a1', 'for-t1', {})
-		dbInsertEvent('t2', 'a2', 'for-t2', {})
-		expect(dbListEventsSince('t1', 0)).toHaveLength(1)
-		expect(dbListEventsSince('t2', 0)).toHaveLength(1)
+		dbInsertActivity('t1', 'a1', 'for-t1', {})
+		dbInsertActivity('t2', 'a2', 'for-t2', {})
+		expect(dbListActivitySince('t1', 0)).toHaveLength(1)
+		expect(dbListActivitySince('t2', 0)).toHaveLength(1)
 	})
 })

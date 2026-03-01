@@ -18,11 +18,11 @@ import {
 import { getTeamDeviceUdid } from '../../api/simulator'
 import { createWorktree } from '../../api/worktrees'
 import { generateId, getTerminalHost } from '../../config'
+import { dbInsertActivity, dbListActivitySince } from '../../db/activity'
 import { dbGetNote } from '../../db/agent-notes'
 import { dbListTasks } from '../../db/agent-tasks'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
 import { dbGetDesignDoc } from '../../db/design-docs'
-import { dbInsertEvent, dbListEventsSince } from '../../db/events'
 import { dbListLogsSince } from '../../db/logs'
 import { dbGetPrd } from '../../db/prds'
 import { dbGetRepo } from '../../db/repos'
@@ -428,7 +428,7 @@ export async function handleV2Teams(
 			if (body.answers) {
 				const { resolveUserReply } = await import('../../agents/grove-tools')
 				if (resolveUserReply(team.id, body.answers)) {
-					const event = dbInsertEvent(team.id, null, 'user:answers', {
+					const event = dbInsertActivity(team.id, null, 'user:answers', {
 						answers: body.answers,
 					})
 					return Response.json(event, { headers })
@@ -447,7 +447,7 @@ export async function handleV2Teams(
 						return { type: b.type as string, mediaType: src.media_type }
 					})
 			: undefined
-		const event = dbInsertEvent(team.id, null, 'user:message', {
+		const event = dbInsertActivity(team.id, null, 'user:message', {
 			text,
 			...(attachments?.length ? { attachments } : {}),
 		})
@@ -456,11 +456,11 @@ export async function handleV2Teams(
 		return Response.json(event, { headers })
 	}
 
-	const eventsMatch = matchRoute(path, '/v2/teams/:id/events')
-	if (eventsMatch && method === 'GET') {
+	const activityMatch = matchRoute(path, '/v2/teams/:id/activity')
+	if (activityMatch && method === 'GET') {
 		const since = Number(url.searchParams.get('since') ?? '0')
-		const events = dbListEventsSince(eventsMatch.id, since)
-		return Response.json(events, { headers })
+		const items = dbListActivitySince(activityMatch.id, since)
+		return Response.json(items, { headers })
 	}
 
 	const logsMatch = matchRoute(path, '/v2/teams/:id/logs')

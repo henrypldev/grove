@@ -1,10 +1,10 @@
 import { createSdkMcpServer, tool } from '@anthropic-ai/claude-agent-sdk'
 import { z } from 'zod'
+import { dbInsertActivity, dbListActivitySince } from '../db/activity'
 import { dbGetNote, dbUpsertNote } from '../db/agent-notes'
 import { dbInsertTasks, dbListTasks, dbUpdateTask } from '../db/agent-tasks'
 import { dbUpdateAgentStatus } from '../db/agents'
 import { dbGetDesignDoc, dbUpsertDesignDoc } from '../db/design-docs'
-import { dbInsertEvent, dbListEventsSince } from '../db/events'
 import { dbGetPrd, dbUpsertPrd } from '../db/prds'
 import { dbGetTeam, dbListTeams } from '../db/teams'
 
@@ -45,7 +45,7 @@ export function waitForUserReply(
 	agentId: string,
 	questions: Question[],
 ): Promise<Record<string, string>> {
-	dbInsertEvent(teamId, agentId, 'pm:questions', { questions })
+	dbInsertActivity(teamId, agentId, 'pm:questions', { questions })
 	dbUpdateAgentStatus(agentId, 'waiting')
 	return new Promise<Record<string, string>>(resolve => {
 		pendingUserReplies.set(teamId, (answers: Record<string, string>) => {
@@ -72,8 +72,8 @@ export function createGroveTools(teamId: string, agentId: string) {
 		version: '1.0.0',
 		tools: [
 			tool(
-				'post_event',
-				'Post an event to this team',
+				'post_activity',
+				'Post an activity entry to this team',
 				{
 					type: z
 						.string()
@@ -83,7 +83,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 						.describe('Event payload as a JSON object'),
 				},
 				async ({ type, payload }) => {
-					dbInsertEvent(
+					dbInsertActivity(
 						teamId,
 						agentId,
 						type,
@@ -93,17 +93,17 @@ export function createGroveTools(teamId: string, agentId: string) {
 				},
 			),
 			tool(
-				'get_events',
-				'Get all team events since a timestamp',
+				'get_activity',
+				'Get all team activity since a timestamp',
 				{
 					since: z
 						.number()
 						.optional()
-						.describe('Unix ms timestamp. Defaults to 0 (all events)'),
+						.describe('Unix ms timestamp. Defaults to 0 (all activity)'),
 				},
 				async ({ since }) => {
-					const events = dbListEventsSince(teamId, since ?? 0)
-					const parsed = events.map(e => ({
+					const items = dbListActivitySince(teamId, since ?? 0)
+					const parsed = items.map(e => ({
 						...e,
 						payload: JSON.parse(e.payload),
 					}))
@@ -120,7 +120,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 				},
 				async ({ content }) => {
 					dbUpsertPrd(teamId, agentId, content)
-					dbInsertEvent(teamId, agentId, 'prd:ready', {})
+					dbInsertActivity(teamId, agentId, 'prd:ready', {})
 					return {
 						content: [{ type: 'text' as const, text: 'saved prd' }],
 					}
@@ -145,7 +145,7 @@ export function createGroveTools(teamId: string, agentId: string) {
 				},
 				async ({ content }) => {
 					dbUpsertDesignDoc(teamId, agentId, content)
-					dbInsertEvent(teamId, agentId, 'design_doc:ready', {})
+					dbInsertActivity(teamId, agentId, 'design_doc:ready', {})
 					return {
 						content: [{ type: 'text' as const, text: 'saved design doc' }],
 					}

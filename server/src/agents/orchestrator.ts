@@ -6,7 +6,7 @@ import { deleteTeamDevice } from '../api/simulator'
 import { unregisterTeamServe } from '../api/tailscale-serve'
 import { deleteWorktree } from '../api/worktrees'
 import { log } from '../config'
-import { dbInsertEvent, subscribeToTeamEvents } from '../db/events'
+import { dbInsertActivity, subscribeToTeamActivity } from '../db/activity'
 import { dbGetRepo } from '../db/repos'
 import { dbGetTeamDependencies } from '../db/team-dependencies'
 import { dbGetTeam, dbUpdateTeamPrUrl, dbUpdateTeamStatus } from '../db/teams'
@@ -47,7 +47,7 @@ export async function onNewTeam(
 		contentBlocks,
 	})
 
-	subscribeToTeamEvents(team.id, async event => {
+	subscribeToTeamActivity(team.id, async event => {
 		if (event.type !== 'agent:message') return
 
 		let payload: { text?: string }
@@ -66,7 +66,7 @@ export async function onNewTeam(
 		await routeMessageToAgents(team, text, event.agentId ?? undefined)
 	})
 
-	subscribeToTeamEvents(team.id, async event => {
+	subscribeToTeamActivity(team.id, async event => {
 		if (event.type === 'task:complete') {
 			log('orchestrator', 'task complete, cycling dev agent', {
 				teamId: team.id,
@@ -75,7 +75,7 @@ export async function onNewTeam(
 		}
 	})
 
-	subscribeToTeamEvents(team.id, async event => {
+	subscribeToTeamActivity(team.id, async event => {
 		if (event.type === 'dev:complete') {
 			let payload: { summary?: string }
 			try {
@@ -89,7 +89,7 @@ export async function onNewTeam(
 			const base = devBaseCommit.get(team.id)
 			const diff = await computeDiff(team.worktreePath, base)
 			devBaseCommit.delete(team.id)
-			dbInsertEvent(team.id, event.agentId, 'agent:message', {
+			dbInsertActivity(team.id, event.agentId, 'agent:message', {
 				text: `@pm done. ${payload.summary ?? ''}`,
 				diff: diff ?? undefined,
 			})
@@ -280,7 +280,7 @@ const depWatchers = new Map<string, Set<string>>()
 function watchTeamForCompletion(depTeamId: string, blockedTeamId: string) {
 	if (!depWatchers.has(depTeamId)) {
 		depWatchers.set(depTeamId, new Set())
-		subscribeToTeamEvents(depTeamId, async event => {
+		subscribeToTeamActivity(depTeamId, async event => {
 			if (event.type !== 'pm:summary') return
 			const blocked = depWatchers.get(depTeamId)
 			if (!blocked) return
@@ -367,7 +367,7 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 			for (const dep of unsatisfied) {
 				watchTeamForCompletion(dep.dependsOnTeamId, team.id)
 			}
-			dbInsertEvent(team.id, null, 'agent:message', {
+			dbInsertActivity(team.id, null, 'agent:message', {
 				text: '@pm Dev work is waiting for dependent teams to complete.',
 			})
 			return

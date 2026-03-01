@@ -111,7 +111,7 @@ export interface AgentMessagePayload {
 	tools: ToolCall[]
 }
 
-export interface TeamEvent {
+export interface TeamActivity {
 	id: number
 	teamId: string
 	agentId: string | null
@@ -148,7 +148,7 @@ export type WsClientMessage =
 	| { type: 'ping' }
 
 export type WsServerMessage =
-	| { type: 'event'; channel: string; data: TeamEvent }
+	| { type: 'activity'; channel: string; data: TeamActivity }
 	| { type: 'log'; channel: string; data: TeamLog }
 	| {
 			type: 'team:update'
@@ -160,6 +160,6 @@ export type WsServerMessage =
 			channel: string
 			data: Partial<Agent> & { id: string; teamId: string }
 	  }
-	| { type: 'replay:batch'; channel: string; events: TeamEvent[] }
+	| { type: 'replay:batch'; channel: string; activity: TeamActivity[] }
 	| { type: 'connected' }
 	| { type: 'pong' }

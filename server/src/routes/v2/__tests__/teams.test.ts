@@ -177,10 +177,10 @@ describe('handleV2Teams', () => {
 		expect(await res?.json()).toHaveLength(1)
 	})
 
-	test('GET /v2/teams/:id/events filters by since', async () => {
+	test('GET /v2/teams/:id/activity filters by since', async () => {
 		const res = await handleV2Teams(
 			makeReq('GET'),
-			makeUrl('/v2/teams/t1/events', '?since=0'),
+			makeUrl('/v2/teams/t1/activity', '?since=0'),
 			headers,
 		)
 		expect(await res?.json()).toEqual([])

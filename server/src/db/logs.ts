@@ -1,10 +1,10 @@
-import { and, asc, desc, eq, gt } from 'drizzle-orm'
 import type { TeamLog } from '../types'
-import { getDb } from './index'
-import { logs } from './schema'
 
 type LogListener = (log: TeamLog) => void
 const listeners = new Map<string, Set<LogListener>>()
+
+const store = new Map<string, TeamLog[]>()
+let nextId = 1
 
 export function subscribeToTeamLogs(
 	teamId: string,
@@ -19,52 +19,42 @@ export function subscribeToTeamLogs(
 	}
 }
 
+export function clearTeamLogs(teamId: string): void {
+	store.delete(teamId)
+}
+
 export function dbInsertLog(
 	teamId: string,
 	type: string,
 	payload: Record<string, unknown>,
 ): TeamLog {
 	const now = Date.now()
-	const result = getDb()
-		.insert(logs)
-		.values({
-			teamId,
-			type,
-			payload: JSON.stringify(payload),
-			createdAt: now,
-		})
-		.run() as unknown as { lastInsertRowid: number }
 	const log: TeamLog = {
-		id: Number(result.lastInsertRowid),
+		id: nextId++,
 		teamId,
 		type,
 		payload: JSON.stringify(payload),
 		createdAt: now,
 	}
+	const logs = store.get(teamId) ?? []
+	logs.push(log)
+	store.set(teamId, logs)
 	for (const fn of listeners.get(teamId) ?? []) fn(log)
 	return log
 }
 
 export function dbListLogsSince(teamId: string, since: number): TeamLog[] {
-	return getDb()
-		.select()
-		.from(logs)
-		.where(and(eq(logs.teamId, teamId), gt(logs.createdAt, since)))
-		.orderBy(asc(logs.createdAt))
-		.all()
+	const logs = store.get(teamId) ?? []
+	return logs.filter(l => l.createdAt > since)
 }
 
 export function dbGetLatestLogByType(
 	teamId: string,
 	type: string,
 ): TeamLog | null {
-	return (
-		getDb()
-			.select()
-			.from(logs)
-			.where(and(eq(logs.teamId, teamId), eq(logs.type, type)))
-			.orderBy(desc(logs.createdAt))
-			.limit(1)
-			.get() ?? null
-	)
+	const logs = store.get(teamId) ?? []
+	for (let i = logs.length - 1; i >= 0; i--) {
+		if (logs[i].type === type) return logs[i]
+	}
+	return null
 }

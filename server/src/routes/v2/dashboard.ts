@@ -1,6 +1,6 @@
 import { getTeamPort, isPortActive } from '../../api/ports'
 import { dbListAgentsByTeam } from '../../db/agents'
-import { dbGetLatestEventByType } from '../../db/events'
+import { dbGetLatestLogByType } from '../../db/logs'
 import { dbGetMetrics } from '../../db/metrics'
 import { dbListTeams } from '../../db/teams'
 
@@ -16,7 +16,7 @@ export async function handleV2Dashboard(
 		const teams = dbListTeams()
 		const dashboard = teams.map(team => {
 			const agents = dbListAgentsByTeam(team.id)
-			const envReady = dbGetLatestEventByType(team.id, 'env:ready')
+			const envReady = dbGetLatestLogByType(team.id, 'env:ready')
 			let envInfo: Record<string, unknown> | null = null
 			if (envReady) {
 				try {

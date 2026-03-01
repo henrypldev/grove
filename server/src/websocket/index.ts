@@ -10,7 +10,13 @@ import {
 	subscribeToGlobalEvents,
 	subscribeToTeamEvents,
 } from '../db/events'
-import type { TeamEvent, WsClientMessage, WsServerMessage } from '../types'
+import { subscribeToTeamLogs } from '../db/logs'
+import type {
+	TeamEvent,
+	TeamLog,
+	WsClientMessage,
+	WsServerMessage,
+} from '../types'
 
 type WsClientData = { type?: undefined; clientId: string } | SimulatorWsData
 
@@ -22,6 +28,7 @@ interface WsClient {
 
 const clients = new Map<string, WsClient>()
 const teamUnsubscribers = new Map<string, () => void>()
+const teamLogUnsubscribers = new Map<string, () => void>()
 
 export function broadcastToChannel(channel: string, message: WsServerMessage) {
 	for (const client of clients.values()) {
@@ -49,15 +56,26 @@ function hasSubscribers(channel: string): boolean {
 }
 
 function ensureTeamListener(teamId: string) {
-	if (teamUnsubscribers.has(teamId)) return
-	const unsub = subscribeToTeamEvents(teamId, (event: TeamEvent) => {
-		broadcastToChannel(`team:${teamId}`, {
-			type: 'event',
-			channel: `team:${teamId}`,
-			data: event,
+	if (!teamUnsubscribers.has(teamId)) {
+		const unsub = subscribeToTeamEvents(teamId, (event: TeamEvent) => {
+			broadcastToChannel(`team:${teamId}`, {
+				type: 'event',
+				channel: `team:${teamId}`,
+				data: event,
+			})
 		})
-	})
-	teamUnsubscribers.set(teamId, unsub)
+		teamUnsubscribers.set(teamId, unsub)
+	}
+	if (!teamLogUnsubscribers.has(teamId)) {
+		const unsub = subscribeToTeamLogs(teamId, (log: TeamLog) => {
+			broadcastToChannel(`team:${teamId}`, {
+				type: 'log',
+				channel: `team:${teamId}`,
+				data: log,
+			})
+		})
+		teamLogUnsubscribers.set(teamId, unsub)
+	}
 }
 
 function maybeRemoveTeamListener(teamId: string) {
@@ -66,6 +84,11 @@ function maybeRemoveTeamListener(teamId: string) {
 	if (unsub) {
 		unsub()
 		teamUnsubscribers.delete(teamId)
+	}
+	const logUnsub = teamLogUnsubscribers.get(teamId)
+	if (logUnsub) {
+		logUnsub()
+		teamLogUnsubscribers.delete(teamId)
 	}
 }
 

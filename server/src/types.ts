@@ -120,6 +120,14 @@ export interface TeamEvent {
 	createdAt: number
 }
 
+export interface TeamLog {
+	id: number
+	teamId: string
+	type: string
+	payload: string
+	createdAt: number
+}
+
 export interface PmReport {
 	id: number
 	teamId: string
@@ -141,6 +149,7 @@ export type WsClientMessage =
 
 export type WsServerMessage =
 	| { type: 'event'; channel: string; data: TeamEvent }
+	| { type: 'log'; channel: string; data: TeamLog }
 	| {
 			type: 'team:update'
 			channel: 'global'

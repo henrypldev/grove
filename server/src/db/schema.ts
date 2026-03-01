@@ -78,6 +78,20 @@ export const events = sqliteTable(
 	],
 )
 
+export const logs = sqliteTable(
+	'logs',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		teamId: text('team_id')
+			.notNull()
+			.references(() => teams.id),
+		type: text('type').notNull(),
+		payload: text('payload').notNull(),
+		createdAt: integer('created_at').notNull(),
+	},
+	table => [index('idx_logs_team_created').on(table.teamId, table.createdAt)],
+)
+
 export const pmReports = sqliteTable('pm_reports', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	teamId: text('team_id')

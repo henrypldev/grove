@@ -23,6 +23,7 @@ import { dbListTasks } from '../../db/agent-tasks'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
 import { dbGetDesignDoc } from '../../db/design-docs'
 import { dbInsertEvent, dbListEventsSince } from '../../db/events'
+import { dbListLogsSince } from '../../db/logs'
 import { dbGetPrd } from '../../db/prds'
 import { dbGetRepo } from '../../db/repos'
 import { dbGetScript } from '../../db/scripts'
@@ -460,6 +461,13 @@ export async function handleV2Teams(
 		const since = Number(url.searchParams.get('since') ?? '0')
 		const events = dbListEventsSince(eventsMatch.id, since)
 		return Response.json(events, { headers })
+	}
+
+	const logsMatch = matchRoute(path, '/v2/teams/:id/logs')
+	if (logsMatch && method === 'GET') {
+		const since = Number(url.searchParams.get('since') ?? '0')
+		const teamLogs = dbListLogsSince(logsMatch.id, since)
+		return Response.json(teamLogs, { headers })
 	}
 
 	const prdMatch = matchRoute(path, '/v2/teams/:id/prd')

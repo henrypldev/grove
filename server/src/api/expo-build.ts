@@ -1,5 +1,5 @@
 import { log } from '../config'
-import { dbInsertEvent } from '../db/events'
+import { dbInsertLog } from '../db/logs'
 import { dbGetRepo, dbUpdateRepoFingerprint } from '../db/repos'
 import { allocatePort, getTeamPort, setTeamPort } from './ports'
 import { createTeamDevice, getTeamDeviceUdid } from './simulator'
@@ -17,11 +17,11 @@ interface ActiveExpoBuild {
 const activeBuilds = new Map<string, ActiveExpoBuild>()
 
 function emitOutput(teamId: string, chunk: string) {
-	dbInsertEvent(teamId, null, 'expo_build_output', { chunk })
+	dbInsertLog(teamId, 'expo_build_output', { chunk })
 }
 
 function emitProgress(teamId: string, status: string) {
-	dbInsertEvent(teamId, null, 'expo_build', { status })
+	dbInsertLog(teamId, 'expo_build', { status })
 }
 
 async function streamOutput(
@@ -192,7 +192,7 @@ export async function rebuildExpoBuild(
 	}
 
 	startExpoBuild(teamId, worktreePath, udid, port)
-	dbInsertEvent(teamId, null, 'simulator:device_created', {
+	dbInsertLog(teamId, 'simulator:device_created', {
 		udid,
 		name: `grove-team-${teamId}`,
 		port,

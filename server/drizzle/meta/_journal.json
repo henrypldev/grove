@@ -1,55 +1,62 @@
 {
-	"version": "7",
-	"dialect": "sqlite",
-	"entries": [
-		{
-			"idx": 0,
-			"version": "6",
-			"when": 1771947066054,
-			"tag": "0000_numerous_morlun",
-			"breakpoints": true
-		},
-		{
-			"idx": 1,
-			"version": "6",
-			"when": 1771972005947,
-			"tag": "0001_keen_barracuda",
-			"breakpoints": true
-		},
-		{
-			"idx": 2,
-			"version": "6",
-			"when": 1772025336827,
-			"tag": "0002_brown_sway",
-			"breakpoints": true
-		},
-		{
-			"idx": 3,
-			"version": "6",
-			"when": 1772092800000,
-			"tag": "0003_split_plans",
-			"breakpoints": true
-		},
-		{
-			"idx": 4,
-			"version": "6",
-			"when": 1772135754989,
-			"tag": "0004_noisy_dagger",
-			"breakpoints": true
-		},
-		{
-			"idx": 5,
-			"version": "6",
-			"when": 1772203544102,
-			"tag": "0005_majestic_justice",
-			"breakpoints": true
-		},
-		{
-			"idx": 6,
-			"version": "6",
-			"when": 1772211494203,
-			"tag": "0006_ordinary_madame_masque",
-			"breakpoints": true
-		}
-	]
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1771947066054,
+      "tag": "0000_numerous_morlun",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1771972005947,
+      "tag": "0001_keen_barracuda",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1772025336827,
+      "tag": "0002_brown_sway",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1772092800000,
+      "tag": "0003_split_plans",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1772135754989,
+      "tag": "0004_noisy_dagger",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1772203544102,
+      "tag": "0005_majestic_justice",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1772211494203,
+      "tag": "0006_ordinary_madame_masque",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1772395483866,
+      "tag": "0007_minor_squadron_sinister",
+      "breakpoints": true
+    }
+  ]
 }

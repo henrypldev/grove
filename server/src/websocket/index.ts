@@ -5,10 +5,14 @@ import {
 	subscribeToTeamEvents,
 } from '../db/events'
 import type { TeamEvent, WsClientMessage, WsServerMessage } from '../types'
+import {
+	handleSimulatorClose,
+	handleSimulatorMessage,
+	handleSimulatorOpen,
+	type SimulatorWsData,
+} from '../api/simulator-relay'
 
-interface WsClientData {
-	clientId: string
-}
+type WsClientData = { type?: undefined; clientId: string } | SimulatorWsData
 
 interface WsClient {
 	ws: ServerWebSocket<WsClientData>
@@ -67,13 +71,25 @@ function maybeRemoveTeamListener(teamId: string) {
 
 export const wsHandlers = {
 	open(ws: ServerWebSocket<WsClientData>) {
+		if (ws.data.type === 'simulator') {
+			handleSimulatorOpen(ws as ServerWebSocket<SimulatorWsData>)
+			return
+		}
 		const clientId = Math.random().toString(36).slice(2)
 		ws.data = { clientId }
-		clients.set(clientId, { ws, deviceType: null, channels: new Set() })
+		clients.set(clientId, {
+			ws: ws as ServerWebSocket<{ clientId: string }>,
+			deviceType: null,
+			channels: new Set(),
+		})
 		ws.send(JSON.stringify({ type: 'connected' } satisfies WsServerMessage))
 	},
 
 	message(ws: ServerWebSocket<WsClientData>, raw: string | Buffer) {
+		if (ws.data.type === 'simulator') {
+			handleSimulatorMessage(ws as ServerWebSocket<SimulatorWsData>, raw)
+			return
+		}
 		const client = clients.get(ws.data.clientId)
 		if (!client) return
 		try {
@@ -116,6 +132,10 @@ export const wsHandlers = {
 	},
 
 	close(ws: ServerWebSocket<WsClientData>) {
+		if (ws.data.type === 'simulator') {
+			handleSimulatorClose(ws as ServerWebSocket<SimulatorWsData>)
+			return
+		}
 		const client = clients.get(ws.data.clientId)
 		if (client) {
 			for (const channel of client.channels) {

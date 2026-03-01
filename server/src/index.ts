@@ -49,6 +49,14 @@ export async function startServer(port: number) {
 				return new Response('WebSocket upgrade failed', { status: 400 })
 			}
 
+			if (path === '/v2/simulator/ws') {
+				const upgraded = server.upgrade(req, {
+					data: { type: 'simulator' as const, clientId: '' },
+				})
+				if (upgraded) return undefined
+				return new Response('WebSocket upgrade failed', { status: 400 })
+			}
+
 			if (method === 'OPTIONS') {
 				return new Response(null, { headers })
 			}

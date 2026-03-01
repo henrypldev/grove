@@ -3,8 +3,9 @@
 	"version": "0.14.0",
 	"scripts": {
 		"start": "NODE_ENV=production bun run src/index.ts",
-		"dev": "NODE_ENV=development bun run --watch src/index.ts",
-		"test": "bun test src/"
+		"dev": "bun build:simserver && NODE_ENV=development bun run --watch src/index.ts",
+		"test": "bun test src/",
+		"build:simserver": "cd simulator-server && swift build -c release && cd .."
 	},
 	"dependencies": {
 		"@anthropic-ai/claude-agent-sdk": "^0.2.50",

@@ -1,9 +1,33 @@
+import { existsSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import type { ServerWebSocket } from 'bun'
 import { log } from '../config'
 
-const SIMULATOR_BINARY =
-	process.env.GROVE_SIMULATOR_BINARY ||
-	`${process.env.HOME}/Projects/grove-desktop/simulator-server/.build/release/GroveSimulatorServer`
+function resolveSimulatorBinary(): string {
+	if (process.env.GROVE_SIMULATOR_BINARY)
+		return process.env.GROVE_SIMULATOR_BINARY
+
+	// Installed: <prefix>/bin/grove + <prefix>/libexec/GroveSimulatorServer
+	const installed = join(
+		dirname(process.execPath),
+		'..',
+		'libexec',
+		'GroveSimulatorServer',
+	)
+	if (existsSync(installed)) return installed
+
+	// Co-located: same directory as the grove binary
+	const colocated = join(dirname(process.execPath), 'GroveSimulatorServer')
+	if (existsSync(colocated)) return colocated
+
+	// Dev: in-repo build output
+	return new URL(
+		'../../simulator-server/.build/release/GroveSimulatorServer',
+		import.meta.url,
+	).pathname
+}
+
+const SIMULATOR_BINARY = resolveSimulatorBinary()
 
 interface SimulatorProcess {
 	proc: ReturnType<typeof Bun.spawn>

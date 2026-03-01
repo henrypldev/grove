@@ -67,8 +67,21 @@ async function ensureReady(): Promise<void> {
 	return initPromise
 }
 
+async function killExistingSimulators(): Promise<void> {
+	try {
+		const result = Bun.spawnSync(['pkill', '-f', 'GroveSimulatorServer'])
+		if (result.exitCode === 0) {
+			log('simulator-relay', 'killed existing GroveSimulatorServer process(es)')
+			// Brief wait for port release
+			await new Promise(r => setTimeout(r, 300))
+		}
+	} catch {}
+}
+
 async function spawnSimulator(): Promise<SimulatorProcess> {
 	if (sim) return sim
+
+	await killExistingSimulators()
 
 	const port = findFreePort()
 	log('simulator-relay', `spawning GroveSimulatorServer on port ${port}`)

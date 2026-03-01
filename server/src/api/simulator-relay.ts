@@ -64,7 +64,9 @@ async function spawnSimulator(): Promise<SimulatorProcess> {
 				port,
 				socket: {
 					data() {},
-					open(s) { s.end() },
+					open(s) {
+						s.end()
+					},
 					error() {},
 					close() {},
 				},
@@ -101,8 +103,12 @@ async function spawnSimulator(): Promise<SimulatorProcess> {
 function teardown() {
 	if (!sim) return
 	log('simulator-relay', 'tearing down GroveSimulatorServer')
-	try { sim.upstreamWs?.close() } catch {}
-	try { sim.proc.kill() } catch {}
+	try {
+		sim.upstreamWs?.close()
+	} catch {}
+	try {
+		sim.proc.kill()
+	} catch {}
 	sim = null
 }
 
@@ -119,7 +125,7 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 			resolve()
 		}
 
-		ws.onmessage = (event) => {
+		ws.onmessage = event => {
 			for (const client of entry.clients) {
 				try {
 					if (event.data instanceof ArrayBuffer) {
@@ -145,9 +151,7 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 	return entry.upstreamReady
 }
 
-export function handleSimulatorOpen(
-	ws: ServerWebSocket<SimulatorWsData>,
-) {
+export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 	// Start init in background — don't block Bun's open handler
 	ensureReady()
 		.then(() => {
@@ -160,7 +164,7 @@ export function handleSimulatorOpen(
 			sim.clients.add(ws)
 			log('simulator-relay', `client connected (refCount=${sim.refCount})`)
 		})
-		.catch((err) => {
+		.catch(err => {
 			log('simulator-relay', `error: ${err}`)
 			ws.close(1011, 'Failed to start simulator server')
 		})
@@ -174,14 +178,14 @@ export function handleSimulatorMessage(
 	ensureReady()
 		.then(() => {
 			if (!sim?.upstreamWs) return
-			try { sim.upstreamWs.send(data) } catch {}
+			try {
+				sim.upstreamWs.send(data)
+			} catch {}
 		})
 		.catch(() => {})
 }
 
-export function handleSimulatorClose(
-	ws: ServerWebSocket<SimulatorWsData>,
-) {
+export function handleSimulatorClose(ws: ServerWebSocket<SimulatorWsData>) {
 	if (!sim) return
 	sim.clients.delete(ws)
 	sim.refCount = Math.max(0, sim.refCount - 1)

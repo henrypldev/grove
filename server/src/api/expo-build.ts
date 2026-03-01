@@ -71,7 +71,11 @@ async function patchExpoHeadless(worktreePath: string) {
 	)
 }
 
-async function patchFile(filePath: string, pattern: RegExp, replacement: string) {
+async function patchFile(
+	filePath: string,
+	pattern: RegExp,
+	replacement: string,
+) {
 	try {
 		const src = await Bun.file(filePath).text()
 		if (src.includes(HEADLESS_MARKER)) return

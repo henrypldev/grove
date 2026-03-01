@@ -1,16 +1,16 @@
 import type { ServerWebSocket } from 'bun'
 import {
-	dbGetEventsSinceId,
-	subscribeToGlobalEvents,
-	subscribeToTeamEvents,
-} from '../db/events'
-import type { TeamEvent, WsClientMessage, WsServerMessage } from '../types'
-import {
 	handleSimulatorClose,
 	handleSimulatorMessage,
 	handleSimulatorOpen,
 	type SimulatorWsData,
 } from '../api/simulator-relay'
+import {
+	dbGetEventsSinceId,
+	subscribeToGlobalEvents,
+	subscribeToTeamEvents,
+} from '../db/events'
+import type { TeamEvent, WsClientMessage, WsServerMessage } from '../types'
 
 type WsClientData = { type?: undefined; clientId: string } | SimulatorWsData
 

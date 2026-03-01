@@ -43,7 +43,49 @@ async function streamOutput(
 	}
 }
 
-export function startExpoBuild(
+const HEADLESS_MARKER = '// GROVE_HEADLESS'
+
+async function patchExpoHeadless(worktreePath: string) {
+	const iosDir = `${worktreePath}/node_modules/@expo/cli/build/src/start/platforms/ios`
+
+	// 1. ensureSimulatorAppRunningAsync — skip the osascript check + open -a Simulator
+	await patchFile(
+		`${iosDir}/ensureSimulatorAppRunning.js`,
+		/async function ensureSimulatorAppRunningAsync\(device, \{ maxWaitTime \} = \{\}\) \{/,
+		`async function ensureSimulatorAppRunningAsync(device, { maxWaitTime } = {}) {\n    if (process.env.GROVE_HEADLESS) return; ${HEADLESS_MARKER}`,
+	)
+
+	// 2. activateWindowAsync — skip `tell application "Simulator" to activate`
+	await patchFile(
+		`${iosDir}/AppleDeviceManager.js`,
+		/async activateWindowAsync\(\) \{/,
+		`async activateWindowAsync() {\n        if (process.env.GROVE_HEADLESS) return; ${HEADLESS_MARKER}`,
+	)
+
+	// 3. ensureSimulatorOpenAsync — skip the waitForAction timeout loop,
+	//    just boot and return the device directly
+	await patchFile(
+		`${iosDir}/AppleDeviceManager.js`,
+		/async function ensureSimulatorOpenAsync\(\{ udid, osType \} = \{\}, tryAgain = true\) \{/,
+		`async function ensureSimulatorOpenAsync({ udid, osType } = {}, tryAgain = true) {\n    if (process.env.GROVE_HEADLESS && udid) { await _simctl.bootAsync({ udid }).catch(() => {}); const d = await _simctl.isDeviceBootedAsync({ udid }); if (d) return d; } ${HEADLESS_MARKER}`,
+	)
+}
+
+async function patchFile(filePath: string, pattern: RegExp, replacement: string) {
+	try {
+		const src = await Bun.file(filePath).text()
+		if (src.includes(HEADLESS_MARKER)) return
+		const patched = src.replace(pattern, replacement)
+		if (patched !== src) {
+			await Bun.write(filePath, patched)
+			log('expo', `patched ${filePath.split('/').pop()}`)
+		}
+	} catch (err) {
+		log('expo', `failed to patch ${filePath}`, { err })
+	}
+}
+
+export async function startExpoBuild(
 	teamId: string,
 	worktreePath: string,
 	deviceUdid: string,
@@ -54,12 +96,20 @@ export function startExpoBuild(
 		return
 	}
 
+	// Patch Expo to skip opening Simulator.app GUI.
+	// The device is already booted headlessly via simctl.
+	await patchExpoHeadless(worktreePath)
+
 	const command = `bunx expo run:ios --device ${deviceUdid} --port ${port}`
 	const proc = Bun.spawn(['sh', '-c', command], {
 		cwd: worktreePath,
 		stdout: 'pipe',
 		stderr: 'pipe',
 		detached: true,
+		env: {
+			...process.env,
+			GROVE_HEADLESS: '1',
+		},
 	})
 
 	const build: ActiveExpoBuild = {

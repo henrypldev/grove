@@ -2,7 +2,58 @@ import { log } from '../config'
 
 const teamDevices = new Map<string, string>()
 
+async function findExistingDevice(
+	deviceName: string,
+): Promise<{ udid: string; state: string } | null> {
+	const proc = Bun.spawn(['xcrun', 'simctl', 'list', 'devices', '-j'], {
+		stdout: 'pipe',
+		stderr: 'ignore',
+	})
+	const json = await new Response(proc.stdout).text()
+	await proc.exited
+	const { devices } = JSON.parse(json) as {
+		devices: Record<
+			string,
+			Array<{ udid: string; name: string; state: string }>
+		>
+	}
+	for (const runtime of Object.values(devices)) {
+		for (const d of runtime) {
+			if (d.name === deviceName) return { udid: d.udid, state: d.state }
+		}
+	}
+	return null
+}
+
+async function bootIfNeeded(udid: string, state: string): Promise<void> {
+	if (state === 'Booted') return
+	const proc = Bun.spawn(['xcrun', 'simctl', 'boot', udid], {
+		stdout: 'ignore',
+		stderr: 'pipe',
+		env: {
+			...process.env,
+			SIMCTL_CHILD_SIMULATOR_RUNTIME_ENVIRONMENT: 'standalone',
+		},
+	})
+	await proc.exited
+}
+
 export async function createTeamDevice(teamId: string): Promise<string> {
+	const deviceName = `grove-team-${teamId}`
+
+	// Reuse existing device if one already exists for this team
+	const existing = await findExistingDevice(deviceName)
+	if (existing) {
+		await bootIfNeeded(existing.udid, existing.state)
+		teamDevices.set(teamId, existing.udid)
+		log('simulator', 'reusing existing device', {
+			teamId,
+			udid: existing.udid,
+			deviceName,
+		})
+		return existing.udid
+	}
+
 	const runtimeProc = Bun.spawn(['xcrun', 'simctl', 'list', 'runtimes', '-j'], {
 		stdout: 'pipe',
 		stderr: 'ignore',
@@ -18,7 +69,6 @@ export async function createTeamDevice(teamId: string): Promise<string> {
 		.pop()
 	if (!iosRuntime) throw new Error('No available iOS runtime found')
 
-	const deviceName = `grove-team-${teamId}`
 	const deviceType = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
 
 	const createProc = Bun.spawn(
@@ -38,15 +88,7 @@ export async function createTeamDevice(teamId: string): Promise<string> {
 		throw new Error(`Failed to create simulator device: ${stderr}`)
 	}
 
-	const bootProc = Bun.spawn(['xcrun', 'simctl', 'boot', udid], {
-		stdout: 'ignore',
-		stderr: 'pipe',
-		env: {
-			...process.env,
-			SIMCTL_CHILD_SIMULATOR_RUNTIME_ENVIRONMENT: 'standalone',
-		},
-	})
-	await bootProc.exited
+	await bootIfNeeded(udid, 'Shutdown')
 
 	teamDevices.set(teamId, udid)
 	log('simulator', 'created and booted device', { teamId, udid, deviceName })

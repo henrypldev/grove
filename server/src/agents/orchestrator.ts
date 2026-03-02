@@ -1,6 +1,7 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { computeDiff, getHeadSha } from '../api/diff'
 import { checkFingerprintAndRebuild, stopExpoBuild } from '../api/expo-build'
+import { stopExpoDevServer } from '../api/expo-dev-server'
 import { clearTeamPort, getTeamPort } from '../api/ports'
 import { deleteTeamDevice } from '../api/simulator'
 import { unregisterTeamServe } from '../api/tailscale-serve'
@@ -246,6 +247,7 @@ export async function closeTeam(teamId: string) {
 	const team = dbGetTeam(teamId)
 	closeAllAgents(teamId)
 	stopExpoBuild(teamId)
+	stopExpoDevServer(teamId)
 	await deleteTeamDevice(teamId)
 	const port = getTeamPort(teamId)
 	if (port) {

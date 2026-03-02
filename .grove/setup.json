@@ -3,8 +3,8 @@
 		{ "name": "Install dependencies", "run": "bun install" },
 		{ "name": "Dev server", "run": "bun dev", "background": true },
 		{
-			"name": "Tailscale funnel 4002",
-			"run": "tailscale funnel --bg --set-path grove 4002"
+			"name": "Tailscale serve 4002",
+			"run": "tailscale serve -bg --set-path grove2 localhost:4002"
 		}
 	]
 }

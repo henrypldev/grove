@@ -1,5 +1,5 @@
 import { log } from '../config'
-import { dbInsertLog } from '../db/logs'
+import { emitTeamLog } from '../db/logs'
 import type { Script } from '../types'
 import { getTeamPort } from './ports'
 
@@ -22,7 +22,7 @@ function emitProgress(
 	status: string,
 	output?: string,
 ) {
-	dbInsertLog(teamId, 'script_progress', {
+	emitTeamLog(teamId, 'script_progress', {
 		scriptId,
 		name,
 		status,
@@ -31,7 +31,7 @@ function emitProgress(
 }
 
 function emitOutput(teamId: string, scriptId: string, chunk: string) {
-	dbInsertLog(teamId, 'script_output', { scriptId, chunk })
+	emitTeamLog(teamId, 'script_output', { scriptId, chunk })
 }
 
 async function streamOutput(

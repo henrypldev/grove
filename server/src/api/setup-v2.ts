@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { log } from '../config'
-import { dbInsertLog } from '../db/logs'
+import { emitTeamLog } from '../db/logs'
 import { dbGetRepo } from '../db/repos'
 import type { SetupStep } from '../types'
 import { rebuildExpoBuild } from './expo-build'
@@ -42,11 +42,11 @@ function emitProgress(
 	const payload: Record<string, unknown> = { step, name, status }
 	if (output !== undefined) payload.output = output
 	if (background) payload.background = true
-	dbInsertLog(teamId, 'setup_progress', payload)
+	emitTeamLog(teamId, 'setup_progress', payload)
 }
 
 function emitOutput(teamId: string, step: number, chunk: string) {
-	dbInsertLog(teamId, 'setup_output', { step, chunk })
+	emitTeamLog(teamId, 'setup_output', { step, chunk })
 }
 
 async function streamOutput(
@@ -196,7 +196,7 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 	}
 
 	if (setup.port) {
-		dbInsertLog(setup.teamId, 'env:ready', { port: setup.port })
+		emitTeamLog(setup.teamId, 'env:ready', { port: setup.port })
 	}
 
 	if (setup.repoId) {

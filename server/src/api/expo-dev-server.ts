@@ -1,5 +1,5 @@
 import { log } from '../config'
-import { dbInsertLog } from '../db/logs'
+import { emitTeamLog } from '../db/logs'
 import { isPortActive } from './ports'
 
 type ExpoDevServerStatus = 'starting' | 'running' | 'stopped' | 'failed'
@@ -16,11 +16,11 @@ interface ActiveDevServer {
 const activeDevServers = new Map<string, ActiveDevServer>()
 
 function emitOutput(teamId: string, chunk: string) {
-	dbInsertLog(teamId, 'expo_dev_server_output', { chunk })
+	emitTeamLog(teamId, 'expo_dev_server_output', { chunk })
 }
 
 function emitProgress(teamId: string, status: string) {
-	dbInsertLog(teamId, 'expo_dev_server', { status })
+	emitTeamLog(teamId, 'expo_dev_server', { status })
 }
 
 async function streamOutput(

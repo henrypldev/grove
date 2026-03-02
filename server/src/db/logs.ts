@@ -23,7 +23,7 @@ export function clearTeamLogs(teamId: string): void {
 	store.delete(teamId)
 }
 
-export function dbInsertLog(
+export function emitTeamLog(
 	teamId: string,
 	type: string,
 	payload: Record<string, unknown>,

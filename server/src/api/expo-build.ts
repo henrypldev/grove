@@ -1,5 +1,5 @@
 import { log } from '../config'
-import { clearTeamLogs, dbInsertLog } from '../db/logs'
+import { clearTeamLogs, emitTeamLog } from '../db/logs'
 import { dbGetRepo, dbUpdateRepoFingerprint } from '../db/repos'
 import {
 	getExpoDevServerStatus,
@@ -22,11 +22,11 @@ interface ActiveExpoBuild {
 const activeBuilds = new Map<string, ActiveExpoBuild>()
 
 function emitOutput(teamId: string, chunk: string) {
-	dbInsertLog(teamId, 'expo_build_output', { chunk })
+	emitTeamLog(teamId, 'expo_build_output', { chunk })
 }
 
 function emitProgress(teamId: string, status: string) {
-	dbInsertLog(teamId, 'expo_build', { status })
+	emitTeamLog(teamId, 'expo_build', { status })
 }
 
 async function streamOutput(
@@ -121,7 +121,7 @@ export async function startExpoBuild(
 		return
 	}
 
-	const command = `bunx expo run:ios --no-bundler --device ${deviceUdid} --port ${port}`
+	const command = `bunx expo run:ios --device ${deviceUdid} --port ${port}`
 	const proc = Bun.spawn(['sh', '-c', command], {
 		cwd: worktreePath,
 		stdout: 'pipe',
@@ -210,7 +210,7 @@ export async function rebuildExpoBuild(
 	}
 
 	startExpoBuild(teamId, worktreePath, udid, port)
-	dbInsertLog(teamId, 'simulator:device_created', {
+	emitTeamLog(teamId, 'simulator:device_created', {
 		udid,
 		name: `grove-team-${teamId}`,
 		port,

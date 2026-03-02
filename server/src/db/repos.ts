@@ -20,6 +20,7 @@ export function dbInsertRepo(repo: Repo): void {
 			id: repo.id,
 			name: repo.name,
 			path: repo.path,
+			framework: repo.framework ?? null,
 			envVars: repo.envVars ? JSON.stringify(repo.envVars) : null,
 			setupSteps: repo.setupSteps ? JSON.stringify(repo.setupSteps) : null,
 			fingerprint: repo.fingerprint ?? null,

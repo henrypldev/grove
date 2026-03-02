@@ -257,10 +257,15 @@ export async function handleV2Teams(
 				? `https://${await getTerminalHost()}:${port}`
 				: null
 			const simulatorUdid = getTeamDeviceUdid(teamMatch.id)
+			const expoBuildStatus = getExpoBuildStatus(teamMatch.id)
+			const repo = dbGetRepo(team.repoId)
+			// Auto-create simulator for expo repos if one doesn't exist yet
+			if (!simulatorUdid && !expoBuildStatus && repo?.framework === 'expo') {
+				rebuildExpoBuild(teamMatch.id, team.worktreePath).catch(() => {})
+			}
 			const simulatorDeviceName = simulatorUdid
 				? `grove-team-${teamMatch.id}`
 				: null
-			const expoBuildStatus = getExpoBuildStatus(teamMatch.id)
 			const devServerStatus = portAlive ? 'running' : port ? 'starting' : null
 			return Response.json(
 				{

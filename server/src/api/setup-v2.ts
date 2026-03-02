@@ -211,20 +211,6 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 			}
 		}
 	}
-
-	if (setup.repoId) {
-		const repo = dbGetRepo(setup.repoId)
-		if (repo?.needsNativeBuild) {
-			try {
-				await rebuildExpoBuild(setup.teamId, setup.worktreePath)
-			} catch (err) {
-				log('setup', 'expo build trigger failed', {
-					teamId: setup.teamId,
-					err,
-				})
-			}
-		}
-	}
 }
 
 function killProcess(proc: ReturnType<typeof Bun.spawn>) {
@@ -266,7 +252,18 @@ export async function startTeamSetup(
 		log('setup', 'using db setup steps', { teamId })
 	}
 
-	if (!steps || steps.length === 0) return
+	if (!steps || steps.length === 0) {
+		// No setup steps, but still trigger expo build if needed
+		if (repoId) {
+			const repo = dbGetRepo(repoId)
+			if (repo?.needsNativeBuild) {
+				rebuildExpoBuild(teamId, worktreePath).catch(err => {
+					log('setup', 'expo build trigger failed', { teamId, err })
+				})
+			}
+		}
+		return
+	}
 
 	const needsPort = steps.some(s => s.run.includes('{{PORT}}'))
 	let port: number | undefined

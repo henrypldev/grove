@@ -1,5 +1,7 @@
 import pkg from '../package.json'
 import { onNewTeam, startOrchestrator } from './agents/orchestrator'
+import { killAllExpoBuilds } from './api/expo-build'
+import { killAllExpoDevServers } from './api/expo-dev-server'
 import { startPortPoller } from './api/ports'
 import { log, setLogsEnabled } from './config'
 import { getDb } from './db'
@@ -123,6 +125,16 @@ export async function startServer(port: number) {
 	})
 
 	log('server', `listening on http://localhost:${port}`)
+
+	function shutdown() {
+		log('server', 'shutting down, killing child processes')
+		killAllExpoBuilds()
+		killAllExpoDevServers()
+		process.exit(0)
+	}
+
+	process.on('SIGTERM', shutdown)
+	process.on('SIGINT', shutdown)
 }
 
 if (import.meta.main) {

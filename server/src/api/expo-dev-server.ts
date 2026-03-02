@@ -142,6 +142,12 @@ export function stopExpoDevServer(teamId: string) {
 	log('expo-dev-server', 'stopped', { teamId })
 }
 
+export function killAllExpoDevServers() {
+	for (const teamId of activeDevServers.keys()) {
+		stopExpoDevServer(teamId)
+	}
+}
+
 export function getExpoDevServerStatus(
 	teamId: string,
 ): ExpoDevServerStatus | null {

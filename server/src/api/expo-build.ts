@@ -165,6 +165,12 @@ export function stopExpoBuild(teamId: string) {
 	log('expo', 'build stopped', { teamId })
 }
 
+export function killAllExpoBuilds() {
+	for (const teamId of activeBuilds.keys()) {
+		stopExpoBuild(teamId)
+	}
+}
+
 export function getExpoBuildStatus(teamId: string): ExpoBuildStatus | null {
 	return activeBuilds.get(teamId)?.status ?? null
 }

@@ -4,6 +4,7 @@ import { dbInsertLog } from '../db/logs'
 import { dbGetRepo } from '../db/repos'
 import type { SetupStep } from '../types'
 import { rebuildExpoBuild } from './expo-build'
+import { startExpoDevServer, waitForDevServerReady } from './expo-dev-server'
 import { allocatePort, setTeamPort } from './ports'
 
 interface SetupConfig {
@@ -202,6 +203,10 @@ async function runSteps(setup: ActiveSetup, fromIndex: number) {
 		const repo = dbGetRepo(setup.repoId)
 		if (repo?.needsNativeBuild) {
 			try {
+				if (setup.port) {
+					startExpoDevServer(setup.teamId, setup.worktreePath, setup.port)
+					await waitForDevServerReady(setup.teamId)
+				}
 				await rebuildExpoBuild(setup.teamId, setup.worktreePath)
 			} catch (err) {
 				log('setup', 'expo build trigger failed', {
@@ -257,6 +262,12 @@ export async function startTeamSetup(
 		if (repoId) {
 			const repo = dbGetRepo(repoId)
 			if (repo?.needsNativeBuild) {
+				const port = (await allocatePort()) ?? null
+				if (port) {
+					setTeamPort(teamId, port)
+					startExpoDevServer(teamId, worktreePath, port)
+					await waitForDevServerReady(teamId)
+				}
 				rebuildExpoBuild(teamId, worktreePath).catch(err => {
 					log('setup', 'expo build trigger failed', { teamId, err })
 				})

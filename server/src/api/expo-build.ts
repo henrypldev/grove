@@ -1,6 +1,11 @@
 import { log } from '../config'
 import { emitTeamLog } from '../db/logs'
 import { dbGetRepo, dbUpdateRepoFingerprint } from '../db/repos'
+import {
+	getExpoDevServerStatus,
+	startExpoDevServer,
+	waitForDevServerReady,
+} from './expo-dev-server'
 import { allocatePort, getTeamPort, setTeamPort } from './ports'
 import { createTeamDevice, getTeamDeviceUdid } from './simulator'
 
@@ -195,6 +200,18 @@ export async function rebuildExpoBuild(
 
 	if (!port) {
 		log('expo', 'no port available for rebuild', { teamId })
+		return
+	}
+
+	// Ensure dev server is running before building
+	const devServerStatus = getExpoDevServerStatus(teamId)
+	if (devServerStatus !== 'running' && devServerStatus !== 'starting') {
+		await startExpoDevServer(teamId, worktreePath, port)
+	}
+	const ready = await waitForDevServerReady(teamId)
+	if (!ready) {
+		log('expo', 'dev server not ready, aborting build', { teamId })
+		emitProgress(teamId, 'failed')
 		return
 	}
 

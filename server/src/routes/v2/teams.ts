@@ -1,20 +1,29 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
+import {
+	getExpoBuildOutput,
+	getExpoBuildStatus,
+	rebuildExpoBuild,
+	stopExpoBuild,
+} from '../../api/expo-build'
 import { getTeamPort, isPortActive } from '../../api/ports'
 import { runScript, stopScript } from '../../api/scripts'
 import {
 	cancelTeamSetup,
+	getTeamSetupLogs,
 	retryTeamSetup,
 	startTeamSetup,
 	startTeamStep,
 	stopTeamStep,
 } from '../../api/setup-v2'
+import { getTeamDeviceUdid } from '../../api/simulator'
 import { createWorktree } from '../../api/worktrees'
 import { generateId, getTerminalHost } from '../../config'
+import { dbInsertActivity, dbListActivitySince } from '../../db/activity'
 import { dbGetNote } from '../../db/agent-notes'
 import { dbListTasks } from '../../db/agent-tasks'
 import { dbGetAgent, dbListAgentsByTeam } from '../../db/agents'
 import { dbGetDesignDoc } from '../../db/design-docs'
-import { dbInsertEvent, dbListEventsSince } from '../../db/events'
+import { dbListLogsSince } from '../../db/logs'
 import { dbGetPrd } from '../../db/prds'
 import { dbGetRepo } from '../../db/repos'
 import { dbGetScript } from '../../db/scripts'
@@ -169,7 +178,7 @@ export async function handleV2Teams(
 				),
 			)
 
-			startTeamSetup(teamId, worktree.path, repo.setupSteps)
+			startTeamSetup(teamId, worktree.path, repo.setupSteps, repo.id)
 
 			if (onTeamCreated) await onTeamCreated(team, contentBlocks)
 
@@ -208,7 +217,7 @@ export async function handleV2Teams(
 				),
 			)
 
-			startTeamSetup(teamId, worktree.path, repo.setupSteps)
+			startTeamSetup(teamId, worktree.path, repo.setupSteps, repo.id)
 			createdTeams.push(team)
 		}
 
@@ -247,8 +256,23 @@ export async function handleV2Teams(
 			const devUrl = portAlive
 				? `https://${await getTerminalHost()}:${port}`
 				: null
+			const simulatorUdid = getTeamDeviceUdid(teamMatch.id)
+			const simulatorDeviceName = simulatorUdid
+				? `grove-team-${teamMatch.id}`
+				: null
+			const expoBuildStatus = getExpoBuildStatus(teamMatch.id)
+			const devServerStatus = portAlive ? 'running' : port ? 'starting' : null
 			return Response.json(
-				{ ...team, port: portAlive ? port : null, devUrl, agents },
+				{
+					...team,
+					port: portAlive ? port : null,
+					devUrl,
+					agents,
+					simulatorUdid,
+					simulatorDeviceName,
+					expoBuildStatus,
+					devServerStatus,
+				},
 				{ headers },
 			)
 		}
@@ -404,7 +428,7 @@ export async function handleV2Teams(
 			if (body.answers) {
 				const { resolveUserReply } = await import('../../agents/grove-tools')
 				if (resolveUserReply(team.id, body.answers)) {
-					const event = dbInsertEvent(team.id, null, 'user:answers', {
+					const event = dbInsertActivity(team.id, null, 'user:answers', {
 						answers: body.answers,
 					})
 					return Response.json(event, { headers })
@@ -423,7 +447,7 @@ export async function handleV2Teams(
 						return { type: b.type as string, mediaType: src.media_type }
 					})
 			: undefined
-		const event = dbInsertEvent(team.id, null, 'user:message', {
+		const event = dbInsertActivity(team.id, null, 'user:message', {
 			text,
 			...(attachments?.length ? { attachments } : {}),
 		})
@@ -432,11 +456,18 @@ export async function handleV2Teams(
 		return Response.json(event, { headers })
 	}
 
-	const eventsMatch = matchRoute(path, '/v2/teams/:id/events')
-	if (eventsMatch && method === 'GET') {
+	const activityMatch = matchRoute(path, '/v2/teams/:id/activity')
+	if (activityMatch && method === 'GET') {
 		const since = Number(url.searchParams.get('since') ?? '0')
-		const events = dbListEventsSince(eventsMatch.id, since)
-		return Response.json(events, { headers })
+		const items = dbListActivitySince(activityMatch.id, since)
+		return Response.json(items, { headers })
+	}
+
+	const logsMatch = matchRoute(path, '/v2/teams/:id/logs')
+	if (logsMatch && method === 'GET') {
+		const since = Number(url.searchParams.get('since') ?? '0')
+		const teamLogs = dbListLogsSince(logsMatch.id, since)
+		return Response.json(teamLogs, { headers })
 	}
 
 	const prdMatch = matchRoute(path, '/v2/teams/:id/prd')
@@ -540,6 +571,57 @@ export async function handleV2Teams(
 		const error = startTeamStep(setupStartMatch.id, body.step)
 		if (error) return Response.json({ error }, { status: 400, headers })
 		return Response.json({ success: true }, { headers })
+	}
+
+	const setupLogsMatch = matchRoute(path, '/v2/teams/:id/setup/logs')
+	if (setupLogsMatch && method === 'GET') {
+		const logs = getTeamSetupLogs(setupLogsMatch.id)
+		if (!logs)
+			return Response.json(
+				{ error: 'No active setup' },
+				{ status: 404, headers },
+			)
+		return Response.json(logs, { headers })
+	}
+
+	const buildMatch = matchRoute(path, '/v2/teams/:id/build')
+	if (buildMatch && method === 'POST') {
+		const team = dbGetTeam(buildMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		try {
+			await rebuildExpoBuild(buildMatch.id, team.worktreePath)
+		} catch (err) {
+			return Response.json({ error: String(err) }, { status: 500, headers })
+		}
+		return Response.json({ success: true }, { headers })
+	}
+
+	const buildStopMatch = matchRoute(path, '/v2/teams/:id/build/stop')
+	if (buildStopMatch && method === 'POST') {
+		const team = dbGetTeam(buildStopMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		stopExpoBuild(buildStopMatch.id)
+		return Response.json({ success: true }, { headers })
+	}
+
+	const buildLogsMatch = matchRoute(path, '/v2/teams/:id/build/logs')
+	if (buildLogsMatch && method === 'GET') {
+		const status = getExpoBuildStatus(buildLogsMatch.id)
+		const output = getExpoBuildOutput(buildLogsMatch.id)
+		if (status === null)
+			return Response.json(
+				{ error: 'No active build' },
+				{ status: 404, headers },
+			)
+		return Response.json({ status, output }, { headers })
 	}
 
 	const scriptRunMatch = matchRoute(

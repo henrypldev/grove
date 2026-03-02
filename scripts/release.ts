@@ -34,6 +34,12 @@ async function sha256(filePath: string): Promise<string> {
 	return createHash('sha256').update(Buffer.from(buffer)).digest('hex')
 }
 
+async function buildSimulatorServer() {
+	console.log('Building GroveSimulatorServer...')
+	await $`cd server/simulator-server && swift build -c release`
+	console.log('  Built GroveSimulatorServer')
+}
+
 async function compileBinaries(
 	version: string,
 ): Promise<{ artifacts: string[]; checksums: Record<string, string> }> {
@@ -43,12 +49,16 @@ async function compileBinaries(
 
 	await $`mkdir -p ${distDir}`
 
+	await buildSimulatorServer()
+
 	for (const target of TARGETS) {
 		const outputName = `grove-${version}-${target}`
-		const outputPath = `${distDir}/${outputName}`
+		const stageDir = `${distDir}/${outputName}`
 
 		console.log(`Compiling for ${target}...`)
-		await $`bun build --compile --minify --target=bun-${target} cli/src/index.tsx --outfile=${outputPath}`
+		await $`mkdir -p ${stageDir}`
+		await $`bun build --compile --minify --target=bun-${target} cli/src/index.tsx --outfile=${stageDir}/grove`
+		await $`cp server/simulator-server/.build/release/GroveSimulatorServer ${stageDir}/GroveSimulatorServer`
 
 		const tarName = `${outputName}.tar.gz`
 		const tarPath = `${distDir}/${tarName}`
@@ -57,6 +67,8 @@ async function compileBinaries(
 		checksums[target] = await sha256(tarPath)
 		artifacts.push(tarPath)
 		console.log(`  Created ${tarName}`)
+
+		await $`rm -rf ${stageDir}`
 	}
 
 	return { artifacts, checksums }
@@ -86,7 +98,8 @@ async function updateHomebrewFormula(
       sha256 "${checksums['darwin-arm64']}"
 
       def install
-        bin.install "grove-#{version}-darwin-arm64" => "grove"
+        bin.install "grove"
+        libexec.install "GroveSimulatorServer"
       end
     end
 
@@ -95,7 +108,8 @@ async function updateHomebrewFormula(
       sha256 "${checksums['darwin-x64']}"
 
       def install
-        bin.install "grove-#{version}-darwin-x64" => "grove"
+        bin.install "grove"
+        libexec.install "GroveSimulatorServer"
       end
     end
   end

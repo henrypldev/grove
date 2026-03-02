@@ -14,6 +14,7 @@ export const repos = sqliteTable('repos', {
 	envVars: text('env_vars'),
 	setupSteps: text('setup_steps'),
 	fingerprint: text('fingerprint'),
+	framework: text('framework'),
 	needsNativeBuild: integer('needs_native_build'),
 	addedAt: integer('added_at').notNull(),
 })
@@ -59,8 +60,8 @@ export const agents = sqliteTable('agents', {
 	updatedAt: integer('updated_at').notNull(),
 })
 
-export const events = sqliteTable(
-	'events',
+export const activity = sqliteTable(
+	'activity',
 	{
 		id: integer('id').primaryKey({ autoIncrement: true }),
 		teamId: text('team_id')
@@ -72,8 +73,8 @@ export const events = sqliteTable(
 		createdAt: integer('created_at').notNull(),
 	},
 	table => [
-		index('idx_events_team_created').on(table.teamId, table.createdAt),
-		index('idx_events_agent_created').on(table.agentId, table.createdAt),
+		index('idx_activity_team_created').on(table.teamId, table.createdAt),
+		index('idx_activity_agent_created').on(table.agentId, table.createdAt),
 	],
 )
 

@@ -23,6 +23,7 @@ export interface Repo {
 	id: string
 	path: string
 	name: string
+	framework?: string
 	envVars?: EnvVar[]
 	setupSteps?: SetupStep[]
 	fingerprint?: string
@@ -110,10 +111,18 @@ export interface AgentMessagePayload {
 	tools: ToolCall[]
 }
 
-export interface TeamEvent {
+export interface TeamActivity {
 	id: number
 	teamId: string
 	agentId: string | null
+	type: string
+	payload: string
+	createdAt: number
+}
+
+export interface TeamLog {
+	id: number
+	teamId: string
 	type: string
 	payload: string
 	createdAt: number
@@ -139,7 +148,8 @@ export type WsClientMessage =
 	| { type: 'ping' }
 
 export type WsServerMessage =
-	| { type: 'event'; channel: string; data: TeamEvent }
+	| { type: 'activity'; channel: string; data: TeamActivity }
+	| { type: 'log'; channel: string; data: TeamLog }
 	| {
 			type: 'team:update'
 			channel: 'global'
@@ -150,6 +160,6 @@ export type WsServerMessage =
 			channel: string
 			data: Partial<Agent> & { id: string; teamId: string }
 	  }
-	| { type: 'replay:batch'; channel: string; events: TeamEvent[] }
+	| { type: 'replay:batch'; channel: string; activity: TeamActivity[] }
 	| { type: 'connected' }
 	| { type: 'pong' }

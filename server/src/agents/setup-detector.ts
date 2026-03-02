@@ -3,6 +3,7 @@ import { generateId, log } from '../config'
 import {
 	dbUpdateRepoEnvVars,
 	dbUpdateRepoFingerprint,
+	dbUpdateRepoFramework,
 	dbUpdateRepoSetupSteps,
 } from '../db/repos'
 import { dbInsertScript } from '../db/scripts'
@@ -41,7 +42,11 @@ Do these steps exactly:
    - If .env* files exist: parse them for KEY=VALUE pairs. For each, record { "key": "KEY", "value": "VALUE", "filePath": ".env" }
    - If NO .env* files exist: search source files (*.ts, *.tsx, *.js, *.jsx) for process.env.VARIABLE_NAME references. For each unique variable found, record { "key": "VARIABLE_NAME", "value": "", "filePath": "" }
    - Skip common built-in vars: NODE_ENV, PORT, HOME, PATH, CI
-8. Output ONLY a JSON object in this exact format (no other text):
+8. Detect the framework:
+   - Identify the primary framework from package.json dependencies (e.g., "next", "expo", "vite", "remix", "nuxt", "astro", "sveltekit", "express", "fastify", "hono", "react-native", etc.)
+   - Use the most specific framework name (e.g., "next" not "react")
+   - If no recognizable framework, use null
+9. Output ONLY a JSON object in this exact format (no other text):
 
 {
   "steps": [
@@ -52,6 +57,7 @@ Do these steps exactly:
   "envVars": [
     { "key": "DATABASE_URL", "value": "postgres://...", "filePath": ".env" }
   ],
+  "framework": "next",
   "fingerprint": "abc123...",
   "needsNativeBuild": false
 }
@@ -60,10 +66,12 @@ Rules:
 - "steps" is required, always an array of SetupStep objects
 - "scripts" is optional, array of { name, run } objects for on-demand scripts. Omit if none found.
 - "envVars" is optional, array of { key, value, filePath } objects. Omit if no env vars found.
+- "framework" is optional, the primary framework name as a lowercase string (e.g., "next", "expo", "vite"). Omit if none detected.
 - "fingerprint" is optional, only for Expo/RN projects (string or null)
 - "needsNativeBuild" is optional, true if Expo project is missing ios/ or android/ directories
 - The dev server step MUST have "background": true
 - The dev server step MUST use {{PORT}} for port assignment
+- If needsNativeBuild is true (Expo project missing ios/ or android/), do NOT include the dev server step — only include the install step. The native build process handles the dev server.
 - Output ONLY the JSON object, nothing else
 `
 
@@ -71,6 +79,7 @@ export interface DetectionResult {
 	steps: SetupStep[]
 	scripts?: { name: string; run: string }[]
 	envVars?: EnvVar[]
+	framework?: string | null
 	fingerprint?: string | null
 	needsNativeBuild?: boolean
 }
@@ -116,6 +125,9 @@ export async function detectSetupSteps(
 		}
 		if (parsed.envVars && parsed.envVars.length > 0) {
 			dbUpdateRepoEnvVars(repoId, parsed.envVars)
+		}
+		if (parsed.framework) {
+			dbUpdateRepoFramework(repoId, parsed.framework)
 		}
 		if (parsed.fingerprint) {
 			dbUpdateRepoFingerprint(

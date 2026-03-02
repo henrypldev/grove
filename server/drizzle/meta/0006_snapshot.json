@@ -1,8 +1,8 @@
 {
 	"version": "6",
 	"dialect": "sqlite",
-	"id": "a4b171c2-b98c-4d35-b076-04eb5edea531",
-	"prevId": "da261287-04a3-4fe0-9d4f-0e7ff546e668",
+	"id": "83edeab1-7aa5-4a9f-be73-63e799267fc4",
+	"prevId": "a4b171c2-b98c-4d35-b076-04eb5edea531",
 	"tables": {
 		"agent_notes": {
 			"name": "agent_notes",
@@ -535,6 +535,13 @@
 					"notNull": false,
 					"autoincrement": false
 				},
+				"framework": {
+					"name": "framework",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
 				"needs_native_build": {
 					"name": "needs_native_build",
 					"type": "integer",
@@ -715,13 +722,6 @@
 				"pm_summary": {
 					"name": "pm_summary",
 					"type": "text",
-					"primaryKey": false,
-					"notNull": false,
-					"autoincrement": false
-				},
-				"port": {
-					"name": "port",
-					"type": "integer",
 					"primaryKey": false,
 					"notNull": false,
 					"autoincrement": false

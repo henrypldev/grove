@@ -7,6 +7,7 @@ import type {
 } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
+import { dbInsertActivity, emitEphemeralActivity } from '../db/activity'
 import {
 	dbGetAgent,
 	dbIncrementAgentRetry,
@@ -15,7 +16,6 @@ import {
 	dbUpdateAgentSessionId,
 	dbUpdateAgentStatus,
 } from '../db/agents'
-import { dbInsertEvent, emitEphemeralEvent } from '../db/events'
 import { dbInsertUsage } from '../db/usage'
 import type { Agent, AgentRole, ToolCall } from '../types'
 import { registerAgent } from './agent-registry'
@@ -41,6 +41,7 @@ export interface AgentRunOptions {
 	allowedTools?: string[]
 	canUseTool?: CanUseTool
 	mcpTools?: ReturnType<typeof createGroveTools>
+	onPostBash?: (command: string) => void
 	onDone?: (agentId: string) => void
 	onError?: (agentId: string, error: unknown) => void
 }
@@ -97,11 +98,11 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 				...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
 				...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
 				...(opts.canUseTool ? { canUseTool: opts.canUseTool } : {}),
-				hooks: buildHooks(agent, pending),
+				hooks: buildHooks(agent, pending, opts),
 			},
 		})) {
 			if (message.type !== 'user') {
-				dbInsertEvent(
+				dbInsertActivity(
 					agent.teamId,
 					agent.id,
 					`sdk:${message.type}`,
@@ -174,7 +175,7 @@ export async function spawnPersistentAgent(
 			...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
 			...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
 			...(opts.canUseTool ? { canUseTool: opts.canUseTool } : {}),
-			hooks: buildHooks(agent, pending),
+			hooks: buildHooks(agent, pending, opts),
 		},
 	})
 
@@ -202,7 +203,7 @@ async function processMessages(
 	try {
 		for await (const message of q) {
 			if (message.type !== 'user') {
-				dbInsertEvent(
+				dbInsertActivity(
 					agent.teamId,
 					agent.id,
 					`sdk:${message.type}`,
@@ -248,7 +249,11 @@ async function processMessages(
 	}
 }
 
-function buildHooks(agent: Agent, pending: Map<string, ToolCall>) {
+function buildHooks(
+	agent: Agent,
+	pending: Map<string, ToolCall>,
+	opts: AgentRunOptions,
+) {
 	return {
 		PreToolUse: [
 			{
@@ -261,10 +266,15 @@ function buildHooks(agent: Agent, pending: Map<string, ToolCall>) {
 						})
 						const activity = activityFromToolName(h.tool_name)
 						dbUpdateAgentActivity(agent.id, activity)
-						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-							status: 'working',
-							activity,
-						})
+						emitEphemeralActivity(
+							agent.teamId,
+							agent.id,
+							'agent:status_change',
+							{
+								status: 'working',
+								activity,
+							},
+						)
 						return {}
 					},
 				],
@@ -282,12 +292,27 @@ function buildHooks(agent: Agent, pending: Map<string, ToolCall>) {
 							arr.push(call)
 							agentToolAccumulator.set(agent.id, arr)
 							pending.delete(h.tool_use_id)
+
+							if (
+								opts.onPostBash &&
+								call.name === 'Bash' &&
+								typeof call.input === 'object' &&
+								call.input !== null &&
+								'command' in call.input
+							) {
+								opts.onPostBash((call.input as { command: string }).command)
+							}
 						}
 						dbUpdateAgentActivity(agent.id, null)
-						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-							status: 'working',
-							activity: null,
-						})
+						emitEphemeralActivity(
+							agent.teamId,
+							agent.id,
+							'agent:status_change',
+							{
+								status: 'working',
+								activity: null,
+							},
+						)
 						return {}
 					},
 				],
@@ -307,10 +332,15 @@ function buildHooks(agent: Agent, pending: Map<string, ToolCall>) {
 							pending.delete(h.tool_use_id)
 						}
 						dbUpdateAgentActivity(agent.id, null)
-						emitEphemeralEvent(agent.teamId, agent.id, 'agent:status_change', {
-							status: 'working',
-							activity: null,
-						})
+						emitEphemeralActivity(
+							agent.teamId,
+							agent.id,
+							'agent:status_change',
+							{
+								status: 'working',
+								activity: null,
+							},
+						)
 						return {}
 					},
 				],

@@ -19,7 +19,7 @@ import {
 	saveConfig,
 	setSetting,
 } from '../../config'
-import { emitGlobalEvent } from '../../db/events'
+import { emitGlobalActivity } from '../../db/activity'
 import {
 	dbDeleteRepo,
 	dbGetRepo,
@@ -41,7 +41,7 @@ function triggerDetection(repo: Repo) {
 	detectSetupSteps(repo.id, repo.path)
 		.then(result => {
 			if (result) {
-				emitGlobalEvent('repo:setup-detected', {
+				emitGlobalActivity('repo:setup-detected', {
 					repoId: repo.id,
 					steps: result.steps,
 					scripts: result.scripts ?? [],
@@ -50,7 +50,7 @@ function triggerDetection(repo: Repo) {
 					needsNativeBuild: result.needsNativeBuild ?? false,
 				})
 			} else {
-				emitGlobalEvent('repo:setup-detection-failed', { repoId: repo.id })
+				emitGlobalActivity('repo:setup-detection-failed', { repoId: repo.id })
 			}
 		})
 		.catch(err => {
@@ -58,7 +58,7 @@ function triggerDetection(repo: Repo) {
 				repoId: repo.id,
 				err,
 			})
-			emitGlobalEvent('repo:setup-detection-failed', { repoId: repo.id })
+			emitGlobalActivity('repo:setup-detection-failed', { repoId: repo.id })
 		})
 }
 

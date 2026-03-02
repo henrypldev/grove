@@ -66,7 +66,7 @@ export async function handleV1(
 	const path = url.pathname
 	const method = req.method
 
-	if (path === '/v1/events' && method === 'GET') {
+	if (path === '/v1/activity' && method === 'GET') {
 		const stream = new ReadableStream({
 			start(controller) {
 				controller.enqueue(

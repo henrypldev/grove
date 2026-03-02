@@ -3,7 +3,7 @@ import { makeTestDb } from '../../../db/__tests__/helpers'
 import { dbInsertAgent } from '../../../db/agents'
 import { dbInsertRepo } from '../../../db/repos'
 import { dbInsertTeam } from '../../../db/teams'
-import { handleV2Events } from '../events'
+import { handleV2Activity } from '../activity'
 
 function makeReq(method: string, body?: unknown): Request {
 	return new Request('http://localhost', {
@@ -15,7 +15,7 @@ function makeReq(method: string, body?: unknown): Request {
 
 const headers = {}
 
-describe('handleV2Events', () => {
+describe('handleV2Activity', () => {
 	beforeEach(() => {
 		makeTestDb()
 		dbInsertRepo({
@@ -51,15 +51,15 @@ describe('handleV2Events', () => {
 		})
 	})
 
-	test('POST /v2/events inserts and returns event', async () => {
-		const res = await handleV2Events(
+	test('POST /v2/activity inserts and returns item', async () => {
+		const res = await handleV2Activity(
 			makeReq('POST', {
 				teamId: 't1',
 				agentId: 'a1',
 				type: 'test',
 				payload: { x: 1 },
 			}),
-			new URL('http://localhost/v2/events'),
+			new URL('http://localhost/v2/activity'),
 			headers,
 		)
 		expect(res?.status).toBe(200)
@@ -69,45 +69,45 @@ describe('handleV2Events', () => {
 		expect(typeof ev.id).toBe('number')
 	})
 
-	test('POST /v2/events missing fields returns 400', async () => {
-		const res = await handleV2Events(
+	test('POST /v2/activity missing fields returns 400', async () => {
+		const res = await handleV2Activity(
 			makeReq('POST', { teamId: 't1' }),
-			new URL('http://localhost/v2/events'),
+			new URL('http://localhost/v2/activity'),
 			headers,
 		)
 		expect(res?.status).toBe(400)
 	})
 
-	test('POST /v2/events unknown team returns 404', async () => {
-		const res = await handleV2Events(
+	test('POST /v2/activity unknown team returns 404', async () => {
+		const res = await handleV2Activity(
 			makeReq('POST', {
 				teamId: 'nope',
 				agentId: 'a1',
 				type: 't',
 				payload: {},
 			}),
-			new URL('http://localhost/v2/events'),
+			new URL('http://localhost/v2/activity'),
 			headers,
 		)
 		expect(res?.status).toBe(404)
 	})
 
-	test('POST /v2/events unknown agent returns 404', async () => {
-		const res = await handleV2Events(
+	test('POST /v2/activity unknown agent returns 404', async () => {
+		const res = await handleV2Activity(
 			makeReq('POST', {
 				teamId: 't1',
 				agentId: 'nope',
 				type: 't',
 				payload: {},
 			}),
-			new URL('http://localhost/v2/events'),
+			new URL('http://localhost/v2/activity'),
 			headers,
 		)
 		expect(res?.status).toBe(404)
 	})
 
 	test('unmatched path returns null', async () => {
-		const res = await handleV2Events(
+		const res = await handleV2Activity(
 			makeReq('GET'),
 			new URL('http://localhost/v2/other'),
 			headers,

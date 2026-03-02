@@ -123,6 +123,7 @@ export async function spawnTeamLead(
 
 export async function spawnDeveloper(
 	team: Team,
+	options?: { onPostBash?: (command: string) => void },
 ): Promise<PersistentAgentResult> {
 	log('agent', 'spawning developer', { teamId: team.id })
 	const agentId = generateId()
@@ -134,6 +135,7 @@ export async function spawnDeveloper(
 		cwd: team.worktreePath,
 		maxBudgetUsd: 30,
 		mcpTools: createGroveTools(team.id, agentId),
+		onPostBash: options?.onPostBash,
 	})
 }
 

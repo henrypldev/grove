@@ -16,6 +16,7 @@ mobile/android/
 
 # Server
 server/dist/
+server/simulator-server/.build/
 
 # Plans
 docs/plans/

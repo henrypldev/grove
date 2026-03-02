@@ -30,7 +30,7 @@ export async function allocatePort(): Promise<number | null> {
 
 const activePorts = new Set<number>()
 
-async function isPortListening(port: number): Promise<boolean> {
+export async function isPortListening(port: number): Promise<boolean> {
 	try {
 		const socket = await Bun.connect({
 			hostname: '127.0.0.1',

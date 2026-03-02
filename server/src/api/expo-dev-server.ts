@@ -1,6 +1,6 @@
 import { log } from '../config'
 import { emitTeamLog } from '../db/logs'
-import { isPortActive } from './ports'
+import { isPortListening } from './ports'
 
 type ExpoDevServerStatus = 'starting' | 'running' | 'stopped' | 'failed'
 
@@ -61,6 +61,10 @@ export function startExpoDevServer(
 		stdout: 'pipe',
 		stderr: 'pipe',
 		detached: true,
+		env: {
+			...process.env,
+			REACT_NATIVE_PACKAGER_HOSTNAME: 'localhost',
+		},
 	})
 
 	const server: ActiveDevServer = {
@@ -88,7 +92,7 @@ export function startExpoDevServer(
 			clearInterval(pollId)
 			return
 		}
-		if (isPortActive(port)) {
+		if (await isPortListening(port)) {
 			s.status = 'running'
 			log('expo-dev-server', 'running', { teamId, port })
 			emitProgress(teamId, 'running')
@@ -112,6 +116,8 @@ export function stopExpoDevServer(teamId: string) {
 	const server = activeDevServers.get(teamId)
 	if (!server) return
 
+	const port = server.port
+
 	if (server.process) {
 		const pid = server.process.pid
 		try {
@@ -122,6 +128,12 @@ export function stopExpoDevServer(teamId: string) {
 			} catch {}
 		}
 	}
+
+	// Also kill anything still listening on the port
+	Bun.spawn(['sh', '-c', `lsof -ti:${port} | xargs kill -9 2>/dev/null`], {
+		stdout: 'ignore',
+		stderr: 'ignore',
+	})
 
 	server.status = 'stopped'
 	server.process = null

@@ -11,6 +11,8 @@ params.defaultProtocolStack.applicationProtocols.insert(wsOptions, at: 0)
 
 let listener = try! NWListener(using: params, on: NWEndpoint.Port(rawValue: port)!)
 
+var activeConnections: [ObjectIdentifier: NWConnection] = [:]
+
 listener.newConnectionHandler = { connection in
     handleConnection(connection)
 }
@@ -42,14 +44,44 @@ signal(SIGINT) { _ in
 }
 
 func handleConnection(_ connection: NWConnection) {
+    activeConnections[ObjectIdentifier(connection)] = connection
+
+    connection.stateUpdateHandler = { state in
+        switch state {
+        case .failed(let error):
+            print("[Connection] Failed: \(error)")
+            cleanupConnection(connection)
+        case .cancelled:
+            print("[Connection] Cancelled")
+            cleanupConnection(connection)
+        default:
+            break
+        }
+    }
+
     connection.start(queue: .main)
     receiveMessage(on: connection)
+}
+
+func cleanupConnection(_ connection: NWConnection) {
+    activeConnections.removeValue(forKey: ObjectIdentifier(connection))
+    FrameStreamer.shared.stopAllStreams(for: connection)
+    HIDInput.shared.removeDevice(for: connection)
+    connection.cancel()
 }
 
 func receiveMessage(on connection: NWConnection) {
     connection.receiveMessage { data, context, _, error in
         if let error = error {
-            print("Receive error: \(error)")
+            if case NWError.posix(let code) = error, code == .ECANCELED {
+                // Connection cancelled — clean up and stop listening
+                cleanupConnection(connection)
+                return
+            }
+            print("[Receive] Error: \(error)")
+            sendError("Internal error", on: connection)
+            // Continue listening for non-fatal errors
+            receiveMessage(on: connection)
             return
         }
 

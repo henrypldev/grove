@@ -1,12 +1,19 @@
 import Foundation
 import CoreGraphics
+import Network
 
 class HIDInput {
     static let shared = HIDInput()
 
-    private var hidClient: AnyObject?
-    private var screenWidth: Double = 1170
-    private var screenHeight: Double = 2532
+    private struct DeviceHID {
+        let client: AnyObject
+        let width: Double
+        let height: Double
+        let connection: NWConnection
+    }
+
+    private var devices: [String: DeviceHID] = [:] // deviceId → HID state
+    private var activeDeviceId: String?
 
     // IndigoHID function pointers from SimulatorKit
     private typealias KeyboardFn = @convention(c) (UInt32, Int32) -> UnsafeMutableRawPointer?
@@ -47,10 +54,7 @@ class HIDInput {
         }
     }
 
-    func setActiveDevice(_ device: AnyObject, width: Double, height: Double) {
-        self.screenWidth = width
-        self.screenHeight = height
-
+    func setActiveDevice(_ device: AnyObject, deviceId: String, width: Double, height: Double, connection: NWConnection) {
         // Create SimDeviceLegacyHIDClient for this device
         guard let cls = hidClientClass else {
             print("[HID] SimDeviceLegacyHIDClient class not found")
@@ -70,15 +74,35 @@ class HIDInput {
         let client = unsafeBitCast(method, to: InitFn.self)(alloc, initSel, device, &error)
 
         if let client = client {
-            self.hidClient = client
-            print("[HID] Client created for device")
+            devices[deviceId] = DeviceHID(client: client, width: width, height: height, connection: connection)
+            activeDeviceId = deviceId
+            print("[HID] Client created for device \(deviceId)")
         } else {
             print("[HID] Failed to create client: \(error?.localizedDescription ?? "unknown")")
         }
     }
 
+    func removeDevice(deviceId: String) {
+        devices.removeValue(forKey: deviceId)
+        if activeDeviceId == deviceId {
+            activeDeviceId = devices.keys.first
+        }
+    }
+
+    func removeDevice(for connection: NWConnection) {
+        let deviceIds = devices.filter { $0.value.connection === connection }.map { $0.key }
+        for deviceId in deviceIds {
+            removeDevice(deviceId: deviceId)
+        }
+    }
+
+    private var activeDevice: DeviceHID? {
+        guard let id = activeDeviceId else { return nil }
+        return devices[id]
+    }
+
     func sendTouch(x: Double, y: Double, phase: String) {
-        guard let mouseFn = mouseFn else { return }
+        guard let mouseFn = mouseFn, let device = activeDevice else { return }
 
         // On modern Xcode, IndigoHIDMessageForMouseNSEvent already produces proper
         // touch digitizer messages (eventType=2) with dual payloads.
@@ -93,9 +117,9 @@ class HIDInput {
         }
 
         // Pass screen-pixel coordinates (not 0-1 ratios) since the function divides by screen size
-        var point = CGPoint(x: x * screenWidth, y: y * screenHeight)
+        var point = CGPoint(x: x * device.width, y: y * device.height)
 
-        guard let msg = mouseFn(&point, nil, 0x32, nsEventType, CGSize(width: screenWidth, height: screenHeight), 0) else {
+        guard let msg = mouseFn(&point, nil, 0x32, nsEventType, CGSize(width: device.width, height: device.height), 0) else {
             return
         }
 
@@ -162,7 +186,8 @@ class HIDInput {
     // MARK: - Private
 
     private func sendIndigoMessage(_ msg: UnsafeMutableRawPointer) {
-        guard let client = hidClient else { return }
+        guard let device = activeDevice else { return }
+        let client = device.client
 
         let sendSel = NSSelectorFromString("sendWithMessage:freeWhenDone:completionQueue:completion:")
         guard (client as AnyObject).responds(to: sendSel) else { return }

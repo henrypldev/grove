@@ -3,6 +3,7 @@ import {
 	handleSimulatorClose,
 	handleSimulatorMessage,
 	handleSimulatorOpen,
+	SIMULATOR_MAX_PAYLOAD,
 	type SimulatorWsData,
 } from '../api/simulator-relay'
 import {
@@ -93,6 +94,8 @@ function maybeRemoveTeamListener(teamId: string) {
 }
 
 export const wsHandlers = {
+	maxPayloadLength: SIMULATOR_MAX_PAYLOAD,
+
 	open(ws: ServerWebSocket<WsClientData>) {
 		if (ws.data.type === 'simulator') {
 			handleSimulatorOpen(ws as ServerWebSocket<SimulatorWsData>)

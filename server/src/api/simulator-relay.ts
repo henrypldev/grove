@@ -28,6 +28,7 @@ function resolveSimulatorBinary(): string {
 }
 
 const SIMULATOR_BINARY = resolveSimulatorBinary()
+const MAX_RECONNECT_ATTEMPTS = 3
 
 interface SimulatorProcess {
 	proc: ReturnType<typeof Bun.spawn>
@@ -37,12 +38,16 @@ interface SimulatorProcess {
 	upstreamWs: WebSocket | null
 	upstreamReady: Promise<void> | null
 	clients: Set<ServerWebSocket<SimulatorWsData>>
+	reconnectAttempts: number
 }
 
 export interface SimulatorWsData {
 	type: 'simulator'
 	clientId: string
 }
+
+/** Max incoming message size from clients (1MB) */
+export const SIMULATOR_MAX_PAYLOAD = 1024 * 1024
 
 let sim: SimulatorProcess | null = null
 let initPromise: Promise<void> | null = null
@@ -131,6 +136,7 @@ async function spawnSimulator(): Promise<SimulatorProcess> {
 		upstreamWs: null,
 		upstreamReady: null,
 		clients: new Set(),
+		reconnectAttempts: 0,
 	}
 
 	sim = entry
@@ -142,10 +148,14 @@ function teardown() {
 	log('simulator-relay', 'tearing down GroveSimulatorServer')
 	try {
 		sim.upstreamWs?.close()
-	} catch {}
+	} catch (err) {
+		log('simulator-relay', `teardown: error closing upstream ws: ${err}`)
+	}
 	try {
 		sim.proc.kill()
-	} catch {}
+	} catch (err) {
+		log('simulator-relay', `teardown: error killing process: ${err}`)
+	}
 	sim = null
 }
 
@@ -158,6 +168,7 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 
 		ws.onopen = () => {
 			entry.upstreamWs = ws
+			entry.reconnectAttempts = 0
 			log('simulator-relay', 'upstream connected')
 			resolve()
 		}
@@ -170,13 +181,32 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 					} else {
 						client.send(event.data as string)
 					}
-				} catch {}
+				} catch (err) {
+					log('simulator-relay', `error sending to client: ${err}`)
+					entry.clients.delete(client)
+				}
 			}
 		}
 
 		ws.onclose = () => {
 			entry.upstreamWs = null
 			entry.upstreamReady = null
+
+			// Auto-reconnect if clients are still connected
+			if (
+				entry.clients.size > 0 &&
+				entry.reconnectAttempts < MAX_RECONNECT_ATTEMPTS
+			) {
+				entry.reconnectAttempts++
+				log(
+					'simulator-relay',
+					`upstream closed unexpectedly, reconnecting (attempt ${entry.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`,
+				)
+				teardown()
+				ensureReady().catch(err => {
+					log('simulator-relay', `reconnection failed: ${err}`)
+				})
+			}
 		}
 
 		ws.onerror = () => {
@@ -217,9 +247,13 @@ export function handleSimulatorMessage(
 			if (!sim?.upstreamWs) return
 			try {
 				sim.upstreamWs.send(data)
-			} catch {}
+			} catch (err) {
+				log('simulator-relay', `error forwarding message upstream: ${err}`)
+			}
 		})
-		.catch(() => {})
+		.catch(err => {
+			log('simulator-relay', `error in handleSimulatorMessage: ${err}`)
+		})
 }
 
 export function handleSimulatorClose(ws: ServerWebSocket<SimulatorWsData>) {

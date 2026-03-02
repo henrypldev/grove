@@ -8,10 +8,16 @@ import ImageIO
 class FrameStreamer {
     static let shared = FrameStreamer()
 
-    private var activeStreams: [String: DispatchSourceTimer] = [:] // deviceId → timer
+    private struct StreamState {
+        let timer: DispatchSourceTimer
+        let connection: NWConnection
+        var encoding: Bool = false
+    }
+
+    private var activeStreams: [String: StreamState] = [:] // deviceId → state
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private let targetFPS: Double = 60.0
-    private let jpegQuality: CGFloat = 0.9
+    private let jpegQuality: CGFloat = 0.8
 
     func startStreaming(device: AnyObject, deviceId: String, connection: NWConnection) {
         guard let surface = getIOSurface(from: device) else {
@@ -19,8 +25,14 @@ class FrameStreamer {
             return
         }
 
+        // Cancel existing stream for this device before starting new one
+        if activeStreams[deviceId] != nil {
+            stopStreaming(deviceId: deviceId)
+        }
+
         var lastSeed: UInt32 = 0
         let interval = 1.0 / targetFPS
+        var isEncoding = false
 
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInteractive))
         timer.schedule(deadline: .now(), repeating: interval)
@@ -28,19 +40,24 @@ class FrameStreamer {
         timer.setEventHandler { [weak self] in
             guard let self = self else { return }
 
+            // Backpressure: skip frame if still encoding previous one
+            if isEncoding { return }
+
             // Check if surface has changed (dirty tracking)
             let currentSeed = IOSurfaceGetSeed(surface)
             guard currentSeed != lastSeed else { return }
             lastSeed = currentSeed
 
             // Convert IOSurface → JPEG
+            isEncoding = true
             if let jpegData = self.encodeFrame(surface: surface) {
                 sendBinary(jpegData, on: connection)
             }
+            isEncoding = false
         }
 
         timer.resume()
-        activeStreams[deviceId] = timer
+        activeStreams[deviceId] = StreamState(timer: timer, connection: connection)
     }
 
     func getIOSurfaceForDevice(_ device: AnyObject) -> IOSurfaceRef? {
@@ -48,8 +65,17 @@ class FrameStreamer {
     }
 
     func stopStreaming(deviceId: String) {
-        activeStreams[deviceId]?.cancel()
-        activeStreams.removeValue(forKey: deviceId)
+        if let state = activeStreams.removeValue(forKey: deviceId) {
+            state.timer.cancel()
+        }
+    }
+
+    func stopAllStreams(for connection: NWConnection) {
+        let deviceIds = activeStreams.filter { $0.value.connection === connection }.map { $0.key }
+        for deviceId in deviceIds {
+            print("[FrameStreamer] Stopping stream for device \(deviceId) (connection closed)")
+            stopStreaming(deviceId: deviceId)
+        }
     }
 
     // MARK: - Private

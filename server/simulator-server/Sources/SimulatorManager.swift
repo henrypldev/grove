@@ -6,29 +6,41 @@ class SimulatorManager {
     static let shared = SimulatorManager()
 
     private var bootedDevices: [String: AnyObject] = [:] // udid → SimDevice
-    private let frameworkHandle: UnsafeMutableRawPointer
+    private let frameworkHandle: UnsafeMutableRawPointer?
+    private let available: Bool
 
     // Objective-C class references loaded from CoreSimulator
-    private let simServiceContextClass: AnyClass
-    private let simDeviceSetClass: AnyClass
+    private let simServiceContextClass: AnyClass?
+    private let simDeviceSetClass: AnyClass?
 
     private init() {
         // Load CoreSimulator.framework
         let frameworkPath = "/Library/Developer/PrivateFrameworks/CoreSimulator.framework/CoreSimulator"
         guard let handle = dlopen(frameworkPath, RTLD_NOW) else {
-            fatalError("Failed to load CoreSimulator: \(String(cString: dlerror()))")
+            print("[SimulatorManager] Failed to load CoreSimulator: \(String(cString: dlerror()))")
+            self.frameworkHandle = nil
+            self.simServiceContextClass = nil
+            self.simDeviceSetClass = nil
+            self.available = false
+            return
         }
         self.frameworkHandle = handle
 
         guard let serviceCtx = NSClassFromString("SimServiceContext"),
               let deviceSet = NSClassFromString("SimDeviceSet") else {
-            fatalError("Failed to find CoreSimulator classes")
+            print("[SimulatorManager] Failed to find CoreSimulator classes")
+            self.simServiceContextClass = nil
+            self.simDeviceSetClass = nil
+            self.available = false
+            return
         }
         self.simServiceContextClass = serviceCtx
         self.simDeviceSetClass = deviceSet
+        self.available = true
     }
 
     func listDevices() -> [DeviceInfo] {
+        guard available else { return [] }
         guard let deviceSet = getDefaultDeviceSet() else { return [] }
 
         let devices = deviceSet.value(forKeyPath: "devices") as? [AnyObject] ?? []
@@ -53,6 +65,11 @@ class SimulatorManager {
     }
 
     func boot(deviceId: String, connection: NWConnection) {
+        guard available else {
+            sendError("CoreSimulator not available", on: connection)
+            return
+        }
+
         guard let device = findDevice(udid: deviceId) else {
             sendError("Device not found: \(deviceId)", on: connection)
             return
@@ -81,10 +98,8 @@ class SimulatorManager {
 
         if success {
             bootedDevices[deviceId] = device
-            // Give the device a moment to finish boot
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.startStreaming(device: device, deviceId: deviceId, connection: connection)
-            }
+            // Poll for IOSurface readiness instead of hard-coded delay
+            pollForReady(device: device, deviceId: deviceId, connection: connection)
         } else {
             sendError("Boot failed: \(error?.localizedDescription ?? "unknown")", on: connection)
         }
@@ -97,6 +112,7 @@ class SimulatorManager {
         }
 
         FrameStreamer.shared.stopStreaming(deviceId: deviceId)
+        HIDInput.shared.removeDevice(deviceId: deviceId)
 
         let sel = NSSelectorFromString("shutdownWithError:")
         let method = device.method(for: sel)
@@ -109,7 +125,9 @@ class SimulatorManager {
     }
 
     func shutdownAll() {
-        for (_, device) in bootedDevices {
+        for (deviceId, device) in bootedDevices {
+            FrameStreamer.shared.stopStreaming(deviceId: deviceId)
+            HIDInput.shared.removeDevice(deviceId: deviceId)
             let sel = NSSelectorFromString("shutdownWithError:")
             let method = device.method(for: sel)
             typealias ShutdownFn = @convention(c) (AnyObject, Selector, UnsafeMutablePointer<NSError?>) -> Bool
@@ -168,7 +186,30 @@ class SimulatorManager {
 
     // MARK: - Private
 
+    private func pollForReady(device: AnyObject, deviceId: String, connection: NWConnection, attempt: Int = 0) {
+        let maxAttempts = 40  // 40 × 250ms = 10s
+        let pollInterval = 0.25
+
+        // Check if device IO and IOSurface are available
+        if device.value(forKey: "io") != nil,
+           FrameStreamer.shared.getIOSurfaceForDevice(device) != nil {
+            startStreaming(device: device, deviceId: deviceId, connection: connection)
+            return
+        }
+
+        if attempt >= maxAttempts {
+            sendError("Boot timeout: device not ready after 10s", on: connection)
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + pollInterval) {
+            self.pollForReady(device: device, deviceId: deviceId, connection: connection, attempt: attempt + 1)
+        }
+    }
+
     private func getDefaultDeviceSet() -> AnyObject? {
+        guard let simServiceContextClass = simServiceContextClass else { return nil }
+
         let sharedSel = NSSelectorFromString("sharedServiceContextForDeveloperDir:error:")
         guard simServiceContextClass.responds(to: sharedSel) else { return nil }
 
@@ -218,7 +259,7 @@ class SimulatorManager {
             else { screenScale = 2 }
         }
 
-        HIDInput.shared.setActiveDevice(device, width: Double(screenWidth), height: Double(screenHeight))
+        HIDInput.shared.setActiveDevice(device, deviceId: deviceId, width: Double(screenWidth), height: Double(screenHeight), connection: connection)
 
         sendJSON(BootedMessage(
             deviceId: deviceId,

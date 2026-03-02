@@ -5,7 +5,18 @@ import {
 	rebuildExpoBuild,
 	stopExpoBuild,
 } from '../../api/expo-build'
-import { getTeamPort, isPortActive } from '../../api/ports'
+import {
+	getExpoDevServerOutput,
+	getExpoDevServerStatus,
+	startExpoDevServer,
+	stopExpoDevServer,
+} from '../../api/expo-dev-server'
+import {
+	allocatePort,
+	getTeamPort,
+	isPortActive,
+	setTeamPort,
+} from '../../api/ports'
 import { runScript, stopScript } from '../../api/scripts'
 import {
 	cancelTeamSetup,
@@ -258,6 +269,7 @@ export async function handleV2Teams(
 				: null
 			const simulatorUdid = getTeamDeviceUdid(teamMatch.id)
 			const expoBuildStatus = getExpoBuildStatus(teamMatch.id)
+			const expoDevServerStatus = getExpoDevServerStatus(teamMatch.id)
 			const repo = dbGetRepo(team.repoId)
 			// Auto-create simulator for expo repos if one doesn't exist yet
 			if (!simulatorUdid && !expoBuildStatus && repo?.framework === 'expo') {
@@ -276,6 +288,7 @@ export async function handleV2Teams(
 					simulatorUdid,
 					simulatorDeviceName,
 					expoBuildStatus,
+					expoDevServerStatus,
 					devServerStatus,
 				},
 				{ headers },
@@ -666,6 +679,53 @@ export async function handleV2Teams(
 		const error = stopScript(scriptStopMatch.id)
 		if (error) return Response.json({ error }, { status: 400, headers })
 		return Response.json({ success: true }, { headers })
+	}
+
+	const devServerMatch = matchRoute(path, '/v2/teams/:id/dev-server')
+	if (devServerMatch && method === 'POST') {
+		const team = dbGetTeam(devServerMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		let port = getTeamPort(devServerMatch.id)
+		if (!port) {
+			port = (await allocatePort()) ?? null
+			if (port) setTeamPort(devServerMatch.id, port)
+		}
+		if (!port) {
+			return Response.json(
+				{ error: 'No port available' },
+				{ status: 500, headers },
+			)
+		}
+		startExpoDevServer(devServerMatch.id, team.worktreePath, port)
+		return Response.json({ success: true, port }, { headers })
+	}
+
+	const devServerStopMatch = matchRoute(path, '/v2/teams/:id/dev-server/stop')
+	if (devServerStopMatch && method === 'POST') {
+		const team = dbGetTeam(devServerStopMatch.id)
+		if (!team)
+			return Response.json(
+				{ error: 'Team not found' },
+				{ status: 404, headers },
+			)
+		stopExpoDevServer(devServerStopMatch.id)
+		return Response.json({ success: true }, { headers })
+	}
+
+	const devServerLogsMatch = matchRoute(path, '/v2/teams/:id/dev-server/logs')
+	if (devServerLogsMatch && method === 'GET') {
+		const status = getExpoDevServerStatus(devServerLogsMatch.id)
+		const output = getExpoDevServerOutput(devServerLogsMatch.id)
+		if (status === null)
+			return Response.json(
+				{ error: 'No active dev server' },
+				{ status: 404, headers },
+			)
+		return Response.json({ status, output }, { headers })
 	}
 
 	return null

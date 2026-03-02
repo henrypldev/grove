@@ -1,4 +1,5 @@
 import { log } from '../config'
+import { emitTeamLog } from '../db/logs'
 
 const teamDevices = new Map<string, string>()
 
@@ -51,6 +52,10 @@ export async function createTeamDevice(teamId: string): Promise<string> {
 			udid: existing.udid,
 			deviceName,
 		})
+		emitTeamLog(teamId, 'simulator:ready', {
+			udid: existing.udid,
+			name: deviceName,
+		})
 		return existing.udid
 	}
 
@@ -92,6 +97,7 @@ export async function createTeamDevice(teamId: string): Promise<string> {
 
 	teamDevices.set(teamId, udid)
 	log('simulator', 'created and booted device', { teamId, udid, deviceName })
+	emitTeamLog(teamId, 'simulator:ready', { udid, name: deviceName })
 	return udid
 }
 
@@ -117,6 +123,7 @@ export async function deleteTeamDevice(teamId: string): Promise<void> {
 
 	teamDevices.delete(teamId)
 	log('simulator', 'deleted device', { teamId, udid })
+	emitTeamLog(teamId, 'simulator:deleted', { udid })
 }
 
 export function getTeamDeviceUdid(teamId: string): string | null {

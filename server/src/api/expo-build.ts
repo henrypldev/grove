@@ -1,6 +1,11 @@
 import { log } from '../config'
 import { clearTeamLogs, dbInsertLog } from '../db/logs'
 import { dbGetRepo, dbUpdateRepoFingerprint } from '../db/repos'
+import {
+	getExpoDevServerStatus,
+	startExpoDevServer,
+	waitForDevServerReady,
+} from './expo-dev-server'
 import { allocatePort, getTeamPort, setTeamPort } from './ports'
 import { createTeamDevice, getTeamDeviceUdid } from './simulator'
 
@@ -104,7 +109,19 @@ export async function startExpoBuild(
 	// The device is already booted headlessly via simctl.
 	await patchExpoHeadless(worktreePath)
 
-	const command = `bunx expo run:ios --device ${deviceUdid} --port ${port}`
+	// Ensure dev server is running before building
+	const devServerStatus = getExpoDevServerStatus(teamId)
+	if (devServerStatus !== 'running' && devServerStatus !== 'starting') {
+		startExpoDevServer(teamId, worktreePath, port)
+	}
+	const ready = await waitForDevServerReady(teamId)
+	if (!ready) {
+		log('expo', 'dev server not ready, aborting build', { teamId })
+		emitProgress(teamId, 'failed')
+		return
+	}
+
+	const command = `bunx expo run:ios --no-bundler --device ${deviceUdid} --port ${port}`
 	const proc = Bun.spawn(['sh', '-c', command], {
 		cwd: worktreePath,
 		stdout: 'pipe',

@@ -47,8 +47,8 @@ export function startExpoDevServer(
 	worktreePath: string,
 	port: number,
 ) {
-	if (activeDevServers.has(teamId)) {
-		const existing = activeDevServers.get(teamId)!
+	const existing = activeDevServers.get(teamId)
+	if (existing) {
 		if (existing.status === 'running' || existing.status === 'starting') {
 			log('expo-dev-server', 'already running', { teamId })
 			return

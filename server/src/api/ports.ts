@@ -76,3 +76,17 @@ export function stopPortPoller() {
 export function isPortActive(port: number): boolean {
 	return activePorts.has(port)
 }
+
+export async function killProcessOnPort(port: number): Promise<void> {
+	const proc = Bun.spawn(
+		['sh', '-c', `lsof -ti:${port} | xargs kill -9 2>/dev/null`],
+		{ stdout: 'ignore', stderr: 'ignore' },
+	)
+	await proc.exited
+	// Wait for OS to release the port
+	const start = Date.now()
+	while (Date.now() - start < 2000) {
+		if (!(await isPortListening(port))) return
+		await new Promise(resolve => setTimeout(resolve, 100))
+	}
+}

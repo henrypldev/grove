@@ -1,6 +1,6 @@
 import { log } from '../config'
 import { emitTeamLog } from '../db/logs'
-import { isPortListening } from './ports'
+import { isPortListening, killProcessOnPort } from './ports'
 
 type ExpoDevServerStatus = 'starting' | 'running' | 'stopped' | 'failed'
 
@@ -42,7 +42,7 @@ async function streamOutput(
 	}
 }
 
-export function startExpoDevServer(
+export async function startExpoDevServer(
 	teamId: string,
 	worktreePath: string,
 	port: number,
@@ -53,6 +53,15 @@ export function startExpoDevServer(
 			log('expo-dev-server', 'already running', { teamId })
 			return
 		}
+	}
+
+	// Kill any leftover process on this port before starting
+	if (await isPortListening(port)) {
+		log('expo-dev-server', 'port already in use, killing leftover process', {
+			teamId,
+			port,
+		})
+		await killProcessOnPort(port)
 	}
 
 	const command = `bunx expo start --port ${port}`
@@ -130,10 +139,7 @@ export function stopExpoDevServer(teamId: string) {
 	}
 
 	// Also kill anything still listening on the port
-	Bun.spawn(['sh', '-c', `lsof -ti:${port} | xargs kill -9 2>/dev/null`], {
-		stdout: 'ignore',
-		stderr: 'ignore',
-	})
+	killProcessOnPort(port)
 
 	server.status = 'stopped'
 	server.process = null

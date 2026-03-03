@@ -1,6 +1,6 @@
 {
 	"name": "grove",
-	"private": true,
+	"private": false,
 	"version": "0.14.0",
 	"workspaces": [
 		"packages/*",

@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { ServerWebSocket } from 'bun'
 import { log } from '../config'
+import { hasActiveSimulators } from './simulator'
 
 function resolveSimulatorBinary(): string {
 	if (process.env.GROVE_SIMULATOR_BINARY)
@@ -262,9 +263,9 @@ export function handleSimulatorClose(ws: ServerWebSocket<SimulatorWsData>) {
 	sim.refCount = Math.max(0, sim.refCount - 1)
 	log('simulator-relay', `client disconnected (refCount=${sim.refCount})`)
 
-	if (sim.refCount === 0) {
+	if (sim.refCount === 0 && !hasActiveSimulators()) {
 		sim.releaseTimer = setTimeout(() => {
-			if (sim && sim.refCount === 0) {
+			if (sim && sim.refCount === 0 && !hasActiveSimulators()) {
 				teardown()
 			}
 		}, 2000)

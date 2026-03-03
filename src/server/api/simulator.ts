@@ -129,3 +129,7 @@ export async function deleteTeamDevice(teamId: string): Promise<void> {
 export function getTeamDeviceUdid(teamId: string): string | null {
 	return teamDevices.get(teamId) ?? null
 }
+
+export function hasActiveSimulators(): boolean {
+	return teamDevices.size > 0
+}

@@ -1,5 +1,5 @@
 {
-	"versioning": "synchronized",
+	"versioning": "independent",
 	"aiReleaseNotes": true,
 	"changelog": true,
 	"packages": {

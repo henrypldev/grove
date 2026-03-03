@@ -185,7 +185,7 @@ const devLogs = await client.teams.devServer.logs({ id: teamId })
 
 // Scripts
 await client.teams.scripts.run({ teamId, scriptId })
-await client.teams.scripts.stop({ id: teamId })
+await client.teams.scripts.stop({ id: teamId })  // stops the running script for this team
 ```
 
 ### Dashboard and Analytics

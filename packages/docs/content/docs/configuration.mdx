@@ -112,29 +112,7 @@ Scripts are custom commands defined per repository that can be run against any t
 
 ## Server Settings
 
-Server settings can be configured via the API:
-
-```typescript
-// Get all settings
-const settings = await client.config.settings.get()
-
-// Update settings
-await client.config.settings.update({
-  settings: { key: 'value' }
-})
-```
-
-## Clone Directory
-
-Configure where GitHub repositories are cloned to:
-
-```typescript
-// Get current clone directory
-const { cloneDirectory } = await client.config.cloneDir.get()
-
-// Set clone directory
-await client.config.cloneDir.set({ cloneDirectory: '/Users/you/Projects' })
-```
+Server settings (and the clone directory for GitHub repos) can be managed via the API or SDK. See the [SDK documentation](/sdk#config) for usage examples.
 
 ## TLS Certificates
 

@@ -15,7 +15,8 @@
 	"files": ["dist"],
 	"scripts": {
 		"build": "tsup",
-		"dev": "tsup --watch"
+		"dev": "tsup --watch",
+		"test": "bun test src/"
 	},
 	"dependencies": {
 		"@usegrove/shared": "workspace:*"

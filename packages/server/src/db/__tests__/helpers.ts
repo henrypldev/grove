@@ -15,3 +15,7 @@ export function makeTestDb() {
 	_injectDb(db)
 	return db
 }
+
+export const REPO = { id: 'r1', name: 'repo', path: '/tmp/repo', envVars: undefined, setupSteps: undefined }
+export const TEAM = { id: 't1', repoId: 'r1', worktreePath: '/tmp/wt', task: 'task', status: 'planning' as const, pmSummary: null, port: null, title: null, createdAt: 1000, updatedAt: 1000 }
+export const AGENT = { id: 'a1', teamId: 't1', role: 'dev' as const, status: 'working' as const, activity: null, currentTask: null, sessionId: null, retryCount: 0, spawnedAt: 1000, updatedAt: 1000 }

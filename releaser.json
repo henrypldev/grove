@@ -1,0 +1,27 @@
+{
+	"versioning": "synchronized",
+	"aiReleaseNotes": true,
+	"changelog": true,
+	"packages": {
+		"packages/cli": {
+			"bump": true,
+			"publish": false
+		},
+		"packages/docs": {
+			"bump": true,
+			"publish": false
+		},
+		"packages/sdk": {
+			"bump": true,
+			"publish": "npm"
+		},
+		"packages/server": {
+			"bump": true,
+			"publish": false
+		},
+		"shared": {
+			"bump": true,
+			"publish": false
+		}
+	}
+}

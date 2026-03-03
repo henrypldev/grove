@@ -24,6 +24,10 @@ export class TypedEmitter<
 		}
 	}
 
+	off<K extends keyof EventMap>(event: K, listener: EventMap[K]): void {
+		this.listeners.get(event)?.delete(listener as any)
+	}
+
 	removeAllListeners(event?: keyof EventMap): void {
 		if (event) {
 			this.listeners.delete(event)

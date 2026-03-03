@@ -11,7 +11,7 @@ import { DepsCheck } from './components/DepsCheck.js'
 import { Running } from './components/Running.js'
 import { loadConfig, loadPid, saveConfig, savePid } from './config.js'
 import { runCommand } from './run.js'
-import { getTailscaleInfo, startFunnel, stopFunnel } from './tunnel.js'
+import { getTailscaleInfo, startServe, stopServe } from './tunnel.js'
 
 interface ParsedArgs {
 	port?: number
@@ -76,18 +76,18 @@ async function runDaemon(port: number) {
 	await startServer(port)
 	savePid(process.pid)
 
-	const success = startFunnel(port)
+	const success = startServe(port)
 	if (!success) {
-		console.error('Failed to start Tailscale Funnel')
+		console.error('Failed to start Tailscale Serve')
 		process.exit(1)
 	}
 
 	process.on('SIGINT', () => {
-		stopFunnel()
+		stopServe()
 		process.exit(0)
 	})
 	process.on('SIGTERM', () => {
-		stopFunnel()
+		stopServe()
 		process.exit(0)
 	})
 }
@@ -160,9 +160,9 @@ function App({ background, port }: AppProps) {
 				await startServer(port)
 				savePid(process.pid)
 
-				const success = startFunnel(port)
+				const success = startServe(port)
 				if (!success) {
-					setError('Failed to start Tailscale Funnel')
+					setError('Failed to start Tailscale Serve')
 					setState('error')
 					return
 				}
@@ -181,7 +181,7 @@ function App({ background, port }: AppProps) {
 		if (background) return
 
 		const cleanup = () => {
-			stopFunnel()
+			stopServe()
 			process.exit(0)
 		}
 

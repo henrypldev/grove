@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { loadPid, removePid } from './config.js'
-import { stopFunnel } from './tunnel.js'
+import { stopServe } from './tunnel.js'
 
 const SESSIONS_FILE = join(homedir(), '.config', 'grove', 'sessions.json')
 
@@ -58,7 +58,7 @@ export function stopAll(): { stopped: boolean; message: string } {
 	spawnSync('tmux', ['kill-session', '-t', 'grove'], { stdio: 'ignore' })
 
 	killProcess(pid)
-	stopFunnel()
+	stopServe()
 	removePid()
 
 	const sessionCount = sessions.sessions.length

@@ -8,7 +8,7 @@ Grove is an AI agent orchestration platform that manages teams of Claude agents 
 ## Requirements
 
 - [Bun](https://bun.sh)
-- [Tailscale](https://tailscale.com) with Funnel enabled
+- [Tailscale](https://tailscale.com)
 - [ttyd](https://github.com/tsl0922/ttyd)
 - [tmux](https://github.com/tmux/tmux)
 
@@ -55,7 +55,7 @@ Tailscale needs to be set up on both your Mac **and** your phone before Grove ca
 grove start
 ```
 
-This starts the Grove server interactively. It checks that all dependencies are installed, starts the HTTP and WebSocket server, and sets up a Tailscale Funnel for external access.
+This starts the Grove server interactively. It checks that all dependencies are installed, starts the HTTP and WebSocket server, and sets up Tailscale Serve for access within your tailnet.
 
 ### 2. Add a repository
 

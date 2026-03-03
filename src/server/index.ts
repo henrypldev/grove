@@ -1,4 +1,4 @@
-import pkg from '../package.json'
+import pkg from '../../package.json'
 import { onNewTeam, startOrchestrator } from './agents/orchestrator'
 import { killAllExpoBuilds } from './api/expo-build'
 import { killAllExpoDevServers } from './api/expo-dev-server'

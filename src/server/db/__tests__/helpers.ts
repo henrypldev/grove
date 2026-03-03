@@ -11,7 +11,7 @@ export function makeTestDb() {
 	sqlite.run('PRAGMA foreign_keys = ON')
 
 	const db = drizzle(sqlite, { schema })
-	migrate(db, { migrationsFolder: join(import.meta.dir, '../../../drizzle') })
+	migrate(db, { migrationsFolder: join(import.meta.dir, '../../../../drizzle') })
 
 	// Migration 0008 uses ALTER TABLE RENAME which doesn't work reliably
 	// with Drizzle's in-memory SQLite migrator. Fix it manually.

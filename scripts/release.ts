@@ -36,7 +36,7 @@ async function sha256(filePath: string): Promise<string> {
 
 async function buildSimulatorServer() {
 	console.log('Building GroveSimulatorServer...')
-	await $`cd packages/server/simulator-server && swift build -c release`
+	await $`cd simulator-server && swift build -c release`
 	console.log('  Built GroveSimulatorServer')
 }
 
@@ -57,8 +57,8 @@ async function compileBinaries(
 
 		console.log(`Compiling for ${target}...`)
 		await $`mkdir -p ${stageDir}`
-		await $`bun build --compile --minify --target=bun-${target} packages/cli/src/index.tsx --outfile=${stageDir}/grove`
-		await $`cp packages/server/simulator-server/.build/release/GroveSimulatorServer ${stageDir}/GroveSimulatorServer`
+		await $`bun build --compile --minify --target=bun-${target} src/cli/index.tsx --outfile=${stageDir}/grove`
+		await $`cp simulator-server/.build/release/GroveSimulatorServer ${stageDir}/GroveSimulatorServer`
 
 		const tarName = `${outputName}.tar.gz`
 		const tarPath = `${distDir}/${tarName}`
@@ -131,21 +131,19 @@ async function run() {
 	const bump = process.argv[2] as Bump | undefined
 
 	if (!bump || !VALID_BUMPS.includes(bump)) {
-		console.error('Usage: bun scripts/release-server.ts <patch|minor|major>')
+		console.error('Usage: bun scripts/release.ts <patch|minor|major>')
 		process.exit(1)
 	}
 
-	const serverPkg = await Bun.file('packages/server/package.json').json()
-	const currentVersion = serverPkg.version
+	const pkg = await Bun.file('package.json').json()
+	const currentVersion = pkg.version
 	const newVersion = bumpVersion(currentVersion, bump)
 	const tag = `v${newVersion}`
 
 	console.log(`Bumping version: ${currentVersion} → ${newVersion}`)
 
-	await updatePackageJson('packages/server/package.json', newVersion)
-	await updatePackageJson('packages/cli/package.json', newVersion)
-	await updatePackageJson('packages/sdk/package.json', newVersion)
-	console.log('Updated packages/server, packages/cli, and packages/sdk package.json')
+	await updatePackageJson('package.json', newVersion)
+	console.log('Updated package.json')
 
 	console.log('\nCompiling binaries...')
 	const { artifacts, checksums } = await compileBinaries(newVersion)
@@ -155,7 +153,7 @@ async function run() {
 		console.log(`  ${target}: ${hash}`)
 	}
 
-	await $`git add packages/server/package.json packages/cli/package.json packages/sdk/package.json`
+	await $`git add package.json`
 	await $`git commit -m "chore: release ${tag}"`
 	console.log('\nCommitted version bump')
 

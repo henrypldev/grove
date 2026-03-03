@@ -25,4 +25,4 @@ export type {
 	UsageResult,
 	WsClientMessage,
 	WsServerMessage,
-} from '@usegrove/shared'
+} from '../shared/types'

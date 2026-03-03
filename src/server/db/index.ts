@@ -20,7 +20,7 @@ export function getDb(): DrizzleDb {
 	sqlite.run('PRAGMA foreign_keys = ON')
 	seedMigrationsForExistingDb(sqlite)
 	const db = drizzle(sqlite, { schema })
-	migrate(db, { migrationsFolder: join(import.meta.dir, '../../drizzle') })
+	migrate(db, { migrationsFolder: join(import.meta.dir, '../../../drizzle') })
 	_db = db
 	return _db
 }

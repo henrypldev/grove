@@ -9,7 +9,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 bun run dev          # Start server with watch mode
 bun run server       # Start server (production)
 bun run cli          # Run CLI in dev mode (e.g., bun run cli start -b)
-bun run build:sdk    # Build SDK package
 ```
 
 ### Testing
@@ -31,13 +30,16 @@ bun scripts/release.ts patch|minor|major
 
 ## Architecture
 
-Monorepo with workspaces: `packages/*` and `shared/`.
+Flat repo structure (no workspaces).
 
-- `packages/server/` — Grove server
-- `packages/cli/` — CLI tool
-- `packages/sdk/` — TypeScript SDK (`@usegrove/sdk`)
-- `packages/docs/` — Documentation
-- `shared/` — Shared types (`@usegrove/shared`)
+- `src/server/` — Grove server
+- `src/cli/` — CLI tool (imports server directly)
+- `src/shared/` — Shared types
+- `docs/` — Documentation (separate Next.js app)
+- `drizzle/` — Database migrations
+- `simulator-server/` — Swift simulator server
+
+SDK is in a separate repo: `grove-sdk` (`@usegrove/sdk`).
 
 ## Network
 

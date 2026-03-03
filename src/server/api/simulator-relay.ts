@@ -22,7 +22,7 @@ function resolveSimulatorBinary(): string {
 
 	// Dev: in-repo build output
 	return new URL(
-		'../../simulator-server/.build/release/GroveSimulatorServer',
+		'../../../simulator-server/.build/release/GroveSimulatorServer',
 		import.meta.url,
 	).pathname
 }

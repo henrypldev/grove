@@ -3,11 +3,11 @@
 		"target": "ESNext",
 		"module": "ESNext",
 		"moduleResolution": "bundler",
+		"jsx": "react-jsx",
 		"strict": true,
 		"skipLibCheck": true,
 		"noEmit": true,
-		"esModuleInterop": true,
-		"types": []
+		"esModuleInterop": true
 	},
 	"include": ["src/**/*"]
 }

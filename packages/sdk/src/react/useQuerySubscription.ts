@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useGrove } from './provider'
 import type { SubscriptionEvent, SubscriptionMap } from './types'
 
@@ -34,7 +34,6 @@ export function useQuerySubscription<E extends SubscriptionEvent>(
 	const { channel, enabled = true } = options
 
 	const [data, setData] = useState<SubscriptionData<E> | null>(null)
-	const historyRef = useRef<SubscriptionData<E>[]>([])
 	const [history, setHistory] = useState<SubscriptionData<E>[]>([])
 
 	const handler = useCallback(
@@ -43,8 +42,7 @@ export function useQuerySubscription<E extends SubscriptionEvent>(
 			if (eventChannel !== channel && event !== 'team:update') return
 
 			setData(eventData)
-			historyRef.current = [...historyRef.current.slice(-MAX_HISTORY + 1), eventData]
-			setHistory(historyRef.current)
+			setHistory((prev) => [...prev.slice(-MAX_HISTORY + 1), eventData])
 
 			const paths = INVALIDATION_MAP[event]
 			if (paths) {

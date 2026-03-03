@@ -2,6 +2,7 @@ import {
 	useMutation as useTanstackMutation,
 	type UseMutationResult,
 } from '@tanstack/react-query'
+import { buildUrl, fetchJson } from './fetch'
 import { useGrove } from './provider'
 import type { MutationBody, MutationKey, MutationParams, MutationResponse } from './types'
 
@@ -11,16 +12,6 @@ function parseMutationKey(key: string): { method: string; path: string } {
 		method: key.slice(0, spaceIdx),
 		path: key.slice(spaceIdx + 1),
 	}
-}
-
-function buildUrl(baseUrl: string, path: string, params?: Record<string, string>): string {
-	let url = `${baseUrl}${path}`
-	if (params) {
-		for (const [key, value] of Object.entries(params)) {
-			url = url.replace(`:${key}`, encodeURIComponent(value))
-		}
-	}
-	return url
 }
 
 type MutationVariables<K extends MutationKey> =
@@ -80,13 +71,7 @@ export function useMutation<K extends MutationKey>(
 				}
 			}
 
-			const res = await fetch(url, init)
-			if (!res.ok) {
-				const err = await res.json().catch(() => ({}))
-				throw new Error((err as any).error ?? `HTTP ${res.status}`)
-			}
-			const text = await res.text()
-			return text ? JSON.parse(text) : undefined
+			return fetchJson<MutationResponse<K>>(url, init)
 		},
 		onSuccess: options?.onSuccess as any,
 		onError: options?.onError,

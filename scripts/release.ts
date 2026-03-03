@@ -144,7 +144,8 @@ async function run() {
 
 	await updatePackageJson('packages/server/package.json', newVersion)
 	await updatePackageJson('packages/cli/package.json', newVersion)
-	console.log('Updated packages/server/package.json and packages/cli/package.json')
+	await updatePackageJson('packages/sdk/package.json', newVersion)
+	console.log('Updated packages/server, packages/cli, and packages/sdk package.json')
 
 	console.log('\nCompiling binaries...')
 	const { artifacts, checksums } = await compileBinaries(newVersion)
@@ -154,7 +155,7 @@ async function run() {
 		console.log(`  ${target}: ${hash}`)
 	}
 
-	await $`git add packages/server/package.json packages/cli/package.json`
+	await $`git add packages/server/package.json packages/cli/package.json packages/sdk/package.json`
 	await $`git commit -m "chore: release ${tag}"`
 	console.log('\nCommitted version bump')
 

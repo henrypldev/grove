@@ -1,4 +1,5 @@
 import { unstable_v2_prompt } from '@anthropic-ai/claude-agent-sdk'
+import { detectEnvVars } from '../api/worktrees'
 import { generateId, log } from '../config'
 import {
 	dbUpdateRepoEnvVars,
@@ -37,16 +38,11 @@ Do these steps exactly:
    - Pick ones useful to run on-demand: test, build, lint, typecheck, migrate, seed, format, etc.
    - Skip dev/start scripts (those are already setup steps)
    - Use "{pm} run {script}" format for each
-7. Detect environment variables:
-   - Look for .env* files (e.g., .env, .env.local, .env.example) in the project root
-   - If .env* files exist: parse them for KEY=VALUE pairs. For each, record { "key": "KEY", "value": "VALUE", "filePath": ".env" }
-   - If NO .env* files exist: search source files (*.ts, *.tsx, *.js, *.jsx) for process.env.VARIABLE_NAME references. For each unique variable found, record { "key": "VARIABLE_NAME", "value": "", "filePath": "" }
-   - Skip common built-in vars: NODE_ENV, PORT, HOME, PATH, CI
-8. Detect the framework:
+7. Detect the framework:
    - Identify the primary framework from package.json dependencies (e.g., "next", "expo", "vite", "remix", "nuxt", "astro", "sveltekit", "express", "fastify", "hono", "react-native", etc.)
    - Use the most specific framework name (e.g., "next" not "react")
    - If no recognizable framework, use null
-9. Output ONLY a JSON object in this exact format (no other text):
+8. Output ONLY a JSON object in this exact format (no other text):
 
 {
   "steps": [
@@ -54,9 +50,6 @@ Do these steps exactly:
     { "name": "Start dev server", "run": "bun run dev --port {{PORT}}", "background": true }
   ],
   "scripts": [],
-  "envVars": [
-    { "key": "DATABASE_URL", "value": "postgres://...", "filePath": ".env" }
-  ],
   "framework": "next",
   "fingerprint": "abc123...",
   "needsNativeBuild": false
@@ -65,7 +58,6 @@ Do these steps exactly:
 Rules:
 - "steps" is required, always an array of SetupStep objects
 - "scripts" is optional, array of { name, run } objects for on-demand scripts. Omit if none found.
-- "envVars" is optional, array of { key, value, filePath } objects. Omit if no env vars found.
 - "framework" is optional, the primary framework name as a lowercase string (e.g., "next", "expo", "vite"). Omit if none detected.
 - "fingerprint" is optional, only for Expo/RN projects (string or null)
 - "needsNativeBuild" is optional, true if Expo project is missing ios/ or android/ directories
@@ -90,12 +82,15 @@ export async function detectSetupSteps(
 ): Promise<DetectionResult | null> {
 	log('setup-detector', 'starting detection', { repoId, repoPath })
 	try {
-		const result = await unstable_v2_prompt(SETUP_DETECTOR_PROMPT(repoPath), {
-			model: 'claude-sonnet-4-6',
-			permissionMode: 'bypassPermissions',
-			allowedTools: ['Read', 'Glob', 'Bash'],
-			disallowedTools: ['Edit', 'Write', 'Task', 'WebFetch', 'WebSearch'],
-		})
+		const [result, envVars] = await Promise.all([
+			unstable_v2_prompt(SETUP_DETECTOR_PROMPT(repoPath), {
+				model: 'claude-sonnet-4-6',
+				permissionMode: 'bypassPermissions',
+				allowedTools: ['Read', 'Glob', 'Bash'],
+				disallowedTools: ['Edit', 'Write', 'Task', 'WebFetch', 'WebSearch'],
+			}),
+			detectEnvVars(repoPath),
+		])
 
 		const text =
 			typeof (result as any).result === 'string' ? (result as any).result : ''
@@ -123,8 +118,8 @@ export async function detectSetupSteps(
 				})
 			}
 		}
-		if (parsed.envVars && parsed.envVars.length > 0) {
-			dbUpdateRepoEnvVars(repoId, parsed.envVars)
+		if (envVars.length > 0) {
+			dbUpdateRepoEnvVars(repoId, envVars)
 		}
 		if (parsed.framework) {
 			dbUpdateRepoFramework(repoId, parsed.framework)
@@ -142,7 +137,10 @@ export async function detectSetupSteps(
 			fingerprint: parsed.fingerprint ?? null,
 		})
 
-		return parsed
+		return {
+			...parsed,
+			envVars: envVars.length > 0 ? envVars : undefined,
+		}
 	} catch (err) {
 		log('setup-detector', 'detection failed', { repoId, err })
 		return null

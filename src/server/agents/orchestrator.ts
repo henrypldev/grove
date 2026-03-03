@@ -8,11 +8,17 @@ import { unregisterTeamServe } from '../api/tailscale-serve'
 import { deleteWorktree } from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertActivity, subscribeToTeamActivity } from '../db/activity'
+import { dbGetAgent } from '../db/agents'
 import { dbGetRepo } from '../db/repos'
 import { dbGetTeamDependencies } from '../db/team-dependencies'
 import { dbGetTeam, dbUpdateTeamPrUrl, dbUpdateTeamStatus } from '../db/teams'
 import type { AgentRole, Team } from '../types'
-import { closeAgent, closeAllAgents, getAgent } from './agent-registry'
+import {
+	closeAgent,
+	closeAllAgents,
+	getAgent,
+	type RegisteredAgent,
+} from './agent-registry'
 import { resolveUserReply } from './grove-tools'
 import { respawnPm, spawnPm } from './pm'
 import {
@@ -25,6 +31,34 @@ import {
 const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer)\b/g
 
 const devBaseCommit = new Map<string, string>()
+
+/** Returns the agent if alive, or undefined after closing a stale one. */
+function closeStaleAgent(
+	teamId: string,
+	role: string,
+): RegisteredAgent | undefined {
+	const agent = getAgent(teamId, role)
+	if (!agent) return undefined
+
+	if (agent.queue.closed) {
+		log('orchestrator', `${role} queue closed, cleaning up zombie`, {
+			teamId,
+		})
+		closeAgent(teamId, role)
+		return undefined
+	}
+
+	const dbAgent = dbGetAgent(agent.agentId)
+	if (dbAgent?.status === 'idle' || dbAgent?.status === 'done') {
+		log('orchestrator', `${role} is ${dbAgent.status}, closing for respawn`, {
+			teamId,
+		})
+		closeAgent(teamId, role)
+		return undefined
+	}
+
+	return agent
+}
 
 export async function startOrchestrator() {
 	log('orchestrator', 'starting')
@@ -155,14 +189,7 @@ export async function routeMessageToAgents(
 	}
 
 	if (mentions.size === 0) {
-		let pmAgent = getAgent(team.id, 'pm')
-		if (pmAgent?.queue.closed) {
-			log('orchestrator', 'pm queue closed, cleaning up zombie', {
-				teamId: team.id,
-			})
-			closeAgent(team.id, 'pm')
-			pmAgent = undefined
-		}
+		const pmAgent = closeStaleAgent(team.id, 'pm')
 		if (!pmAgent) {
 			log('orchestrator', 'pm not found, respawning', { teamId: team.id })
 			await respawnPm(team, text, pmCallbacks)
@@ -187,14 +214,7 @@ export async function routeMessageToAgents(
 
 	for (const role of mentions) {
 		if (role === 'pm') {
-			let pmAgent = getAgent(team.id, 'pm')
-			if (pmAgent?.queue.closed) {
-				log('orchestrator', 'pm queue closed, cleaning up zombie', {
-					teamId: team.id,
-				})
-				closeAgent(team.id, 'pm')
-				pmAgent = undefined
-			}
+			const pmAgent = closeStaleAgent(team.id, 'pm')
 			if (!pmAgent) {
 				log('orchestrator', 'pm not found, respawning', { teamId: team.id })
 				await respawnPm(team, text, pmCallbacks)
@@ -213,14 +233,7 @@ export async function routeMessageToAgents(
 			continue
 		}
 
-		let agent = getAgent(team.id, role)
-		if (agent?.queue.closed) {
-			log('orchestrator', `${role} queue closed, cleaning up zombie`, {
-				teamId: team.id,
-			})
-			closeAgent(team.id, role)
-			agent = undefined
-		}
+		let agent = closeStaleAgent(team.id, role)
 		if (!agent) {
 			await spawnSpecialist(team, role as AgentRole)
 			agent = getAgent(team.id, role)

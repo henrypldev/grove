@@ -8,7 +8,7 @@ import {
 import {
 	getExpoDevServerOutput,
 	getExpoDevServerStatus,
-	sendExpoDevServerInput,
+	sendExpoDevServerCommand,
 	startExpoDevServer,
 	stopExpoDevServer,
 } from '../../api/expo-dev-server'
@@ -722,7 +722,10 @@ export async function handleV2Teams(
 		const body = (await req.json()) as { input: string }
 		if (typeof body.input !== 'string' || body.input.length === 0)
 			return Response.json({ error: 'Missing input' }, { status: 400, headers })
-		const sent = sendExpoDevServerInput(devServerStdinMatch.id, body.input)
+		const sent = await sendExpoDevServerCommand(
+			devServerStdinMatch.id,
+			body.input,
+		)
 		if (!sent)
 			return Response.json(
 				{ error: 'No active dev server' },

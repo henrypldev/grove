@@ -67,7 +67,6 @@ export async function startExpoDevServer(
 	const command = `bunx expo start --port ${port}`
 	const proc = Bun.spawn(['sh', '-c', command], {
 		cwd: worktreePath,
-		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'pipe',
 		detached: true,
@@ -165,16 +164,49 @@ export function getExpoDevServerOutput(teamId: string): string | null {
 	return activeDevServers.get(teamId)?.output ?? null
 }
 
-export function sendExpoDevServerInput(teamId: string, input: string): boolean {
+const KEY_TO_METRO_METHOD: Record<string, string> = {
+	r: 'reload',
+	m: 'devMenu',
+}
+
+export async function sendExpoDevServerCommand(
+	teamId: string,
+	key: string,
+): Promise<boolean> {
 	const server = activeDevServers.get(teamId)
-	if (!server?.process) return false
-	try {
-		server.process.stdin.write(input)
-		server.process.stdin.flush()
-		return true
-	} catch {
+	if (!server || server.status !== 'running') return false
+
+	const method = KEY_TO_METRO_METHOD[key]
+	if (!method) {
+		log('expo-dev-server', 'unknown key', { teamId, key })
 		return false
 	}
+
+	log('expo-dev-server', 'command', { teamId, key, method })
+
+	return new Promise<boolean>(resolve => {
+		let resolved = false
+		const done = (result: boolean) => {
+			if (resolved) return
+			resolved = true
+			clearTimeout(timeout)
+			resolve(result)
+		}
+		const timeout = setTimeout(() => done(false), 5000)
+
+		try {
+			const ws = new WebSocket(`ws://localhost:${server.port}/message`)
+			ws.onopen = () => {
+				ws.send(JSON.stringify({ version: 2, method }))
+				ws.close()
+				done(true)
+			}
+			ws.onerror = () => done(false)
+			ws.onclose = () => done(false)
+		} catch {
+			done(false)
+		}
+	})
 }
 
 export async function waitForDevServerReady(

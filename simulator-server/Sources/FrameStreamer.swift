@@ -17,7 +17,7 @@ class FrameStreamer {
     private var activeStreams: [String: StreamState] = [:] // deviceId → state
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private let targetFPS: Double = 60.0
-    private let jpegQuality: CGFloat = 0.8
+    private let jpegQuality: CGFloat = 0.1
 
     func startStreaming(device: AnyObject, deviceId: String, connection: NWConnection) {
         guard let surface = getIOSurface(from: device) else {
@@ -124,7 +124,7 @@ class FrameStreamer {
         ) else { return nil }
 
         let options: [CFString: Any] = [
-            kCGImageDestinationLossyCompressionQuality: jpegQuality
+            kCGImageDestinationLossyCompressionQuality: NSNumber(value: Float(jpegQuality))
         ]
         CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
         CGImageDestinationFinalize(destination)

@@ -3,8 +3,9 @@ import { dbListAgentsByTeam } from '../../db/agents'
 import { dbGetLatestLogByType } from '../../db/logs'
 import { dbGetMetrics } from '../../db/metrics'
 import { dbListTeams } from '../../db/teams'
+import type { DashboardResult } from '../../types'
 
-export function getDashboard() {
+export function getDashboard(): DashboardResult {
 	const teams = dbListTeams()
 	const dashboard = teams.map(team => {
 		const agents = dbListAgentsByTeam(team.id)

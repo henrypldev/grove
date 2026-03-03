@@ -57,7 +57,7 @@ import {
 	stopTeamScript,
 } from '../routes/v2/teams'
 import { getUsage } from '../routes/v2/usage'
-import type { WsServerMessage } from '../types'
+import type { SpawnableRole, WsServerMessage } from '../types'
 
 type RpcHandler = (
 	params: Record<string, unknown>,
@@ -149,7 +149,7 @@ register('teams:agents:list', p => listTeamAgents({ id: p.id as string }))
 register('teams:agents:spawn', p =>
 	spawnAgent({
 		id: p.id as string,
-		role: p.role as 'team-lead' | 'dev' | 'qa' | 'reviewer' | 'env',
+		role: p.role as SpawnableRole,
 	}),
 )
 register('teams:agents:respawn', p =>

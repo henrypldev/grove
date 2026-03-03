@@ -23,6 +23,7 @@ export class GroveClient extends TypedEmitter<ServerEventMap> {
 		}
 	>()
 	private rpcCounter = 0
+	private intentionalDisconnect = false
 	private reconnectAttempt = 0
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null
 	private pingTimer: ReturnType<typeof setInterval> | null = null
@@ -85,6 +86,7 @@ export class GroveClient extends TypedEmitter<ServerEventMap> {
 				return
 			}
 
+			this.intentionalDisconnect = false
 			this._status = 'connecting'
 			this.ws = new WebSocket(this.options.url)
 
@@ -122,7 +124,7 @@ export class GroveClient extends TypedEmitter<ServerEventMap> {
 	}
 
 	disconnect(): void {
-		this.options.autoReconnect = false
+		this.intentionalDisconnect = true
 		this.cleanup()
 	}
 
@@ -231,6 +233,7 @@ export class GroveClient extends TypedEmitter<ServerEventMap> {
 
 	private handleClose(): void {
 		this.stopPing()
+		this.ws = null
 		const wasConnected = this._status === 'connected'
 		this._status = 'disconnected'
 
@@ -247,6 +250,7 @@ export class GroveClient extends TypedEmitter<ServerEventMap> {
 
 		if (
 			this.options.autoReconnect &&
+			!this.intentionalDisconnect &&
 			this.reconnectAttempt < this.options.reconnectMaxRetries
 		) {
 			this.scheduleReconnect()
@@ -255,13 +259,11 @@ export class GroveClient extends TypedEmitter<ServerEventMap> {
 
 	private scheduleReconnect(): void {
 		const delay =
-			this.options.reconnectBaseDelay *
-			Math.pow(2, this.reconnectAttempt)
+			this.options.reconnectBaseDelay * 2 ** this.reconnectAttempt
 		this.reconnectAttempt++
 		this.emit('reconnecting', this.reconnectAttempt)
 
 		this.reconnectTimer = setTimeout(() => {
-			this.ws = null
 			this.connect().catch(() => {})
 		}, delay)
 	}

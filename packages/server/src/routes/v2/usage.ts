@@ -1,11 +1,12 @@
 import { dbGetTeam } from '../../db/teams'
 import { dbGetUsage } from '../../db/usage'
+import type { UsageResult } from '../../types'
 
 export async function getUsage(params: {
 	period?: string
 	teamId?: string
 	repoId?: string
-}) {
+}): Promise<UsageResult | { error: string }> {
 	const period = params.period ?? 'day'
 	const teamId = params.teamId
 	const repoId = params.repoId

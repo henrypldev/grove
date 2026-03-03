@@ -48,7 +48,7 @@ import {
 	dbUpdateTeamTitle,
 } from '../../db/teams'
 import { parseBatchTasks } from '../../parse-batch-tasks'
-import type { Team } from '../../types'
+import type { SpawnableRole, Team, TeamDetail } from '../../types'
 
 const IMAGE_TYPES = new Set([
 	'image/jpeg',
@@ -98,7 +98,9 @@ export function listTeams() {
 	return dbListTeams()
 }
 
-export async function getTeam(params: { id: string }) {
+export async function getTeam(params: {
+	id: string
+}): Promise<TeamDetail | { error: string }> {
 	const team = dbGetTeam(params.id)
 	if (!team) return { error: 'Team not found' }
 	const agents = dbListAgentsByTeam(params.id)
@@ -141,10 +143,7 @@ export function listTeamAgents(params: { id: string }) {
 	return dbListAgentsByTeam(params.id)
 }
 
-export async function spawnAgent(params: {
-	id: string
-	role: 'team-lead' | 'dev' | 'qa' | 'reviewer' | 'env'
-}) {
+export async function spawnAgent(params: { id: string; role: SpawnableRole }) {
 	const team = dbGetTeam(params.id)
 	if (!team) return { error: 'Team not found' }
 	const { spawnTeamLead, spawnDeveloper, spawnQaAgent, spawnReviewerAgent } =
@@ -534,7 +533,7 @@ export async function handleV2Teams(
 		}
 		if (method === 'POST') {
 			const body = (await req.json()) as {
-				role: 'team-lead' | 'dev' | 'qa' | 'reviewer' | 'env'
+				role: SpawnableRole
 			}
 			const result = await spawnAgent({ id: agentsMatch.id, role: body.role })
 			if (result && 'error' in result)

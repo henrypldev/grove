@@ -1,16 +1,28 @@
 import type {
 	Agent,
-	AgentRole,
+	AgentTask,
+	DashboardResult,
 	Repo,
 	Script,
+	SetupLogEntry,
 	SetupStep,
+	SpawnableRole,
 	Team,
 	TeamActivity,
+	TeamDetail,
 	TeamLog,
+	UsageResult,
 } from '@usegrove/shared'
 
-// Spawnable roles (subset of AgentRole)
-export type SpawnableRole = 'team-lead' | 'dev' | 'qa' | 'reviewer' | 'env'
+export type {
+	AgentTask,
+	DashboardResult,
+	DashboardTeam,
+	SetupLogEntry,
+	SpawnableRole,
+	TeamDetail,
+	UsageResult,
+} from '@usegrove/shared'
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
@@ -213,79 +225,6 @@ export interface RpcMethods {
 		}
 		result: TeamActivity
 	}
-}
-
-// Extended Team type returned by teams:get
-export interface TeamDetail extends Team {
-	port: number | null
-	devUrl: string | null
-	agents: Agent[]
-	simulatorUdid: string | null
-	simulatorDeviceName: string | null
-	expoBuildStatus: string | null
-	expoDevServerStatus: string | null
-	devServerStatus: string | null
-}
-
-export interface AgentTask {
-	idString: string
-	title: string
-	priority: string
-	status: string
-	blockedBy: string[]
-}
-
-export interface SetupLogEntry {
-	step: number
-	name: string
-	status: string
-	output: string
-}
-
-export interface DashboardTeam {
-	id: string
-	title: string | null
-	status: string
-	repoId: string
-	port: number | null
-	agents: Array<{
-		id: string
-		role: string
-		status: string
-		activity: string | null
-	}>
-	env: Record<string, unknown> | null
-	behindMain: number
-	lastCommit: string
-}
-
-export interface DashboardResult {
-	teams: DashboardTeam[]
-	metrics: Record<string, unknown>
-}
-
-export interface UsageResult {
-	totalInputTokens: number
-	totalOutputTokens: number
-	totalCacheReadTokens: number
-	totalCacheCreationTokens: number
-	totalNumTurns: number
-	avgDurationMs: number
-	avgDurationApiMs: number
-	byModel: Record<
-		string,
-		{ inputTokens: number; outputTokens: number; costUsd: number }
-	>
-	byDay: Record<
-		string,
-		{
-			inputTokens: number
-			outputTokens: number
-			cacheReadTokens: number
-			cacheCreationTokens: number
-			numTurns: number
-		}
-	>
 }
 
 // Server event map for typed on() listeners

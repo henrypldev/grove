@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { log } from '../config'
 import { emitTeamLog } from '../db/logs'
 import { dbGetRepo } from '../db/repos'
-import type { SetupStep } from '../types'
+import type { SetupLogEntry, SetupStep } from '../types'
 import { rebuildExpoBuild } from './expo-build'
 import { allocatePort, setTeamPort } from './ports'
 
@@ -397,12 +397,11 @@ export function startTeamStep(
 	return null
 }
 
-export function getTeamSetupLogs(
-	teamId: string,
-): Array<{ name: string; status: string; output: string }> | null {
+export function getTeamSetupLogs(teamId: string): SetupLogEntry[] | null {
 	const setup = activeSetups.get(teamId)
 	if (!setup) return null
-	return setup.steps.map(s => ({
+	return setup.steps.map((s, i) => ({
+		step: i,
 		name: s.name,
 		status: s.status,
 		output: s.output,

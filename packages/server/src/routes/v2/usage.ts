@@ -1,31 +1,23 @@
 import { dbGetTeam } from '../../db/teams'
 import { dbGetUsage } from '../../db/usage'
 
-export async function handleV2Usage(
-	req: Request,
-	url: URL,
-	headers: Record<string, string>,
-): Promise<Response | null> {
-	if (url.pathname !== '/v2/usage' || req.method !== 'GET') return null
-
-	const period = url.searchParams.get('period') ?? 'day'
-	const teamId = url.searchParams.get('teamId') ?? undefined
-	const repoId = url.searchParams.get('repoId') ?? undefined
+export async function getUsage(params: {
+	period?: string
+	teamId?: string
+	repoId?: string
+}) {
+	const period = params.period ?? 'day'
+	const teamId = params.teamId
+	const repoId = params.repoId
 
 	let since: number
 	if (period === 'session') {
 		if (!teamId) {
-			return Response.json(
-				{ error: 'teamId required for session period' },
-				{ status: 400, headers },
-			)
+			return { error: 'teamId required for session period' }
 		}
 		const team = dbGetTeam(teamId)
 		if (!team) {
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
+			return { error: 'Team not found' }
 		}
 		since = team.createdAt
 	} else if (period === 'week') {
@@ -94,18 +86,35 @@ export async function handleV2Usage(
 	}
 
 	const count = rows.length || 1
-	return Response.json(
-		{
-			totalInputTokens,
-			totalOutputTokens,
-			totalCacheReadTokens,
-			totalCacheCreationTokens,
-			totalNumTurns,
-			avgDurationMs: Math.round(totalDurationMs / count),
-			avgDurationApiMs: Math.round(totalDurationApiMs / count),
-			byModel,
-			byDay,
-		},
-		{ headers },
-	)
+	return {
+		totalInputTokens,
+		totalOutputTokens,
+		totalCacheReadTokens,
+		totalCacheCreationTokens,
+		totalNumTurns,
+		avgDurationMs: Math.round(totalDurationMs / count),
+		avgDurationApiMs: Math.round(totalDurationApiMs / count),
+		byModel,
+		byDay,
+	}
+}
+
+export async function handleV2Usage(
+	req: Request,
+	url: URL,
+	headers: Record<string, string>,
+): Promise<Response | null> {
+	if (url.pathname !== '/v2/usage' || req.method !== 'GET') return null
+
+	const result = await getUsage({
+		period: url.searchParams.get('period') ?? undefined,
+		teamId: url.searchParams.get('teamId') ?? undefined,
+		repoId: url.searchParams.get('repoId') ?? undefined,
+	})
+	if ('error' in result) {
+		const status =
+			result.error === 'teamId required for session period' ? 400 : 404
+		return Response.json(result, { status, headers })
+	}
+	return Response.json(result, { headers })
 }

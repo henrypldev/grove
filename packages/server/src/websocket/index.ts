@@ -18,6 +18,7 @@ import type {
 	WsClientMessage,
 	WsServerMessage,
 } from '../types'
+import { handleRpc } from './rpc'
 
 type WsClientData = { type?: undefined; clientId: string } | SimulatorWsData
 
@@ -111,7 +112,7 @@ export const wsHandlers = {
 		ws.send(JSON.stringify({ type: 'connected' } satisfies WsServerMessage))
 	},
 
-	message(ws: ServerWebSocket<WsClientData>, raw: string | Buffer) {
+	async message(ws: ServerWebSocket<WsClientData>, raw: string | Buffer) {
 		if (ws.data.type === 'simulator') {
 			handleSimulatorMessage(ws as ServerWebSocket<SimulatorWsData>, raw)
 			return
@@ -153,6 +154,8 @@ export const wsHandlers = {
 				}
 			} else if (msg.type === 'ping') {
 				ws.send(JSON.stringify({ type: 'pong' } satisfies WsServerMessage))
+			} else if (msg.type === 'rpc') {
+				await handleRpc(ws, msg)
 			}
 		} catch {}
 	},

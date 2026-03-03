@@ -9,6 +9,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 bun run dev          # Start server with watch mode
 bun run server       # Start server (production)
 bun run cli          # Run CLI in dev mode (e.g., bun run cli start -b)
+bun run build:sdk    # Build SDK package
+```
+
+### Testing
+```bash
+bun run test         # Run server tests
 ```
 
 ### Linting/Formatting
@@ -20,8 +26,18 @@ bunx biome check --write .    # Fix issues
 
 ### Release
 ```bash
-bun scripts/release-server.ts patch|minor|major
+bun scripts/release.ts patch|minor|major
 ```
+
+## Architecture
+
+Monorepo with workspaces: `packages/*` and `shared/`.
+
+- `packages/server/` — Grove server
+- `packages/cli/` — CLI tool
+- `packages/sdk/` — TypeScript SDK (`@usegrove/sdk`)
+- `packages/docs/` — Documentation
+- `shared/` — Shared types (`@usegrove/shared`)
 
 ## Network
 

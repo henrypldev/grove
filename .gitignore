@@ -15,11 +15,14 @@ mobile/android/
 *.orig.*
 
 # Server
-server/dist/
-server/simulator-server/.build/
+packages/server/dist/
+packages/server/simulator-server/.build/
+
+# SDK
+packages/sdk/dist/
 
 # Plans
-docs/plans/
+packages/docs/plans/
 
 # Environment
 .env

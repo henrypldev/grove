@@ -146,6 +146,12 @@ export type WsClientMessage =
 	| { type: 'unsubscribe'; channels: string[] }
 	| { type: 'replay'; channel: string; sinceId: number }
 	| { type: 'ping' }
+	| {
+			type: 'rpc'
+			id: string
+			method: string
+			params?: Record<string, unknown>
+	  }
 
 export type WsServerMessage =
 	| { type: 'activity'; channel: string; data: TeamActivity }
@@ -163,3 +169,4 @@ export type WsServerMessage =
 	| { type: 'replay:batch'; channel: string; activity: TeamActivity[] }
 	| { type: 'connected' }
 	| { type: 'pong' }
+	| { type: 'rpc:response'; id: string; data?: unknown; error?: string }

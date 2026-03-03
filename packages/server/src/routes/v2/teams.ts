@@ -92,6 +92,260 @@ export function setTeamCreatedHook(
 	onTeamCreated = hook
 }
 
+// --- Extracted standalone functions ---
+
+export function listTeams() {
+	return dbListTeams()
+}
+
+export async function getTeam(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	const agents = dbListAgentsByTeam(params.id)
+	const port = getTeamPort(params.id)
+	const portAlive = port && isPortActive(port)
+	const devUrl = portAlive ? `https://${await getTerminalHost()}:${port}` : null
+	const simulatorUdid = getTeamDeviceUdid(params.id)
+	const expoBuildStatus = getExpoBuildStatus(params.id)
+	const expoDevServerStatus = getExpoDevServerStatus(params.id)
+	const repo = dbGetRepo(team.repoId)
+	// Auto-create simulator for expo repos if one doesn't exist yet
+	if (!simulatorUdid && !expoBuildStatus && repo?.framework === 'expo') {
+		rebuildExpoBuild(params.id, team.worktreePath).catch(() => {})
+	}
+	const simulatorDeviceName = simulatorUdid ? `grove-team-${params.id}` : null
+	const devServerStatus = portAlive ? 'running' : port ? 'starting' : null
+	return {
+		...team,
+		port: portAlive ? port : null,
+		devUrl,
+		agents,
+		simulatorUdid,
+		simulatorDeviceName,
+		expoBuildStatus,
+		expoDevServerStatus,
+		devServerStatus,
+	}
+}
+
+export function archiveTeam(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	dbArchiveTeam(params.id)
+	return { success: true }
+}
+
+export function listTeamAgents(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	return dbListAgentsByTeam(params.id)
+}
+
+export async function spawnAgent(params: {
+	id: string
+	role: 'team-lead' | 'dev' | 'qa' | 'reviewer' | 'env'
+}) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	const { spawnTeamLead, spawnDeveloper, spawnQaAgent, spawnReviewerAgent } =
+		await import('../../agents/specialists')
+	let agent: Awaited<ReturnType<typeof spawnDeveloper>> | undefined
+	switch (params.role) {
+		case 'team-lead':
+			agent = await spawnTeamLead(team)
+			break
+		case 'dev':
+			agent = await spawnDeveloper(team)
+			break
+		case 'qa':
+			agent = await spawnQaAgent(team)
+			break
+		case 'reviewer':
+			agent = await spawnReviewerAgent(team)
+			break
+		default:
+			return { error: 'Invalid role' }
+	}
+	return agent
+}
+
+export async function respawnAgent(params: {
+	teamId: string
+	agentId: string
+	prompt?: string
+}) {
+	const team = dbGetTeam(params.teamId)
+	if (!team) return { error: 'Team not found' }
+	const agent = dbGetAgent(params.agentId)
+	if (!agent) return { error: 'Agent not found' }
+	const { respawnAgent: doRespawn } = await import('../../agents/runner')
+	const success = await doRespawn(
+		params.agentId,
+		params.prompt ?? agent.currentTask ?? '',
+		team.worktreePath,
+	)
+	return { success }
+}
+
+export async function closeTeam(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	const { closeTeam: doClose } = await import('../../agents/orchestrator')
+	await doClose(team.id)
+	return { success: true }
+}
+
+export function getTeamActivity(params: { id: string; since: number }) {
+	return dbListActivitySince(params.id, params.since)
+}
+
+export function getTeamLogs(params: { id: string; since: number }) {
+	return dbListLogsSince(params.id, params.since)
+}
+
+export function getTeamPrd(params: { id: string }) {
+	const prd = dbGetPrd(params.id)
+	if (!prd) return { error: 'PRD not found' }
+	return { content: prd.content }
+}
+
+export function getTeamDesignDoc(params: { id: string }) {
+	const doc = dbGetDesignDoc(params.id)
+	if (!doc) return { error: 'Design doc not found' }
+	return { content: doc.content }
+}
+
+export function getTeamTasks(params: { id: string }) {
+	return dbListTasks(params.id)
+}
+
+export function getTeamNotes(params: { id: string }) {
+	const note = dbGetNote(params.id)
+	if (!note) return { error: 'Notes not found' }
+	return { content: note.content }
+}
+
+export async function retrySetup(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	const repo = dbGetRepo(team.repoId)
+	await retryTeamSetup(params.id, team.worktreePath, repo?.setupSteps)
+	return { success: true }
+}
+
+export function cancelSetup(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	cancelTeamSetup(params.id)
+	return { success: true }
+}
+
+export function stopSetup(params: { id: string; step: number }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	const error = stopTeamStep(params.id, params.step)
+	if (error) return { error }
+	return { success: true }
+}
+
+export function startSetup(params: { id: string; step: number }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	const error = startTeamStep(params.id, params.step)
+	if (error) return { error }
+	return { success: true }
+}
+
+export function getSetupLogs(params: { id: string }) {
+	const logs = getTeamSetupLogs(params.id)
+	if (!logs) return { error: 'No active setup' }
+	return logs
+}
+
+export async function startBuild(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	try {
+		await rebuildExpoBuild(params.id, team.worktreePath)
+	} catch (err) {
+		return { error: String(err) }
+	}
+	return { success: true }
+}
+
+export function stopBuild(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	stopExpoBuild(params.id)
+	return { success: true }
+}
+
+export function getBuildLogs(params: { id: string }) {
+	const status = getExpoBuildStatus(params.id)
+	const output = getExpoBuildOutput(params.id)
+	if (status === null) return { error: 'No active build' }
+	return { status, output }
+}
+
+export async function runTeamScript(params: {
+	teamId: string
+	scriptId: string
+}) {
+	const team = dbGetTeam(params.teamId)
+	if (!team) return { error: 'Team not found' }
+	const script = dbGetScript(params.scriptId)
+	if (!script) return { error: 'Script not found' }
+	const error = await runScript(params.teamId, team.worktreePath, script)
+	if (error) return { error }
+	return { success: true }
+}
+
+export function stopTeamScript(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	const error = stopScript(params.id)
+	if (error) return { error }
+	return { success: true }
+}
+
+export async function startDevServer(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	let port = getTeamPort(params.id)
+	if (!port) {
+		port = (await allocatePort()) ?? null
+		if (port) setTeamPort(params.id, port)
+	}
+	if (!port) return { error: 'No port available' }
+	startExpoDevServer(params.id, team.worktreePath, port)
+	return { success: true, port }
+}
+
+export function stopDevServer(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	stopExpoDevServer(params.id)
+	return { success: true }
+}
+
+export async function sendDevServerInput(params: {
+	id: string
+	input: string
+}) {
+	const sent = await sendExpoDevServerCommand(params.id, params.input)
+	if (!sent) return { error: 'No active dev server' }
+	return { success: true }
+}
+
+export function getDevServerLogs(params: { id: string }) {
+	const status = getExpoDevServerStatus(params.id)
+	const output = getExpoDevServerOutput(params.id)
+	if (status === null) return { error: 'No active dev server' }
+	return { status, output }
+}
+
+// --- HTTP handler ---
+
 export async function handleV2Teams(
 	req: Request,
 	url: URL,
@@ -101,7 +355,8 @@ export async function handleV2Teams(
 	const method = req.method
 
 	if (path === '/v2/teams' && method === 'GET') {
-		return Response.json(dbListTeams(), { headers })
+		const result = await listTeams()
+		return Response.json(result, { headers })
 	}
 
 	if (path === '/v2/teams' && method === 'POST') {
@@ -256,99 +511,35 @@ export async function handleV2Teams(
 	const teamMatch = matchRoute(path, '/v2/teams/:id')
 	if (teamMatch) {
 		if (method === 'GET') {
-			const team = dbGetTeam(teamMatch.id)
-			if (!team)
-				return Response.json(
-					{ error: 'Team not found' },
-					{ status: 404, headers },
-				)
-			const agents = dbListAgentsByTeam(teamMatch.id)
-			const port = getTeamPort(teamMatch.id)
-			const portAlive = port && isPortActive(port)
-			const devUrl = portAlive
-				? `https://${await getTerminalHost()}:${port}`
-				: null
-			const simulatorUdid = getTeamDeviceUdid(teamMatch.id)
-			const expoBuildStatus = getExpoBuildStatus(teamMatch.id)
-			const expoDevServerStatus = getExpoDevServerStatus(teamMatch.id)
-			const repo = dbGetRepo(team.repoId)
-			// Auto-create simulator for expo repos if one doesn't exist yet
-			if (!simulatorUdid && !expoBuildStatus && repo?.framework === 'expo') {
-				rebuildExpoBuild(teamMatch.id, team.worktreePath).catch(() => {})
-			}
-			const simulatorDeviceName = simulatorUdid
-				? `grove-team-${teamMatch.id}`
-				: null
-			const devServerStatus = portAlive ? 'running' : port ? 'starting' : null
-			return Response.json(
-				{
-					...team,
-					port: portAlive ? port : null,
-					devUrl,
-					agents,
-					simulatorUdid,
-					simulatorDeviceName,
-					expoBuildStatus,
-					expoDevServerStatus,
-					devServerStatus,
-				},
-				{ headers },
-			)
+			const result = await getTeam({ id: teamMatch.id })
+			if ('error' in result)
+				return Response.json(result, { status: 404, headers })
+			return Response.json(result, { headers })
 		}
 		if (method === 'DELETE') {
-			const team = dbGetTeam(teamMatch.id)
-			if (!team)
-				return Response.json(
-					{ error: 'Team not found' },
-					{ status: 404, headers },
-				)
-			dbArchiveTeam(teamMatch.id)
-			return Response.json({ success: true }, { headers })
+			const result = await archiveTeam({ id: teamMatch.id })
+			if ('error' in result)
+				return Response.json(result, { status: 404, headers })
+			return Response.json(result, { headers })
 		}
 	}
 
 	const agentsMatch = matchRoute(path, '/v2/teams/:id/agents')
 	if (agentsMatch) {
-		const team = dbGetTeam(agentsMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
 		if (method === 'GET') {
-			return Response.json(dbListAgentsByTeam(agentsMatch.id), { headers })
+			const result = await listTeamAgents({ id: agentsMatch.id })
+			if ('error' in result)
+				return Response.json(result, { status: 404, headers })
+			return Response.json(result, { headers })
 		}
 		if (method === 'POST') {
 			const body = (await req.json()) as {
 				role: 'team-lead' | 'dev' | 'qa' | 'reviewer' | 'env'
 			}
-			const {
-				spawnTeamLead,
-				spawnDeveloper,
-				spawnQaAgent,
-				spawnReviewerAgent,
-			} = await import('../../agents/specialists')
-			let agent: Awaited<ReturnType<typeof spawnDeveloper>> | undefined
-			switch (body.role) {
-				case 'team-lead':
-					agent = await spawnTeamLead(team)
-					break
-				case 'dev':
-					agent = await spawnDeveloper(team)
-					break
-				case 'qa':
-					agent = await spawnQaAgent(team)
-					break
-				case 'reviewer':
-					agent = await spawnReviewerAgent(team)
-					break
-				default:
-					return Response.json(
-						{ error: 'Invalid role' },
-						{ status: 400, headers },
-					)
-			}
-			return Response.json(agent, { headers })
+			const result = await spawnAgent({ id: agentsMatch.id, role: body.role })
+			if (result && 'error' in result)
+				return Response.json(result, { status: 400, headers })
+			return Response.json(result, { headers })
 		}
 	}
 
@@ -357,39 +548,28 @@ export async function handleV2Teams(
 		'/v2/teams/:teamId/agents/:agentId/respawn',
 	)
 	if (respawnMatch && method === 'POST') {
-		const team = dbGetTeam(respawnMatch.teamId)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		const agent = dbGetAgent(respawnMatch.agentId)
-		if (!agent)
-			return Response.json(
-				{ error: 'Agent not found' },
-				{ status: 404, headers },
-			)
 		const body = (await req.json()) as { prompt?: string }
-		const { respawnAgent } = await import('../../agents/runner')
-		const success = await respawnAgent(
-			respawnMatch.agentId,
-			body.prompt ?? agent.currentTask ?? '',
-			team.worktreePath,
-		)
-		return Response.json({ success }, { headers })
+		const result = await respawnAgent({
+			teamId: respawnMatch.teamId,
+			agentId: respawnMatch.agentId,
+			prompt: body.prompt,
+		})
+		if ('error' in result) {
+			const status =
+				result.error === 'Team not found' || result.error === 'Agent not found'
+					? 404
+					: 400
+			return Response.json(result, { status, headers })
+		}
+		return Response.json(result, { headers })
 	}
 
 	const closeMatch = matchRoute(path, '/v2/teams/:id/close')
 	if (closeMatch && method === 'POST') {
-		const team = dbGetTeam(closeMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		const { closeTeam } = await import('../../agents/orchestrator')
-		await closeTeam(team.id)
-		return Response.json({ success: true }, { headers })
+		const result = await closeTeam({ id: closeMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const messagesMatch = matchRoute(path, '/v2/teams/:id/messages')
@@ -478,169 +658,126 @@ export async function handleV2Teams(
 	const activityMatch = matchRoute(path, '/v2/teams/:id/activity')
 	if (activityMatch && method === 'GET') {
 		const since = Number(url.searchParams.get('since') ?? '0')
-		const items = dbListActivitySince(activityMatch.id, since)
-		return Response.json(items, { headers })
+		const result = await getTeamActivity({ id: activityMatch.id, since })
+		return Response.json(result, { headers })
 	}
 
 	const logsMatch = matchRoute(path, '/v2/teams/:id/logs')
 	if (logsMatch && method === 'GET') {
 		const since = Number(url.searchParams.get('since') ?? '0')
-		const teamLogs = dbListLogsSince(logsMatch.id, since)
-		return Response.json(teamLogs, { headers })
+		const result = await getTeamLogs({ id: logsMatch.id, since })
+		return Response.json(result, { headers })
 	}
 
 	const prdMatch = matchRoute(path, '/v2/teams/:id/prd')
 	if (prdMatch && method === 'GET') {
-		const prd = dbGetPrd(prdMatch.id)
-		if (!prd)
-			return Response.json({ error: 'PRD not found' }, { status: 404, headers })
-		return Response.json({ content: prd.content }, { headers })
+		const result = await getTeamPrd({ id: prdMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const designDocMatch = matchRoute(path, '/v2/teams/:id/design-doc')
 	if (designDocMatch && method === 'GET') {
-		const doc = dbGetDesignDoc(designDocMatch.id)
-		if (!doc)
-			return Response.json(
-				{ error: 'Design doc not found' },
-				{ status: 404, headers },
-			)
-		return Response.json({ content: doc.content }, { headers })
+		const result = await getTeamDesignDoc({ id: designDocMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const tasksMatch = matchRoute(path, '/v2/teams/:id/tasks')
 	if (tasksMatch && method === 'GET') {
-		const tasks = dbListTasks(tasksMatch.id)
-		return Response.json(tasks, { headers })
+		const result = await getTeamTasks({ id: tasksMatch.id })
+		return Response.json(result, { headers })
 	}
 
 	const notesMatch = matchRoute(path, '/v2/teams/:id/notes')
 	if (notesMatch && method === 'GET') {
-		const note = dbGetNote(notesMatch.id)
-		if (!note)
-			return Response.json(
-				{ error: 'Notes not found' },
-				{ status: 404, headers },
-			)
-		return Response.json({ content: note.content }, { headers })
+		const result = await getTeamNotes({ id: notesMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const setupRetryMatch = matchRoute(path, '/v2/teams/:id/setup/retry')
 	if (setupRetryMatch && method === 'POST') {
-		const team = dbGetTeam(setupRetryMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		const repo = dbGetRepo(team.repoId)
-		await retryTeamSetup(
-			setupRetryMatch.id,
-			team.worktreePath,
-			repo?.setupSteps,
-		)
-		return Response.json({ success: true }, { headers })
+		const result = await retrySetup({ id: setupRetryMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const setupCancelMatch = matchRoute(path, '/v2/teams/:id/setup/cancel')
 	if (setupCancelMatch && method === 'POST') {
-		const team = dbGetTeam(setupCancelMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		cancelTeamSetup(setupCancelMatch.id)
-		return Response.json({ success: true }, { headers })
+		const result = await cancelSetup({ id: setupCancelMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const setupStopMatch = matchRoute(path, '/v2/teams/:id/setup/stop')
 	if (setupStopMatch && method === 'POST') {
-		const team = dbGetTeam(setupStopMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
 		const body = (await req.json()) as { step?: number }
 		if (typeof body.step !== 'number')
 			return Response.json(
 				{ error: 'Missing step index' },
 				{ status: 400, headers },
 			)
-		const error = stopTeamStep(setupStopMatch.id, body.step)
-		if (error) return Response.json({ error }, { status: 400, headers })
-		return Response.json({ success: true }, { headers })
+		const result = await stopSetup({ id: setupStopMatch.id, step: body.step })
+		if ('error' in result)
+			return Response.json(result, { status: 400, headers })
+		return Response.json(result, { headers })
 	}
 
 	const setupStartMatch = matchRoute(path, '/v2/teams/:id/setup/start')
 	if (setupStartMatch && method === 'POST') {
-		const team = dbGetTeam(setupStartMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
 		const body = (await req.json()) as { step?: number }
 		if (typeof body.step !== 'number')
 			return Response.json(
 				{ error: 'Missing step index' },
 				{ status: 400, headers },
 			)
-		const error = startTeamStep(setupStartMatch.id, body.step)
-		if (error) return Response.json({ error }, { status: 400, headers })
-		return Response.json({ success: true }, { headers })
+		const result = await startSetup({
+			id: setupStartMatch.id,
+			step: body.step,
+		})
+		if ('error' in result)
+			return Response.json(result, { status: 400, headers })
+		return Response.json(result, { headers })
 	}
 
 	const setupLogsMatch = matchRoute(path, '/v2/teams/:id/setup/logs')
 	if (setupLogsMatch && method === 'GET') {
-		const logs = getTeamSetupLogs(setupLogsMatch.id)
-		if (!logs)
-			return Response.json(
-				{ error: 'No active setup' },
-				{ status: 404, headers },
-			)
-		return Response.json(logs, { headers })
+		const result = await getSetupLogs({ id: setupLogsMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const buildMatch = matchRoute(path, '/v2/teams/:id/build')
 	if (buildMatch && method === 'POST') {
-		const team = dbGetTeam(buildMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		try {
-			await rebuildExpoBuild(buildMatch.id, team.worktreePath)
-		} catch (err) {
-			return Response.json({ error: String(err) }, { status: 500, headers })
+		const result = await startBuild({ id: buildMatch.id })
+		if ('error' in result) {
+			const status = result.error === 'Team not found' ? 404 : 500
+			return Response.json(result, { status, headers })
 		}
-		return Response.json({ success: true }, { headers })
+		return Response.json(result, { headers })
 	}
 
 	const buildStopMatch = matchRoute(path, '/v2/teams/:id/build/stop')
 	if (buildStopMatch && method === 'POST') {
-		const team = dbGetTeam(buildStopMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		stopExpoBuild(buildStopMatch.id)
-		return Response.json({ success: true }, { headers })
+		const result = await stopBuild({ id: buildStopMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const buildLogsMatch = matchRoute(path, '/v2/teams/:id/build/logs')
 	if (buildLogsMatch && method === 'GET') {
-		const status = getExpoBuildStatus(buildLogsMatch.id)
-		const output = getExpoBuildOutput(buildLogsMatch.id)
-		if (status === null)
-			return Response.json(
-				{ error: 'No active build' },
-				{ status: 404, headers },
-			)
-		return Response.json({ status, output }, { headers })
+		const result = await getBuildLogs({ id: buildLogsMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const scriptRunMatch = matchRoute(
@@ -648,73 +785,46 @@ export async function handleV2Teams(
 		'/v2/teams/:teamId/scripts/:scriptId/run',
 	)
 	if (scriptRunMatch && method === 'POST') {
-		const team = dbGetTeam(scriptRunMatch.teamId)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		const script = dbGetScript(scriptRunMatch.scriptId)
-		if (!script)
-			return Response.json(
-				{ error: 'Script not found' },
-				{ status: 404, headers },
-			)
-		const error = await runScript(
-			scriptRunMatch.teamId,
-			team.worktreePath,
-			script,
-		)
-		if (error) return Response.json({ error }, { status: 400, headers })
-		return Response.json({ success: true }, { headers })
+		const result = await runTeamScript({
+			teamId: scriptRunMatch.teamId,
+			scriptId: scriptRunMatch.scriptId,
+		})
+		if ('error' in result) {
+			const status =
+				result.error === 'Team not found' || result.error === 'Script not found'
+					? 404
+					: 400
+			return Response.json(result, { status, headers })
+		}
+		return Response.json(result, { headers })
 	}
 
 	const scriptStopMatch = matchRoute(path, '/v2/teams/:id/scripts/stop')
 	if (scriptStopMatch && method === 'POST') {
-		const team = dbGetTeam(scriptStopMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		const error = stopScript(scriptStopMatch.id)
-		if (error) return Response.json({ error }, { status: 400, headers })
-		return Response.json({ success: true }, { headers })
+		const result = await stopTeamScript({ id: scriptStopMatch.id })
+		if ('error' in result) {
+			const status = result.error === 'Team not found' ? 404 : 400
+			return Response.json(result, { status, headers })
+		}
+		return Response.json(result, { headers })
 	}
 
 	const devServerMatch = matchRoute(path, '/v2/teams/:id/dev-server')
 	if (devServerMatch && method === 'POST') {
-		const team = dbGetTeam(devServerMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		let port = getTeamPort(devServerMatch.id)
-		if (!port) {
-			port = (await allocatePort()) ?? null
-			if (port) setTeamPort(devServerMatch.id, port)
+		const result = await startDevServer({ id: devServerMatch.id })
+		if ('error' in result) {
+			const status = result.error === 'Team not found' ? 404 : 500
+			return Response.json(result, { status, headers })
 		}
-		if (!port) {
-			return Response.json(
-				{ error: 'No port available' },
-				{ status: 500, headers },
-			)
-		}
-		startExpoDevServer(devServerMatch.id, team.worktreePath, port)
-		return Response.json({ success: true, port }, { headers })
+		return Response.json(result, { headers })
 	}
 
 	const devServerStopMatch = matchRoute(path, '/v2/teams/:id/dev-server/stop')
 	if (devServerStopMatch && method === 'POST') {
-		const team = dbGetTeam(devServerStopMatch.id)
-		if (!team)
-			return Response.json(
-				{ error: 'Team not found' },
-				{ status: 404, headers },
-			)
-		stopExpoDevServer(devServerStopMatch.id)
-		return Response.json({ success: true }, { headers })
+		const result = await stopDevServer({ id: devServerStopMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const devServerStdinMatch = matchRoute(path, '/v2/teams/:id/dev-server/stdin')
@@ -722,28 +832,21 @@ export async function handleV2Teams(
 		const body = (await req.json()) as { input: string }
 		if (typeof body.input !== 'string' || body.input.length === 0)
 			return Response.json({ error: 'Missing input' }, { status: 400, headers })
-		const sent = await sendExpoDevServerCommand(
-			devServerStdinMatch.id,
-			body.input,
-		)
-		if (!sent)
-			return Response.json(
-				{ error: 'No active dev server' },
-				{ status: 404, headers },
-			)
-		return Response.json({ success: true }, { headers })
+		const result = await sendDevServerInput({
+			id: devServerStdinMatch.id,
+			input: body.input,
+		})
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	const devServerLogsMatch = matchRoute(path, '/v2/teams/:id/dev-server/logs')
 	if (devServerLogsMatch && method === 'GET') {
-		const status = getExpoDevServerStatus(devServerLogsMatch.id)
-		const output = getExpoDevServerOutput(devServerLogsMatch.id)
-		if (status === null)
-			return Response.json(
-				{ error: 'No active dev server' },
-				{ status: 404, headers },
-			)
-		return Response.json({ status, output }, { headers })
+		const result = await getDevServerLogs({ id: devServerLogsMatch.id })
+		if ('error' in result)
+			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
 	}
 
 	return null

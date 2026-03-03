@@ -19,7 +19,6 @@
 		"check:fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test src/server/",
-		"build": "bun build --target=node src/cli/index.tsx --outdir=dist",
 		"compile": "bun build --compile --minify src/cli/index.tsx --outfile=grove",
 		"build:simserver": "cd simulator-server && swift build -c release && cd .."
 	},

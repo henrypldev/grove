@@ -3,7 +3,7 @@ title: SDK
 description: TypeScript SDK for building Grove integrations.
 ---
 
-The `@usegrove/sdk` package provides a TypeScript client for connecting to a Grove server over WebSocket.
+The `@usegrove/sdk` package provides a TypeScript client for connecting to a Grove server over WebSocket, with optional React hooks for data fetching and real-time subscriptions.
 
 ## Installation
 
@@ -280,6 +280,159 @@ Catch up on events you may have missed:
 ```typescript
 client.replay({ channel: `team:${teamId}`, sinceId: lastSeenEventId })
 ```
+
+## React Hooks
+
+The SDK includes React bindings built on [TanStack Query](https://tanstack.com/query) for type-safe data fetching and real-time subscriptions.
+
+### Setup
+
+Install peer dependencies:
+
+```bash
+npm install @tanstack/react-query react
+```
+
+Wrap your app with both providers:
+
+```tsx
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { GroveProvider } from '@usegrove/sdk/react'
+
+const queryClient = new QueryClient()
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <GroveProvider url="https://your-machine.tail-net.ts.net/grove">
+        <MyApp />
+      </GroveProvider>
+    </QueryClientProvider>
+  )
+}
+```
+
+`GroveProvider` accepts:
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `url` | `string` | — | Server URL (automatically converts to WebSocket) |
+| `autoConnect` | `boolean` | `true` | Connect on mount |
+| `deviceType` | `'mac' \| 'mobile'` | `'mac'` | Device type for the connection |
+
+### useGrove
+
+Access the Grove client and connection status:
+
+```tsx
+import { useGrove } from '@usegrove/sdk/react'
+
+function StatusBar() {
+  const { client, baseUrl, status } = useGrove()
+  // status: 'connecting' | 'connected' | 'disconnected'
+  return <span>{status}</span>
+}
+```
+
+### useQuery
+
+Fetch data from GET endpoints with caching and automatic refetching. Paths and parameters are fully typed via `RouteMap`.
+
+```tsx
+import { useQuery } from '@usegrove/sdk/react'
+
+// No params needed
+const { data: teams, isLoading } = useQuery('/v2/teams')
+
+// With path params
+const { data: team } = useQuery('/v2/teams/:id', {
+  params: { id: 'team-123' },
+})
+
+// With query params
+const { data: activity } = useQuery('/v2/teams/:id/activity', {
+  params: { id: 'team-123' },
+  query: { since: lastEventId },
+})
+
+// With options
+const { data } = useQuery('/v2/dashboard', {
+  enabled: isConnected,
+  refetchInterval: 5000,
+  staleTime: 10000,
+  gcTime: 300000,
+})
+```
+
+### useMutation
+
+Execute mutations (POST, PUT, DELETE, PATCH) with type-safe bodies and parameters. Automatically handles file uploads via FormData.
+
+```tsx
+import { useMutation } from '@usegrove/sdk/react'
+
+// Create a team
+const createTeam = useMutation('POST /v2/teams', {
+  onSuccess: (data) => console.log('Created:', data),
+  onError: (error) => console.error(error),
+})
+
+createTeam.mutate({
+  body: { repoId: 'repo-id', task: 'Add dark mode' },
+})
+
+// With path params
+const spawnAgent = useMutation('POST /v2/teams/:id/agents')
+
+spawnAgent.mutate({
+  params: { id: 'team-123' },
+  body: { role: 'dev' },
+})
+
+// File uploads are detected automatically
+const sendMessage = useMutation('POST /v2/teams/:id/messages')
+
+sendMessage.mutate({
+  params: { id: 'team-123' },
+  body: { text: 'See attached', files: [imageFile] },
+})
+```
+
+### useQuerySubscription
+
+Subscribe to real-time WebSocket events. Automatically invalidates related queries when events arrive.
+
+```tsx
+import { useQuerySubscription } from '@usegrove/sdk/react'
+
+// Subscribe to team activity
+const { data: latestEvent, history } = useQuerySubscription('activity', {
+  channel: `team:${teamId}`,
+})
+
+// Subscribe to agent updates
+const { data: agentUpdate } = useQuerySubscription('agent:update', {
+  channel: `team:${teamId}`,
+})
+
+// Conditional subscription
+const { data: log } = useQuerySubscription('log', {
+  channel: `team:${teamId}`,
+  enabled: showLogs,
+})
+```
+
+Events and their automatic query invalidations:
+
+| Event | Invalidates |
+|-------|-------------|
+| `team:update` | `/v2/teams`, `/v2/dashboard` |
+| `agent:update` | `/v2/teams/:id/agents` |
+| `activity` | `/v2/teams/:id/activity` |
+| `log` | `/v2/teams/:id/logs` |
+| `replay:batch` | `/v2/teams/:id/activity` |
+
+The `history` array keeps the last 200 events received for each subscription.
 
 ## Types
 

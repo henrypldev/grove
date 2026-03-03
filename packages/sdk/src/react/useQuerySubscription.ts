@@ -5,11 +5,13 @@ import type { SubscriptionEvent, SubscriptionMap } from './types'
 
 const INVALIDATION_MAP: Record<SubscriptionEvent, string[]> = {
 	'team:update': ['/v2/teams', '/v2/dashboard'],
-	'agent:update': ['/v2/teams'],
-	activity: ['/v2/teams'],
-	log: ['/v2/teams'],
-	'replay:batch': ['/v2/teams'],
+	'agent:update': ['/v2/teams/:id/agents'],
+	activity: ['/v2/teams/:id/activity'],
+	log: ['/v2/teams/:id/logs'],
+	'replay:batch': ['/v2/teams/:id/activity'],
 }
+
+const MAX_HISTORY = 200
 
 type SubscriptionData<E extends SubscriptionEvent> = SubscriptionMap[E]['data']
 
@@ -41,7 +43,7 @@ export function useQuerySubscription<E extends SubscriptionEvent>(
 			if (eventChannel !== channel && event !== 'team:update') return
 
 			setData(eventData)
-			historyRef.current = [...historyRef.current, eventData]
+			historyRef.current = [...historyRef.current.slice(-MAX_HISTORY + 1), eventData]
 			setHistory(historyRef.current)
 
 			const paths = INVALIDATION_MAP[event]

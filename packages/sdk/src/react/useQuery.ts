@@ -49,7 +49,7 @@ export function useQuery<P extends keyof RouteMap>(
 	const query = (options as any)?.query
 
 	return useTanstackQuery({
-		queryKey: [path, params, query].filter(Boolean),
+		queryKey: [path, params ?? null, query ?? null],
 		queryFn: async () => {
 			const url = buildUrl(baseUrl, path, params, query)
 			const res = await fetch(url)

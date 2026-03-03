@@ -1,0 +1,226 @@
+---
+title: API Reference
+description: Grove server REST and WebSocket API.
+---
+
+The Grove server exposes both REST (HTTP) and WebSocket APIs. All REST endpoints are under `/v2/`. The WebSocket endpoint is at `/grove/ws`.
+
+<Callout>
+For most use cases, prefer the [SDK](/sdk) which provides a typed client over WebSocket. The REST API is primarily used for operations requiring file uploads.
+</Callout>
+
+## REST Endpoints
+
+### Version
+
+```
+GET /v2/version
+```
+
+Returns `{ version: string }`.
+
+### Config
+
+```
+GET    /v2/config/settings           → Get all settings
+PATCH  /v2/config/settings           → Update settings
+GET    /v2/config/clone-directory    → Get clone directory
+PUT    /v2/config/clone-directory    → Set clone directory
+GET    /v2/config/list-directories   → List directories at a path
+```
+
+### GitHub
+
+```
+GET  /v2/github/repos               → List authenticated user's repos
+GET  /v2/github/repos/orgs          → List user's organizations
+GET  /v2/github/repos/orgs/:org     → List repos for an organization
+```
+
+### Repos
+
+```
+GET    /v2/repos                     → List all repos
+POST   /v2/repos                     → Add a local repo { path }
+POST   /v2/repos/clone               → Clone from GitHub { fullName }
+DELETE /v2/repos/:id                 → Delete a repo
+
+GET    /v2/repos/:id/teams           → List teams for a repo
+POST   /v2/repos/:id/detect          → Trigger setup step auto-detection
+```
+
+#### Setup Steps
+
+```
+GET    /v2/repos/:id/setup           → List setup steps
+POST   /v2/repos/:id/setup           → Add a step { name, run, background? }
+PUT    /v2/repos/:id/setup           → Update a step { index, name, run, background? }
+DELETE /v2/repos/:id/setup           → Delete a step { index }
+PATCH  /v2/repos/:id/setup/reorder   → Reorder steps { order: number[] }
+```
+
+#### Scripts
+
+```
+GET    /v2/repos/:id/scripts         → List scripts
+POST   /v2/repos/:id/scripts         → Create a script { name, run, background? }
+PUT    /v2/scripts/:id               → Update a script
+DELETE /v2/scripts/:id               → Delete a script
+```
+
+### Teams
+
+#### Lifecycle
+
+```
+GET    /v2/teams                     → List all teams
+POST   /v2/teams                     → Create a team (multipart: repoId, task, files[])
+GET    /v2/teams/:id                 → Get team detail (includes agents)
+DELETE /v2/teams/:id                 → Archive a team
+POST   /v2/teams/:id/close           → Close a team (triggers PR creation)
+```
+
+#### Messages
+
+```
+POST   /v2/teams/:id/messages        → Send a message (multipart: text, files[])
+```
+
+#### Activity and Documents
+
+```
+GET    /v2/teams/:id/activity        → Get activity events (?since=eventId)
+GET    /v2/teams/:id/logs            → Get team logs (?since=eventId)
+GET    /v2/teams/:id/prd             → Get PRD content
+GET    /v2/teams/:id/design-doc      → Get design doc content
+GET    /v2/teams/:id/tasks           → Get agent task list
+GET    /v2/teams/:id/notes           → Get agent notes
+```
+
+#### Agents
+
+```
+GET    /v2/teams/:id/agents                         → List agents
+POST   /v2/teams/:id/agents                         → Spawn an agent { role }
+POST   /v2/teams/:teamId/agents/:agentId/respawn    → Respawn an agent { prompt? }
+```
+
+#### Setup Management
+
+```
+POST   /v2/teams/:id/setup/retry     → Retry failed setup
+POST   /v2/teams/:id/setup/cancel    → Cancel active setup
+POST   /v2/teams/:id/setup/stop      → Stop a setup step { step }
+POST   /v2/teams/:id/setup/start     → Start a setup step { step }
+GET    /v2/teams/:id/setup/logs      → Get setup logs
+```
+
+#### Build Management (Expo)
+
+```
+POST   /v2/teams/:id/build           → Start a build
+POST   /v2/teams/:id/build/stop      → Stop the build
+GET    /v2/teams/:id/build/logs      → Get build logs { status, output }
+```
+
+#### Dev Server (Expo)
+
+```
+POST   /v2/teams/:id/dev-server      → Start dev server
+POST   /v2/teams/:id/dev-server/stop → Stop dev server
+POST   /v2/teams/:id/dev-server/stdin → Send input to dev server { input }
+GET    /v2/teams/:id/dev-server/logs  → Get dev server logs { status, output }
+```
+
+#### Scripts
+
+```
+POST   /v2/teams/:teamId/scripts/:scriptId/run   → Run a script
+POST   /v2/teams/:id/scripts/stop                 → Stop running script
+```
+
+### Dashboard and Analytics
+
+```
+GET    /v2/dashboard                  → Dashboard overview (all active teams + metrics)
+GET    /v2/conflicts                  → Git conflict analysis across teams
+GET    /v2/usage                      → Usage metrics (?period=day&teamId=&repoId=)
+```
+
+Usage periods: `session`, `day`, `week`, `month`.
+
+### Activity
+
+```
+POST   /v2/activity                   → Insert a custom activity event
+```
+
+## WebSocket
+
+Connect to `/grove/ws` for real-time communication. The WebSocket protocol uses JSON messages.
+
+### Client Messages
+
+#### Auth
+
+Sent immediately after connecting:
+
+```json
+{ "type": "auth", "payload": { "deviceType": "mac" } }
+```
+
+`deviceType` is `"mac"` or `"mobile"`.
+
+#### Subscribe / Unsubscribe
+
+```json
+{ "type": "subscribe", "channels": ["team:abc123", "global"] }
+{ "type": "unsubscribe", "channels": ["team:abc123"] }
+```
+
+#### Replay
+
+Request historical events since a given event ID:
+
+```json
+{ "type": "replay", "channel": "team:abc123", "sinceId": 42 }
+```
+
+#### RPC
+
+Call any server method over WebSocket:
+
+```json
+{ "type": "rpc", "id": "unique-id", "method": "teams:list", "params": {} }
+```
+
+### Server Messages
+
+#### Events
+
+```json
+{ "type": "activity", "channel": "team:abc123", "data": { "id": 1, "teamId": "abc123", "type": "agent:message", "payload": "...", "createdAt": 1234567890 } }
+{ "type": "log", "channel": "team:abc123", "data": { ... } }
+{ "type": "team:update", "channel": "global", "data": { "id": "abc123", "status": "active" } }
+{ "type": "agent:update", "channel": "team:abc123", "data": { "id": "agent1", "teamId": "abc123", "status": "working" } }
+```
+
+#### Replay Batch
+
+```json
+{ "type": "replay:batch", "channel": "team:abc123", "activity": [ ... ] }
+```
+
+#### RPC Response
+
+```json
+{ "type": "rpc:response", "id": "unique-id", "data": { ... } }
+{ "type": "rpc:response", "id": "unique-id", "error": "Not found" }
+```
+
+#### Connection
+
+```json
+{ "type": "connected" }
+{ "type": "pong" }
+```

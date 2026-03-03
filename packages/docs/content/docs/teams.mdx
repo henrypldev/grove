@@ -1,0 +1,50 @@
+---
+title: Teams
+description: How teams work in Grove — the core unit of work.
+---
+
+A **team** is the core unit of work in Grove. Each team represents a single task or feature being worked on by a group of AI agents.
+
+## Lifecycle
+
+Teams progress through these statuses:
+
+| Status | Description |
+|--------|-------------|
+| `planning` | Orchestrator is creating the PRD and design doc |
+| `active` | Agents are working on the task |
+| `blocked` | Work is paused, waiting for user input |
+| `review` | Code review is in progress |
+| `idle` | All agents are idle |
+| `done` | Task is complete, PR has been created |
+| `archived` | Team has been cleaned up |
+
+## What happens when you create a team
+
+1. **Worktree creation** — Grove creates a new git worktree from the main branch, giving the team an isolated copy of the repo
+2. **Setup** — Your configured setup steps run in the worktree (install dependencies, build, start dev servers, etc.)
+3. **Orchestration** — The orchestrator agent analyzes the task and generates a PRD and design doc
+4. **Agent spawning** — Specialist agents are spawned based on what the task requires
+5. **Development** — Agents collaborate to implement the task, with the team lead coordinating work
+6. **Completion** — When work is done, the reviewer agent creates a pull request
+
+## Team documents
+
+Each team generates and maintains several documents:
+
+- **PRD** — Product requirements document describing what needs to be built
+- **Design doc** — Technical design document with implementation details
+- **Tasks** — A prioritized task list that agents work through
+- **Notes** — Running progress notes from agents
+
+## Sending messages
+
+You can send messages to a team at any time. Messages are routed to the orchestrator, which can relay them to the appropriate agent. You can also attach images and PDFs to provide additional context.
+
+## Batch creation
+
+You can create multiple teams at once with dependencies between them. Teams with dependencies wait for their blocking teams to complete before starting.
+
+## Closing a team
+
+Closing a team triggers the PR creation flow. The reviewer agent reviews the changes and opens a pull request. Archiving a team cleans up its resources (worktree, agents, processes).

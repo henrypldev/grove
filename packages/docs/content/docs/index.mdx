@@ -1,9 +1,9 @@
 ---
 title: Getting Started
-description: Install Grove and start managing terminal sessions from your phone.
+description: Install Grove and start orchestrating AI agent teams from your phone.
 ---
 
-Grove is a server and CLI for managing Git repositories and terminal sessions from a mobile device. Run Claude Code sessions on your dev machine, access them from anywhere.
+Grove is an AI agent orchestration platform that manages teams of Claude agents working on your codebase. Create tasks from your phone, and Grove handles the planning, development, testing, and review — all running on your dev machine.
 
 ## Requirements
 
@@ -44,30 +44,41 @@ brew install --cask tailscale
 ```
 
 <Callout>
-Tailscale needs to be set up on both your Mac **and** your phone before Grove can work remotely. See the [Tailscale Setup](/docs/tailscale) guide for step-by-step instructions.
+Tailscale needs to be set up on both your Mac **and** your phone before Grove can work remotely. See the [Tailscale Setup](/tailscale) guide for step-by-step instructions.
 </Callout>
 
 ## Quick Start
 
-### Start the server
+### 1. Start the server
 
 ```bash
 grove start
 ```
 
-This starts the Grove server interactively. It will check that all dependencies are installed, start the HTTP server, and set up a Tailscale Funnel for external access.
+This starts the Grove server interactively. It checks that all dependencies are installed, starts the HTTP and WebSocket server, and sets up a Tailscale Funnel for external access.
 
-### Run a command with mobile access
+### 2. Add a repository
 
-```bash
-grove run claude
-```
+Open the Grove app on your phone and add a repository — either clone from GitHub or point to a local directory on your Mac.
 
-This launches Claude Code in a tmux session with a ttyd web terminal, accessible over HTTPS via your Tailscale hostname. Open the printed URL on your phone to interact with the session.
+### 3. Create a team
+
+Describe a task (e.g. "Add dark mode support to the settings page") and Grove will:
+
+1. Create a git worktree for isolated work
+2. Run your configured setup steps
+3. Spin up an orchestrator agent that creates a PRD and design doc
+4. Spawn specialist agents (team lead, developers, QA, reviewer) to implement the task
+5. Open a pull request when the work is complete
+
+### 4. Monitor progress
+
+Track agent activity, review generated documents, and send messages to the team — all from your phone.
 
 ## How it works
 
-1. **grove CLI** starts the server and sets up a Tailscale Funnel for external HTTPS access
-2. **grove server** exposes a REST API for managing repos, worktrees, and terminal sessions
-3. **Terminal sessions** are tmux sessions served via ttyd over HTTPS
-4. **Grove mobile app** (separate repo) connects to the server to create and manage sessions
+1. **Grove server** runs on your Mac, exposing a REST API and WebSocket connection over Tailscale
+2. **Teams** are the core unit of work — each team gets its own git worktree and set of agents
+3. **Agents** are specialized Claude instances (orchestrator, PM, team lead, devs, QA, reviewer) that collaborate on your task
+4. **The mobile app** connects to the server to create teams, monitor progress, and interact with agents
+5. **The SDK** (`@usegrove/sdk`) provides a TypeScript client for building custom integrations

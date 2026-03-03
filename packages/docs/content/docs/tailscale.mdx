@@ -70,15 +70,15 @@ Grove uses two Tailscale features:
 
 | Feature | What it does | Used for |
 |---------|-------------|----------|
-| **Funnel** | Exposes a path on your Tailscale hostname over HTTPS | The Grove API at `https://<your-machine>.tail-net.ts.net/grove` |
+| **Funnel** | Exposes a path on your Tailscale hostname over HTTPS | The Grove API and WebSocket at `https://<your-machine>.tail-net.ts.net/grove` |
 | **TLS Certificates** | Auto-generated certs for your Tailscale hostname | Terminal sessions at `https://<your-machine>.tail-net.ts.net:<port>` |
 
 When you run `grove start`, it automatically:
 1. Gets your Tailscale hostname and IP
-2. Sets up a Funnel at the `/grove` path for the API
+2. Sets up a Funnel at the `/grove` path for the REST API and WebSocket
 3. Generates TLS certificates (cached in `~/.config/grove/certs/`)
 
-When a terminal session starts, it launches ttyd on its own HTTPS port using those certificates.
+Terminal sessions (for agent work and `grove run`) use ttyd on individual HTTPS ports with those certificates.
 
 **Authentication** is handled by Tailscale itself — only devices on your tailnet can connect. No passwords or API keys needed.
 

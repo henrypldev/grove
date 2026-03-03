@@ -4,8 +4,13 @@
 		"---Getting Started---",
 		"index",
 		"tailscale",
+		"---Concepts---",
+		"teams",
+		"agents",
 		"---Reference---",
 		"cli",
-		"configuration"
+		"configuration",
+		"sdk",
+		"api"
 	]
 }

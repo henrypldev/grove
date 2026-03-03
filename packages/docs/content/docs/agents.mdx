@@ -1,0 +1,66 @@
+---
+title: Agents
+description: The AI agents that make up a Grove team.
+---
+
+Each team in Grove is made up of specialized AI agents that collaborate to complete a task. Agents are Claude instances with specific roles and tools.
+
+## Roles
+
+| Role | Description |
+|------|-------------|
+| `orchestrator` | Coordinates the team, routes messages, manages the overall flow |
+| `pm` | Creates the PRD and design doc during the planning phase |
+| `team-lead` | Manages tasks, coordinates developers, makes technical decisions |
+| `dev` | Writes code and implements features |
+| `qa` | Tests the implementation and reports issues |
+| `reviewer` | Reviews code and creates pull requests |
+| `env` | Manages environment setup and build processes |
+
+The orchestrator and PM are created automatically. You can spawn additional agents (`team-lead`, `dev`, `qa`, `reviewer`) manually or let the orchestrator decide what's needed.
+
+## Agent status
+
+| Status | Description |
+|--------|-------------|
+| `idle` | Not currently doing anything |
+| `planning` | Working on a plan |
+| `working` | Actively executing a task |
+| `waiting` | Waiting for input or another agent |
+| `blocked` | Cannot proceed, needs help |
+| `done` | Finished all assigned work |
+| `error` | Encountered an error |
+
+## Agent tools
+
+Agents have access to a set of Grove-specific tools via MCP, in addition to standard Claude capabilities:
+
+- **Activity** — Post and retrieve team activity events
+- **Documents** — Save and read PRDs, design docs, and notes
+- **Tasks** — Create, read, and update the team task list
+- **Conflicts** — Check for git conflicts between team worktrees
+- **User interaction** — Ask the user questions (with multi-select support)
+- **Git and file operations** — Standard development tools
+
+## Spawning agents
+
+Agents can be spawned via the SDK or API:
+
+```typescript
+// Spawn a new developer agent
+await client.teams.agents.spawn({ id: teamId, role: 'dev' })
+```
+
+Spawnable roles: `team-lead`, `dev`, `qa`, `reviewer`, `env`
+
+## Respawning agents
+
+If an agent errors out or gets stuck, you can respawn it with an optional prompt to provide additional context:
+
+```typescript
+await client.teams.agents.respawn({
+  teamId,
+  agentId,
+  prompt: 'Focus on the failing test in auth.test.ts'
+})
+```

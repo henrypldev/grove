@@ -10,8 +10,7 @@ Grove stores its configuration in `~/.config/grove/`.
 | File | Description |
 |------|-------------|
 | `cli.json` | CLI configuration (port, etc.) |
-| `config.json` | Registered repositories |
-| `sessions.json` | Active session state |
+| `grove.db` | SQLite database (repos, teams, agents, activity) |
 | `certs/` | Tailscale TLS certificates for ttyd |
 | `pid` | PID file for the background server process |
 
@@ -21,7 +20,7 @@ The CLI configuration file at `~/.config/grove/cli.json` stores persistent setti
 
 ```json
 {
-  "port": 3000
+  "port": 3001
 }
 ```
 
@@ -29,168 +28,42 @@ The CLI configuration file at `~/.config/grove/cli.json` stores persistent setti
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `port` | `number` | `3000` | Server port |
+| `port` | `number` | `3001` | Server port |
 
 The port can also be set per-invocation with the `--port` flag, which takes precedence and updates the saved config.
 
-## Sessions
+## Repository Configuration
 
-Active terminal sessions are tracked in `~/.config/grove/sessions.json`. This file is managed automatically — sessions are added when created and removed when cleaned up.
+Repositories are managed through the API or mobile app and stored in the database. Each repository tracks:
 
-Each session entry contains:
+- **Path** — Local filesystem path
+- **Name** — Display name
+- **Framework** — Auto-detected framework (Expo, Next.js, etc.)
+- **Environment variables** — Key-value pairs written to `.env` files in worktrees
+- **Setup steps** — Commands that run when a team worktree is created
+- **Scripts** — Custom commands that can be run against teams
 
-- Session ID
-- Repository name and branch
-- Working directory
-- Terminal URL and port
-- ttyd process PID
-- The command being run (for `grove run` sessions)
+### Environment Variables
 
-## Environment Variables
-
-You can configure environment variables for each repository through the Mac app or by editing `~/.config/grove/config.json` directly.
-
-Environment variables are defined per repository:
+Environment variables are defined per repository and written to worktrees when teams are created:
 
 ```json
 {
-  "repos": [
-    {
-      "id": "abc12345",
-      "path": "/Users/you/Projects/my-app",
-      "name": "my-app",
-      "envVars": [
-        {
-          "key": "DATABASE_URL",
-          "value": "postgresql://localhost:5432/mydb",
-          "filePath": ".env.local"
-        },
-        {
-          "key": "API_KEY",
-          "value": "your-api-key-here"
-        }
-      ]
-    }
-  ]
+  "key": "DATABASE_URL",
+  "value": "postgresql://localhost:5432/mydb",
+  "filePath": ".env.local"
 }
 ```
-
-### Fields
 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `key` | Yes | The environment variable name |
 | `value` | Yes | The environment variable value |
-| `filePath` | No | Path where the env file will be saved (useful for monorepos). Defaults to `.env.local` at the repository root |
+| `filePath` | Yes | Path where the env file will be saved (relative to repo root) |
 
-When a worktree is created, Grove generates the environment files with the configured variables.
+### Setup Steps
 
-## Setup Steps
-
-Setup steps are commands that run automatically when a session starts. There are two ways to configure them:
-
-1. **`.grove/setup.json`** — Committed to your repository. Shared with your team.
-2. **Config UI** — Managed through the Grove Mac app. Stored in `~/.config/grove/config.json`.
-
-If both are present, `.grove/setup.json` takes full priority — config.json steps are ignored.
-
-### `.grove/setup.json` (recommended)
-
-Create `.grove/setup.json` in your repository root:
-
-```json
-{
-  "setup": [
-    {
-      "name": "Install dependencies",
-      "run": "npm install"
-    },
-    {
-      "name": "Build project",
-      "run": "npm run build"
-    }
-  ]
-}
-```
-
-This file can be committed to version control so all team members get the same setup steps.
-
-### Config UI
-
-You can also manage setup steps per-repository through the Grove Mac app or by editing `~/.config/grove/config.json` directly. Steps are stored under each repo entry:
-
-```json
-{
-  "repos": [
-    {
-      "id": "abc12345",
-      "path": "/Users/you/Projects/my-app",
-      "name": "my-app",
-      "setupSteps": [
-        {
-          "name": "Install dependencies",
-          "run": "npm install"
-        }
-      ]
-    }
-  ]
-}
-```
-
-The Mac app provides a JSON view of your configured steps that you can copy and paste into a `.grove/setup.json` file when you're ready to commit them.
-
-### Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `setup` | array | List of setup steps to run in order |
-| `setup[].name` | string | Display name shown in the UI |
-| `setup[].run` | string | Shell command to execute |
-| `setup[].background` | boolean | If `true`, the step starts but doesn't block — the next step begins immediately |
-
-### Behavior
-
-- Steps run sequentially in the worktree directory
-- Each step streams output in real-time to the UI
-- Each step shows status: pending, running, done, failed, or stopped
-- If a step fails, subsequent steps are skipped
-- You can cancel running steps or retry failed ones from the UI
-- Output from each step is viewable in the setup inspector
-- **Background steps** start but don't block — the runner immediately moves to the next step. This is useful for long-running processes like dev servers that never exit on their own. Background steps can be individually stopped and restarted from the UI.
-
-### Priority
-
-| `.grove/setup.json` exists? | Config UI steps exist? | Result |
-|------------------------------|------------------------|--------|
-| Yes | No | `.grove/setup.json` is used |
-| Yes | Yes | `.grove/setup.json` is used |
-| No | Yes | Config UI steps are used |
-| No | No | No setup runs |
-
-### Example for React Native / Expo
-
-```json
-{
-  "setup": [
-    {
-      "name": "Install dependencies",
-      "run": "npm install"
-    },
-    {
-      "name": "Install pods",
-      "run": "cd ios && pod install"
-    },
-    {
-      "name": "Build iOS",
-      "run": "npx expo run:ios"
-    }
-  ]
-}
-```
-
-### Example with background steps
-
-For monorepo setups where you need multiple dev servers running concurrently:
+Setup steps run automatically when a team worktree is created. You can also place a `.grove/setup.json` file in your repository:
 
 ```json
 {
@@ -200,17 +73,67 @@ For monorepo setups where you need multiple dev servers running concurrently:
       "run": "bun install"
     },
     {
-      "name": "Web server",
-      "run": "bun run web",
-      "background": true
-    },
-    {
-      "name": "React Native server",
-      "run": "bun run native",
-      "background": true
+      "name": "Build project",
+      "run": "bun run build"
     }
   ]
 }
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` | Display name shown in the UI |
+| `run` | `string` | Shell command to execute |
+| `background` | `boolean` | If `true`, the step starts but doesn't block — the next step begins immediately |
+
+#### Behavior
+
+- Steps run sequentially in the worktree directory
+- Each step streams output in real-time to the UI
+- If a step fails, subsequent steps are skipped
+- You can cancel, retry, stop, or restart individual steps
+- Background steps are useful for long-running processes like dev servers
+
+#### Auto-detection
+
+Grove can auto-detect setup steps for your project. Trigger detection via the API or mobile app, and Grove will analyze your repository to suggest appropriate setup commands.
+
+### Scripts
+
+Scripts are custom commands defined per repository that can be run against any team. They're useful for common operations like running tests, linting, or deploying.
+
+```json
+{
+  "name": "Run tests",
+  "run": "bun test",
+  "background": false
+}
+```
+
+## Server Settings
+
+Server settings can be configured via the API:
+
+```typescript
+// Get all settings
+const settings = await client.config.settings.get()
+
+// Update settings
+await client.config.settings.update({
+  settings: { key: 'value' }
+})
+```
+
+## Clone Directory
+
+Configure where GitHub repositories are cloned to:
+
+```typescript
+// Get current clone directory
+const { cloneDirectory } = await client.config.cloneDir.get()
+
+// Set clone directory
+await client.config.cloneDir.set({ cloneDirectory: '/Users/you/Projects' })
 ```
 
 ## TLS Certificates

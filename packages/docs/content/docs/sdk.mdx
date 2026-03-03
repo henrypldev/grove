@@ -1,0 +1,308 @@
+---
+title: SDK
+description: TypeScript SDK for building Grove integrations.
+---
+
+The `@usegrove/sdk` package provides a TypeScript client for connecting to a Grove server over WebSocket.
+
+## Installation
+
+```bash
+npm install @usegrove/sdk
+```
+
+## Quick Start
+
+```typescript
+import { GroveClient } from '@usegrove/sdk'
+
+const client = new GroveClient({
+  url: 'wss://your-machine.tail-net.ts.net/grove/ws'
+})
+
+await client.connect()
+
+// List all teams
+const teams = await client.teams.list()
+
+// Create a team (uses REST for file upload support)
+const team = await client.rest.teams.create({
+  repoId: 'repo-id',
+  task: 'Add dark mode to the settings page'
+})
+
+// Subscribe to real-time updates
+client.subscribe([`team:${team.id}`])
+
+client.on('activity', (event, channel) => {
+  console.log(`[${event.type}]`, event.payload)
+})
+
+client.on('agent:update', (agent, channel) => {
+  console.log(`Agent ${agent.id}: ${agent.status}`)
+})
+```
+
+## Client Options
+
+```typescript
+interface GroveClientOptions {
+  url: string                       // WebSocket URL (wss://...)
+  deviceType?: 'mac' | 'mobile'    // Default: 'mac'
+  autoReconnect?: boolean          // Default: true
+  reconnectMaxRetries?: number     // Default: 10
+  reconnectBaseDelay?: number      // Default: 1000ms
+  pingInterval?: number            // Default: 30000ms
+  rpcTimeout?: number              // Default: 30000ms
+}
+```
+
+## Connection Management
+
+```typescript
+// Connect to the server
+await client.connect()
+
+// Check connection status: 'connecting' | 'connected' | 'disconnected'
+console.log(client.status)
+
+// Disconnect
+client.disconnect()
+```
+
+The client automatically reconnects on connection loss with exponential backoff.
+
+## RPC Methods
+
+All RPC methods are available as namespaced async functions on the client. They communicate over WebSocket.
+
+### Version
+
+```typescript
+const { version } = await client.version()
+```
+
+### Config
+
+```typescript
+// Server settings
+const settings = await client.config.settings.get()
+await client.config.settings.update({ settings: { key: 'value' } })
+
+// Clone directory
+const { cloneDirectory } = await client.config.cloneDir.get()
+await client.config.cloneDir.set({ cloneDirectory: '/path/to/dir' })
+
+// Browse directories
+const { directories } = await client.config.listDirs({ path: '/Users' })
+```
+
+### GitHub
+
+```typescript
+const { repos } = await client.github.repos()
+const { orgs } = await client.github.orgs()
+const { repos: orgRepos } = await client.github.orgRepos({ org: 'my-org' })
+```
+
+### Repos
+
+```typescript
+// CRUD
+const repos = await client.repos.list()
+const repo = await client.repos.add({ path: '/path/to/repo' })
+const cloned = await client.repos.clone({ fullName: 'owner/repo' })
+await client.repos.delete({ id: repoId })
+
+// Teams for a repo
+const teams = await client.repos.teams({ id: repoId })
+
+// Auto-detect setup steps
+await client.repos.detect({ id: repoId })
+
+// Setup steps
+const steps = await client.repos.setup.list({ id: repoId })
+await client.repos.setup.add({ id: repoId, name: 'Install', run: 'bun install' })
+await client.repos.setup.update({ id: repoId, index: 0, name: 'Install', run: 'bun install' })
+await client.repos.setup.delete({ id: repoId, index: 0 })
+await client.repos.setup.reorder({ id: repoId, order: [2, 0, 1] })
+
+// Scripts
+const scripts = await client.repos.scripts.list({ id: repoId })
+await client.repos.scripts.create({ id: repoId, name: 'Test', run: 'bun test' })
+```
+
+### Scripts
+
+```typescript
+await client.scripts.update({ id: scriptId, name: 'Test', run: 'bun test' })
+await client.scripts.delete({ id: scriptId })
+```
+
+### Teams
+
+```typescript
+// List and get
+const teams = await client.teams.list()
+const team = await client.teams.get({ id: teamId })
+
+// Lifecycle
+await client.teams.archive({ id: teamId })
+await client.teams.close({ id: teamId })  // Triggers PR creation
+
+// Agents
+const agents = await client.teams.agents.list({ id: teamId })
+const agent = await client.teams.agents.spawn({ id: teamId, role: 'dev' })
+await client.teams.agents.respawn({ teamId, agentId, prompt: 'Fix the failing test' })
+
+// Activity and logs
+const activity = await client.teams.activity({ id: teamId, since: lastEventId })
+const logs = await client.teams.logs({ id: teamId })
+
+// Documents
+const { content: prd } = await client.teams.prd({ id: teamId })
+const { content: design } = await client.teams.designDoc({ id: teamId })
+const tasks = await client.teams.tasks({ id: teamId })
+const { content: notes } = await client.teams.notes({ id: teamId })
+
+// Setup management
+await client.teams.setup.retry({ id: teamId })
+await client.teams.setup.cancel({ id: teamId })
+await client.teams.setup.stop({ id: teamId, step: 0 })
+await client.teams.setup.start({ id: teamId, step: 0 })
+const setupLogs = await client.teams.setup.logs({ id: teamId })
+
+// Build management (Expo)
+await client.teams.build.start({ id: teamId })
+await client.teams.build.stop({ id: teamId })
+const { status, output } = await client.teams.build.logs({ id: teamId })
+
+// Dev server (Expo)
+const { port } = await client.teams.devServer.start({ id: teamId })
+await client.teams.devServer.stop({ id: teamId })
+await client.teams.devServer.stdin({ id: teamId, input: 'r\n' })
+const devLogs = await client.teams.devServer.logs({ id: teamId })
+
+// Scripts
+await client.teams.scripts.run({ teamId, scriptId })
+await client.teams.scripts.stop({ id: teamId })
+```
+
+### Dashboard and Analytics
+
+```typescript
+// Dashboard overview
+const { teams, metrics } = await client.dashboard()
+
+// Git conflict detection
+const conflicts = await client.conflicts()
+
+// Usage metrics
+const usage = await client.usage({ period: 'day' })
+// periods: 'session' | 'day' | 'week' | 'month'
+// optional filters: teamId, repoId
+```
+
+### Activity
+
+```typescript
+// Insert a custom activity event
+await client.activity.insert({
+  teamId,
+  agentId,
+  type: 'custom:event',
+  payload: { message: 'Something happened' }
+})
+```
+
+## REST Client
+
+Some operations require REST (e.g. file uploads). These are available via `client.rest`:
+
+```typescript
+// Create a team with file attachments
+const team = await client.rest.teams.create({
+  repoId: 'repo-id',
+  task: 'Implement the design in the attached mockup',
+  files: [mockupFile]  // File objects (images, PDFs)
+})
+
+// Send a message with attachments
+await client.rest.teams.sendMessage({
+  id: teamId,
+  text: 'Here is the updated spec',
+  files: [specFile]
+})
+```
+
+## Real-time Events
+
+Subscribe to channels to receive real-time updates:
+
+```typescript
+// Subscribe to a specific team
+client.subscribe([`team:${teamId}`])
+
+// Subscribe to global updates
+client.subscribe(['global'])
+
+// Event handlers
+client.on('activity', (event, channel) => {
+  // TeamActivity event
+})
+
+client.on('log', (event, channel) => {
+  // TeamLog event
+})
+
+client.on('team:update', (data, channel) => {
+  // Partial team update (status changes, etc.)
+})
+
+client.on('agent:update', (data, channel) => {
+  // Partial agent update (status, activity changes)
+})
+
+client.on('replay:batch', (events, channel) => {
+  // Batch of historical events (from replay)
+})
+
+// Connection events
+client.on('connected', () => {})
+client.on('disconnected', () => {})
+client.on('reconnecting', (attempt) => {})
+```
+
+### Replay
+
+Catch up on events you may have missed:
+
+```typescript
+client.replay({ channel: `team:${teamId}`, sinceId: lastSeenEventId })
+```
+
+## Types
+
+The SDK re-exports all shared types:
+
+```typescript
+import type {
+  Team,
+  TeamDetail,
+  Agent,
+  AgentRole,
+  AgentStatus,
+  TeamStatus,
+  TeamActivity,
+  TeamLog,
+  Repo,
+  Script,
+  SetupStep,
+  AgentTask,
+  DashboardResult,
+  UsageResult,
+  ConnectionStatus,
+  GroveClientOptions,
+  ServerEventMap,
+} from '@usegrove/sdk'
+```

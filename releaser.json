@@ -1,4 +1,7 @@
 {
 	"aiReleaseNotes": true,
-	"changelog": true
+	"changelog": true,
+	"hooks": {
+		"postRelease": "bun scripts/release.ts"
+	}
 }

@@ -3,41 +3,13 @@
 import { createHash } from 'node:crypto'
 import { $ } from 'bun'
 
-const VALID_BUMPS = ['patch', 'minor', 'major'] as const
-type Bump = (typeof VALID_BUMPS)[number]
-
 const TARGETS = ['darwin-arm64', 'darwin-x64'] as const
 const HOMEBREW_TAP_PATH = '../homebrew-grove'
-
-function bumpVersion(current: string, bump: Bump): string {
-	const [major, minor, patch] = current.split('.').map(Number)
-	switch (bump) {
-		case 'major':
-			return `${major + 1}.0.0`
-		case 'minor':
-			return `${major}.${minor + 1}.0`
-		case 'patch':
-			return `${major}.${minor}.${patch + 1}`
-	}
-}
-
-async function updatePackageJson(path: string, version: string) {
-	const file = Bun.file(path)
-	const pkg = await file.json()
-	pkg.version = version
-	await Bun.write(file, `${JSON.stringify(pkg, null, '\t')}\n`)
-}
 
 async function sha256(filePath: string): Promise<string> {
 	const file = Bun.file(filePath)
 	const buffer = await file.arrayBuffer()
 	return createHash('sha256').update(Buffer.from(buffer)).digest('hex')
-}
-
-async function buildSimulatorServer() {
-	console.log('Building GroveSimulatorServer...')
-	await $`cd simulator-server && swift build -c release`
-	console.log('  Built GroveSimulatorServer')
 }
 
 async function compileBinaries(
@@ -49,26 +21,34 @@ async function compileBinaries(
 
 	await $`mkdir -p ${distDir}`
 
-	await buildSimulatorServer()
+	console.log('Building GroveSimulatorServer...')
+	await $`cd simulator-server && swift build -c release`
 
-	for (const target of TARGETS) {
-		const outputName = `grove-${version}-${target}`
-		const stageDir = `${distDir}/${outputName}`
+	const results = await Promise.all(
+		TARGETS.map(async (target) => {
+			const outputName = `grove-${version}-${target}`
+			const stageDir = `${distDir}/${outputName}`
 
-		console.log(`Compiling for ${target}...`)
-		await $`mkdir -p ${stageDir}`
-		await $`bun build --compile --minify --target=bun-${target} src/cli/index.tsx --outfile=${stageDir}/grove`
-		await $`cp simulator-server/.build/release/GroveSimulatorServer ${stageDir}/GroveSimulatorServer`
+			console.log(`Compiling for ${target}...`)
+			await $`mkdir -p ${stageDir}`
+			await $`bun build --compile --minify --target=bun-${target} src/cli/index.tsx --outfile=${stageDir}/grove`
+			await $`cp simulator-server/.build/release/GroveSimulatorServer ${stageDir}/GroveSimulatorServer`
 
-		const tarName = `${outputName}.tar.gz`
-		const tarPath = `${distDir}/${tarName}`
-		await $`tar -czf ${tarPath} -C ${distDir} ${outputName}`
+			const tarName = `${outputName}.tar.gz`
+			const tarPath = `${distDir}/${tarName}`
+			await $`tar -czf ${tarPath} -C ${distDir} ${outputName}`
 
-		checksums[target] = await sha256(tarPath)
+			const checksum = await sha256(tarPath)
+			console.log(`  Created ${tarName}`)
+
+			await $`rm -rf ${stageDir}`
+			return { target, tarPath, checksum }
+		}),
+	)
+
+	for (const { target, tarPath, checksum } of results) {
+		checksums[target] = checksum
 		artifacts.push(tarPath)
-		console.log(`  Created ${tarName}`)
-
-		await $`rm -rf ${stageDir}`
 	}
 
 	return { artifacts, checksums }
@@ -128,54 +108,28 @@ end
 }
 
 async function run() {
-	const bump = process.argv[2] as Bump | undefined
-
-	if (!bump || !VALID_BUMPS.includes(bump)) {
-		console.error('Usage: bun scripts/release.ts <patch|minor|major>')
-		process.exit(1)
-	}
-
 	const pkg = await Bun.file('package.json').json()
-	const currentVersion = pkg.version
-	const newVersion = bumpVersion(currentVersion, bump)
-	const tag = `v${newVersion}`
+	const version = pkg.version
+	const tag = `v${version}`
 
-	console.log(`Bumping version: ${currentVersion} → ${newVersion}`)
-
-	await updatePackageJson('package.json', newVersion)
-	console.log('Updated package.json')
-
-	console.log('\nCompiling binaries...')
-	const { artifacts, checksums } = await compileBinaries(newVersion)
+	console.log(`\nCompiling binaries for ${tag}...`)
+	const { artifacts, checksums } = await compileBinaries(version)
 
 	console.log('\nSHA256 checksums:')
 	for (const [target, hash] of Object.entries(checksums)) {
 		console.log(`  ${target}: ${hash}`)
 	}
 
-	await $`git add package.json`
-	await $`git commit -m "chore: release ${tag}"`
-	console.log('\nCommitted version bump')
-
-	await $`git tag ${tag}`
-	console.log(`Created tag ${tag}`)
-
-	await $`git push origin main --tags`
-	console.log('Pushed to origin')
-
-	await $`gh release create ${tag} --generate-notes ${artifacts}`
-	console.log(`Created GitHub release ${tag} with binaries`)
+	console.log('\nUploading binaries to GitHub release...')
+	await $`gh release upload ${tag} ${artifacts}`
 
 	await $`rm -rf dist`
 	console.log('Cleaned up dist/')
 
 	console.log('\nUpdating Homebrew tap...')
-	await updateHomebrewFormula(newVersion, checksums)
+	await updateHomebrewFormula(version, checksums)
 
-	console.log('\n✓ Release complete!')
-	console.log(
-		`\nUsers can install with: brew tap henrypldev/grove && brew install grove`,
-	)
+	console.log('\n✓ Post-release complete!')
 }
 
 run()

@@ -12,6 +12,14 @@ export function makeTestDb() {
 
 	const db = drizzle(sqlite, { schema })
 	migrate(db, { migrationsFolder: join(import.meta.dir, '../../../drizzle') })
+
+	// Migration 0008 uses ALTER TABLE RENAME which doesn't work reliably
+	// with Drizzle's in-memory SQLite migrator. Fix it manually.
+	const tables = sqlite.query("SELECT name FROM sqlite_master WHERE type='table' AND name='events'").all()
+	if (tables.length > 0) {
+		sqlite.run('ALTER TABLE `events` RENAME TO `activity`')
+	}
+
 	_injectDb(db)
 	return db
 }

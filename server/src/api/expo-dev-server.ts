@@ -185,20 +185,23 @@ export async function sendExpoDevServerCommand(
 	log('expo-dev-server', 'command', { teamId, key, method })
 
 	return new Promise<boolean>(resolve => {
+		let ws: WebSocket | null = null
 		let resolved = false
 		const done = (result: boolean) => {
 			if (resolved) return
 			resolved = true
 			clearTimeout(timeout)
+			try {
+				ws?.close()
+			} catch {}
 			resolve(result)
 		}
 		const timeout = setTimeout(() => done(false), 5000)
 
 		try {
-			const ws = new WebSocket(`ws://localhost:${server.port}/message`)
+			ws = new WebSocket(`ws://localhost:${server.port}/message`)
 			ws.onopen = () => {
-				ws.send(JSON.stringify({ version: 2, method }))
-				ws.close()
+				ws?.send(JSON.stringify({ version: 2, method }))
 				done(true)
 			}
 			ws.onerror = () => done(false)

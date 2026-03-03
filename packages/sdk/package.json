@@ -1,51 +1,51 @@
 {
-	"name": "@usegrove/sdk",
-	"version": "0.15.0-beta.0",
-	"type": "module",
-	"main": "./dist/index.cjs",
-	"module": "./dist/index.js",
-	"types": "./dist/index.d.ts",
-	"private": false,
-	"exports": {
-		".": {
-			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js",
-			"require": "./dist/index.cjs"
-		},
-		"./react": {
-			"types": "./dist/react/index.d.ts",
-			"import": "./dist/react/index.js",
-			"require": "./dist/react/index.cjs"
-		}
-	},
-	"files": [
-		"dist"
-	],
-	"scripts": {
-		"build": "tsup",
-		"dev": "tsup --watch",
-		"test": "bun test src/"
-	},
-	"peerDependencies": {
-		"react": ">= 18",
-		"@tanstack/react-query": ">= 5"
-	},
-	"peerDependenciesMeta": {
-		"react": {
-			"optional": true
-		},
-		"@tanstack/react-query": {
-			"optional": true
-		}
-	},
-	"dependencies": {
-		"@usegrove/shared": "workspace:*"
-	},
-	"devDependencies": {
-		"@tanstack/react-query": "^5.90.21",
-		"@types/react": "^19.2.14",
-		"react": "^19.2.4",
-		"tsup": "^8.4.0",
-		"typescript": "^5.8.3"
-	}
+  "name": "@usegrove/sdk",
+  "version": "0.15.0-beta.1",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "private": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js",
+      "require": "./dist/react/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "bun test src/"
+  },
+  "peerDependencies": {
+    "react": ">= 18",
+    "@tanstack/react-query": ">= 5"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@usegrove/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "^5.90.21",
+    "@types/react": "^19.2.14",
+    "react": "^19.2.4",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3"
+  }
 }

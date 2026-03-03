@@ -67,6 +67,7 @@ export async function startExpoDevServer(
 	const command = `bunx expo start --port ${port}`
 	const proc = Bun.spawn(['sh', '-c', command], {
 		cwd: worktreePath,
+		stdin: 'pipe',
 		stdout: 'pipe',
 		stderr: 'pipe',
 		detached: true,
@@ -162,6 +163,18 @@ export function getExpoDevServerStatus(
 
 export function getExpoDevServerOutput(teamId: string): string | null {
 	return activeDevServers.get(teamId)?.output ?? null
+}
+
+export function sendExpoDevServerInput(teamId: string, input: string): boolean {
+	const server = activeDevServers.get(teamId)
+	if (!server?.process) return false
+	try {
+		server.process.stdin.write(input)
+		server.process.stdin.flush()
+		return true
+	} catch {
+		return false
+	}
 }
 
 export async function waitForDevServerReady(

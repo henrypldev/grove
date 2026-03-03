@@ -8,6 +8,7 @@ import {
 import {
 	getExpoDevServerOutput,
 	getExpoDevServerStatus,
+	sendExpoDevServerInput,
 	startExpoDevServer,
 	stopExpoDevServer,
 } from '../../api/expo-dev-server'
@@ -713,6 +714,20 @@ export async function handleV2Teams(
 				{ status: 404, headers },
 			)
 		stopExpoDevServer(devServerStopMatch.id)
+		return Response.json({ success: true }, { headers })
+	}
+
+	const devServerStdinMatch = matchRoute(path, '/v2/teams/:id/dev-server/stdin')
+	if (devServerStdinMatch && method === 'POST') {
+		const body = (await req.json()) as { input: string }
+		if (typeof body.input !== 'string' || body.input.length === 0)
+			return Response.json({ error: 'Missing input' }, { status: 400, headers })
+		const sent = sendExpoDevServerInput(devServerStdinMatch.id, body.input)
+		if (!sent)
+			return Response.json(
+				{ error: 'No active dev server' },
+				{ status: 404, headers },
+			)
 		return Response.json({ success: true }, { headers })
 	}
 

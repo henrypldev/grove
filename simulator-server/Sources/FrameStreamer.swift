@@ -17,7 +17,7 @@ class FrameStreamer {
     private var activeStreams: [String: StreamState] = [:] // deviceId → state
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private let targetFPS: Double = 60.0
-    private let jpegQuality: CGFloat = 0.1
+    private let jpegQuality: CGFloat = 0.3
 
     func startStreaming(device: AnyObject, deviceId: String, connection: NWConnection) {
         guard let surface = getIOSurface(from: device) else {

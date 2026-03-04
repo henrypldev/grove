@@ -1,12 +1,12 @@
 import {
 	generateId,
 	getPushTokens,
+	getSetting,
 	getTerminalHost,
-	loadConfig,
 	loadSessions,
 	log,
 	type SessionData,
-	saveConfig,
+	setSetting,
 } from '../config'
 import { dbGetRepo } from '../db/repos'
 import {
@@ -184,10 +184,10 @@ export function broadcastSSE(data: string) {
 }
 
 async function fireWebhook(payload: object) {
-	const config = await loadConfig()
-	if (!config.webhookUrl) return
+	const webhookUrl = await getSetting('webhookUrl')
+	if (!webhookUrl) return
 	try {
-		await fetch(config.webhookUrl, {
+		await fetch(webhookUrl, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(payload),
@@ -239,20 +239,16 @@ export async function broadcastSessions() {
 }
 
 export async function setWebhookUrl(url: string) {
-	const config = await loadConfig()
-	config.webhookUrl = url
-	await saveConfig(config)
+	await setSetting('webhookUrl', url)
 }
 
 export async function removeWebhookUrl() {
-	const config = await loadConfig()
-	delete config.webhookUrl
-	await saveConfig(config)
+	await setSetting('webhookUrl', '')
 }
 
 export async function getWebhookUrl(): Promise<string | undefined> {
-	const config = await loadConfig()
-	return config.webhookUrl
+	const url = await getSetting('webhookUrl')
+	return url || undefined
 }
 
 export function setSessionFocused(sessionId: string) {

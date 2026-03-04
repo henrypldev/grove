@@ -2,8 +2,8 @@ import { Database } from 'bun:sqlite'
 import { join } from 'node:path'
 import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { GROVE_DIR } from '../config'
+import { migrations } from './migrations'
 import * as schema from './schema'
 
 export const DB_FILES = {
@@ -31,7 +31,7 @@ export function getDb(): DrizzleDb {
 	sqlite.run('PRAGMA foreign_keys = ON')
 	seedMigrationsForExistingDb(sqlite)
 	const db = drizzle(sqlite, { schema })
-	migrate(db, { migrationsFolder: join(import.meta.dir, '../../../drizzle') })
+	db.dialect.migrate(migrations, db.session, {})
 	_db = db
 	return _db
 }

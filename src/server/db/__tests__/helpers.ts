@@ -2,9 +2,9 @@ import { Database } from 'bun:sqlite'
 import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { GROVE_DIR } from '../../config'
 import { DB_FILES, _injectDb } from '../index'
+import { migrations } from '../migrations'
 import * as schema from '../schema'
 
 const TEST_DB_PATH = join(GROVE_DIR, DB_FILES.test)
@@ -21,14 +21,7 @@ export function makeTestDb() {
 	sqlite.run('PRAGMA foreign_keys = ON')
 
 	const db = drizzle(sqlite, { schema })
-	migrate(db, { migrationsFolder: join(import.meta.dir, '../../../../drizzle') })
-
-	// Migration 0008 uses ALTER TABLE RENAME which doesn't work reliably
-	// with Drizzle's SQLite migrator. Fix it manually.
-	const tables = sqlite.query("SELECT name FROM sqlite_master WHERE type='table' AND name='events'").all()
-	if (tables.length > 0) {
-		sqlite.run('ALTER TABLE `events` RENAME TO `activity`')
-	}
+	db.dialect.migrate(migrations, db.session, {})
 
 	_injectDb(db)
 	return db

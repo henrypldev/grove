@@ -65,6 +65,7 @@ export type AgentRole =
 	| 'qa'
 	| 'reviewer'
 	| 'env'
+	| 'expo'
 export type SpawnableRole = Exclude<AgentRole, 'orchestrator' | 'pm'>
 export type AgentStatus =
 	| 'idle'

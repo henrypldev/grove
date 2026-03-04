@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
+import { dbInsertTasks, dbListTasks, dbUpdateTask } from '../agent-tasks'
 import { dbInsertRepo } from '../repos'
 import { dbInsertTeam } from '../teams'
-import { dbInsertTasks, dbListTasks, dbUpdateTask } from '../agent-tasks'
-import { REPO, TEAM, makeTestDb } from './helpers'
+import { makeTestDb, REPO, TEAM } from './helpers'
 
 describe('db/agent-tasks', () => {
 	beforeEach(() => {
@@ -40,7 +40,13 @@ describe('db/agent-tasks', () => {
 	})
 
 	test('filters by team', () => {
-		dbInsertRepo({ id: 'r2', name: 'r2', path: '/r2', envVars: undefined, setupSteps: undefined })
+		dbInsertRepo({
+			id: 'r2',
+			name: 'r2',
+			path: '/r2',
+			envVars: undefined,
+			setupSteps: undefined,
+		})
 		dbInsertTeam({ ...TEAM, id: 't2', repoId: 'r2' })
 		dbInsertTasks('t1', [{ idString: 'a', title: 'A', priority: 1 }])
 		dbInsertTasks('t2', [{ idString: 'b', title: 'B', priority: 1 }])

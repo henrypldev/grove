@@ -18,7 +18,11 @@ function makeMockWs() {
 describe('websocket/rpc', () => {
 	test('unknown method sends error response', async () => {
 		const ws = makeMockWs()
-		await handleRpc(ws as any, { id: 'rpc_1', method: 'nonexistent', params: {} })
+		await handleRpc(ws as any, {
+			id: 'rpc_1',
+			method: 'nonexistent',
+			params: {},
+		})
 		const response = JSON.parse(ws.sent[0])
 		expect(response.type).toBe('rpc:response')
 		expect(response.id).toBe('rpc_1')
@@ -39,7 +43,11 @@ describe('websocket/rpc', () => {
 
 	test('response always includes type and id', async () => {
 		const ws = makeMockWs()
-		await handleRpc(ws as any, { id: 'rpc_3', method: 'repos:list', params: {} })
+		await handleRpc(ws as any, {
+			id: 'rpc_3',
+			method: 'repos:list',
+			params: {},
+		})
 		const response = JSON.parse(ws.sent[0])
 		expect(response.type).toBe('rpc:response')
 		expect(response.id).toBe('rpc_3')

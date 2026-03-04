@@ -25,7 +25,7 @@ async function compileBinaries(
 	await $`cd simulator-server && swift build -c release`
 
 	const results = await Promise.all(
-		TARGETS.map(async (target) => {
+		TARGETS.map(async target => {
 			const outputName = `grove-${version}-${target}`
 			const stageDir = `${distDir}/${outputName}`
 

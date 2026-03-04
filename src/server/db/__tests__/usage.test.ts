@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from 'bun:test'
 import { dbInsertRepo } from '../repos'
 import { dbInsertTeam } from '../teams'
 import { dbGetUsage, dbInsertUsage } from '../usage'
-import { REPO, TEAM, makeTestDb } from './helpers'
+import { makeTestDb, REPO, TEAM } from './helpers'
 
 const USAGE_ROW = {
 	teamId: 't1',
@@ -42,7 +42,13 @@ describe('db/usage', () => {
 	})
 
 	test('filters by repoId via team lookup', () => {
-		dbInsertRepo({ id: 'r2', name: 'r2', path: '/r2', envVars: undefined, setupSteps: undefined })
+		dbInsertRepo({
+			id: 'r2',
+			name: 'r2',
+			path: '/r2',
+			envVars: undefined,
+			setupSteps: undefined,
+		})
 		dbInsertTeam({ ...TEAM, id: 't2', repoId: 'r2' })
 		dbInsertUsage({ ...USAGE_ROW, teamId: 't2', createdAt: 2000 })
 		dbInsertUsage({ ...USAGE_ROW, createdAt: 2000 })

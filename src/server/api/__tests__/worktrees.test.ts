@@ -7,7 +7,7 @@ mock.module('../../config', () => ({
 	log: mock(() => {}),
 }))
 
-import { getWorktrees, createWorktree, deleteWorktree } from '../worktrees'
+import { createWorktree, deleteWorktree, getWorktrees } from '../worktrees'
 
 describe('worktrees', () => {
 	test('getWorktrees returns empty for missing repo', async () => {

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { dbInsertActivity } from '../activity'
 import { dbInsertAgent } from '../agents'
+import { dbGetMetrics } from '../metrics'
 import { dbInsertRepo } from '../repos'
 import { dbInsertTeam } from '../teams'
-import { AGENT, REPO, TEAM, makeTestDb } from './helpers'
-import { dbGetMetrics } from '../metrics'
+import { AGENT, makeTestDb, REPO, TEAM } from './helpers'
 
 describe('db/metrics', () => {
 	beforeEach(() => makeTestDb())

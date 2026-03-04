@@ -30,4 +30,6 @@ for (const entry of journal.entries) {
 output += `]\n`
 
 writeFileSync('src/server/db/migrations.ts', output)
-console.log(`Embedded ${journal.entries.length} migrations into src/server/db/migrations.ts`)
+console.log(
+	`Embedded ${journal.entries.length} migrations into src/server/db/migrations.ts`,
+)

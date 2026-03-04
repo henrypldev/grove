@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { dbInsertRepo } from '../repos'
-import { dbInsertTeam } from '../teams'
 import {
 	dbGetDependentTeams,
 	dbGetTeamDependencies,
 	dbInsertTeamDependency,
 } from '../team-dependencies'
-import { REPO, TEAM, makeTestDb } from './helpers'
+import { dbInsertTeam } from '../teams'
+import { makeTestDb, REPO, TEAM } from './helpers'
 
 describe('db/team-dependencies', () => {
 	beforeEach(() => {

@@ -7,9 +7,16 @@ import {
 	dbListScriptsByRepo,
 	dbUpdateScript,
 } from '../scripts'
-import { REPO, makeTestDb } from './helpers'
+import { makeTestDb, REPO } from './helpers'
 
-const SCRIPT = { id: 's1', repoId: 'r1', name: 'dev', run: 'bun run dev', background: undefined, createdAt: 1000 }
+const SCRIPT = {
+	id: 's1',
+	repoId: 'r1',
+	name: 'dev',
+	run: 'bun run dev',
+	background: undefined,
+	createdAt: 1000,
+}
 
 describe('db/scripts', () => {
 	beforeEach(() => {

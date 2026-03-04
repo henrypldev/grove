@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
-import { dbInsertRepo } from '../repos'
-import { dbInsertTeam } from '../teams'
 import { dbInsertAgent } from '../agents'
 import { dbGetPrd, dbUpsertPrd } from '../prds'
-import { AGENT, REPO, TEAM, makeTestDb } from './helpers'
+import { dbInsertRepo } from '../repos'
+import { dbInsertTeam } from '../teams'
+import { AGENT, makeTestDb, REPO, TEAM } from './helpers'
 
 describe('db/prds', () => {
 	beforeEach(() => {

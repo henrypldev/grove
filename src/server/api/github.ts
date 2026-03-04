@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { getCloneDirectory, loadConfig, log } from '../config'
+import { getCloneDirectory, log } from '../config'
+import { dbGetRepoByPath } from '../db/repos'
 import { addRepo } from './repos'
 
 export interface GitHubRepo {
@@ -98,8 +99,7 @@ export async function cloneRepo(
 	const repoName = fullName.split('/').pop() ?? fullName
 	const targetPath = join(cloneDir, repoName)
 
-	const config = await loadConfig()
-	const existing = config.repos.find(r => r.path === targetPath)
+	const existing = dbGetRepoByPath(targetPath)
 	if (existing) {
 		log('github', 'repo already registered', {
 			id: existing.id,

@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { type EnvVar, loadConfig, log, WORKTREES_DIR } from '../config'
+import { type EnvVar, log, WORKTREES_DIR } from '../config'
+import { dbGetRepo } from '../db/repos'
 
 export interface Worktree {
 	path: string
@@ -9,8 +10,7 @@ export interface Worktree {
 
 export async function getWorktrees(repoId: string): Promise<Worktree[]> {
 	log('worktrees', 'getting worktrees', { repoId })
-	const config = await loadConfig()
-	const repo = config.repos.find(r => r.id === repoId)
+	const repo = dbGetRepo(repoId)
 	if (!repo) {
 		log('worktrees', 'repo not found', { repoId })
 		return []
@@ -68,8 +68,7 @@ export async function createWorktree(
 	baseBranch: string,
 ): Promise<Worktree | string> {
 	log('worktrees', 'creating worktree', { repoId, branch, baseBranch })
-	const config = await loadConfig()
-	const repo = config.repos.find(r => r.id === repoId)
+	const repo = dbGetRepo(repoId)
 	if (!repo) {
 		log('worktrees', 'repo not found', { repoId })
 		return `Repo not found: ${repoId}`
@@ -201,8 +200,7 @@ export async function deleteWorktree(
 	force?: boolean,
 ): Promise<true | string> {
 	log('worktrees', 'deleting worktree', { repoId, branch, force })
-	const config = await loadConfig()
-	const repo = config.repos.find(r => r.id === repoId)
+	const repo = dbGetRepo(repoId)
 	if (!repo) {
 		log('worktrees', 'repo not found', { repoId })
 		return `Repo not found: ${repoId}`

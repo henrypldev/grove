@@ -8,6 +8,7 @@ import {
 	type SessionData,
 	saveConfig,
 } from '../config'
+import { dbGetRepo } from '../db/repos'
 import {
 	getSessionState,
 	isSessionActive,
@@ -299,8 +300,7 @@ export async function createSession(
 	skipPermissions?: boolean,
 ): Promise<SessionData | string> {
 	log('sessions', 'creating session', { repoId, worktreeBranch })
-	const config = await loadConfig()
-	const repo = config.repos.find(r => r.id === repoId)
+	const repo = dbGetRepo(repoId)
 	if (!repo) {
 		log('sessions', 'repo not found', { repoId })
 		return `Repo not found: ${repoId}`
@@ -356,8 +356,7 @@ export async function getBehindMain(
 	const session = sessionsState.sessions.find(s => s.id === sessionId)
 	if (!session) return `Session not found: ${sessionId}`
 
-	const config = await loadConfig()
-	const repo = config.repos.find(r => r.id === session.repoId)
+	const repo = dbGetRepo(session.repoId)
 	if (!repo) return 'Repo not found for session'
 
 	await Bun.$`git -C ${repo.path} fetch origin`.quiet().nothrow()
@@ -388,8 +387,7 @@ export async function mergeMain(
 	const session = sessionsState.sessions.find(s => s.id === sessionId)
 	if (!session) return { success: false, error: 'Session not found' }
 
-	const config = await loadConfig()
-	const repo = config.repos.find(r => r.id === session.repoId)
+	const repo = dbGetRepo(session.repoId)
 	if (!repo) return { success: false, error: 'Repo not found' }
 
 	const mainBranch =
@@ -432,8 +430,7 @@ export async function createPR(
 	const session = sessionsState.sessions.find(s => s.id === sessionId)
 	if (!session) return { success: false, error: 'Session not found' }
 
-	const config = await loadConfig()
-	const repo = config.repos.find(r => r.id === session.repoId)
+	const repo = dbGetRepo(session.repoId)
 	if (!repo) return { success: false, error: 'Repo not found' }
 
 	const push =

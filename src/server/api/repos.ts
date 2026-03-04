@@ -17,6 +17,13 @@ export function withSetupFile<T extends Repo>(
 
 export async function addRepo(path: string): Promise<Repo | string> {
 	log('repos', 'adding repo', { path })
+
+	const existing = dbGetRepoByPath(path)
+	if (existing) {
+		log('repos', 'repo already exists', { id: existing.id })
+		return existing
+	}
+
 	const result = await Bun.$`test -d ${path}`.quiet().nothrow()
 	if (result.exitCode !== 0) {
 		log('repos', 'path does not exist or is not a directory', { path })
@@ -29,12 +36,6 @@ export async function addRepo(path: string): Promise<Repo | string> {
 	if (gitResult.exitCode !== 0) {
 		log('repos', 'not a git repository', { path })
 		return `Path is not a git repository: ${path}`
-	}
-
-	const existing = dbGetRepoByPath(path)
-	if (existing) {
-		log('repos', 'repo already exists', { id: existing.id })
-		return existing
 	}
 
 	const [envVars, framework] = await Promise.all([

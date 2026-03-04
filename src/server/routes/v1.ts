@@ -6,7 +6,7 @@ import {
 	getGitHubRepos,
 	getOrgRepos,
 } from '../api/github'
-import { addRepo, deleteRepo, getRepos, withSetupFile } from '../api/repos'
+import { addRepo, withSetupFile } from '../api/repos'
 import {
 	addSSEClient,
 	clearSessionFocused,
@@ -39,6 +39,7 @@ import {
 	removePushToken,
 	saveConfig,
 } from '../config'
+import { dbDeleteRepo, dbListRepos } from '../db/repos'
 
 function matchRoute(
 	path: string,
@@ -99,7 +100,7 @@ export async function handleV1(
 	}
 
 	if (path === '/v1/repos' && method === 'GET') {
-		return Response.json(await getRepos(), { headers })
+		return Response.json(dbListRepos().map(withSetupFile), { headers })
 	}
 
 	if (path === '/v1/repos' && method === 'POST') {
@@ -113,9 +114,12 @@ export async function handleV1(
 
 	const repoMatch = matchRoute(path, '/v1/repos/:id')
 	if (repoMatch && method === 'DELETE') {
-		const deleted = await deleteRepo(repoMatch.id)
-		if (typeof deleted === 'string') {
-			return Response.json({ error: deleted }, { status: 404, headers })
+		const deleted = dbDeleteRepo(repoMatch.id)
+		if (!deleted) {
+			return Response.json(
+				{ error: 'Repo not found' },
+				{ status: 404, headers },
+			)
 		}
 		return Response.json({ success: true }, { headers })
 	}

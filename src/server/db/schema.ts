@@ -30,35 +30,43 @@ export const scripts = sqliteTable('scripts', {
 	createdAt: integer('created_at').notNull(),
 })
 
-export const teams = sqliteTable('teams', {
-	id: text('id').primaryKey(),
-	repoId: text('repo_id')
-		.notNull()
-		.references(() => repos.id),
-	worktreePath: text('worktree_path').notNull(),
-	task: text('task').notNull(),
-	title: text('title'),
-	status: text('status').notNull(),
-	pmSummary: text('pm_summary'),
-	prUrl: text('pr_url'),
-	createdAt: integer('created_at').notNull(),
-	updatedAt: integer('updated_at').notNull(),
-})
+export const teams = sqliteTable(
+	'teams',
+	{
+		id: text('id').primaryKey(),
+		repoId: text('repo_id')
+			.notNull()
+			.references(() => repos.id),
+		worktreePath: text('worktree_path').notNull(),
+		task: text('task').notNull(),
+		title: text('title'),
+		status: text('status').notNull(),
+		pmSummary: text('pm_summary'),
+		prUrl: text('pr_url'),
+		createdAt: integer('created_at').notNull(),
+		updatedAt: integer('updated_at').notNull(),
+	},
+	table => [index('idx_teams_repo').on(table.repoId)],
+)
 
-export const agents = sqliteTable('agents', {
-	id: text('id').primaryKey(),
-	teamId: text('team_id')
-		.notNull()
-		.references(() => teams.id),
-	role: text('role').notNull(),
-	status: text('status').notNull(),
-	activity: text('activity'),
-	currentTask: text('current_task'),
-	sessionId: text('session_id'),
-	retryCount: integer('retry_count').default(0),
-	spawnedAt: integer('spawned_at').notNull(),
-	updatedAt: integer('updated_at').notNull(),
-})
+export const agents = sqliteTable(
+	'agents',
+	{
+		id: text('id').primaryKey(),
+		teamId: text('team_id')
+			.notNull()
+			.references(() => teams.id),
+		role: text('role').notNull(),
+		status: text('status').notNull(),
+		activity: text('activity'),
+		currentTask: text('current_task'),
+		sessionId: text('session_id'),
+		retryCount: integer('retry_count').default(0),
+		spawnedAt: integer('spawned_at').notNull(),
+		updatedAt: integer('updated_at').notNull(),
+	},
+	table => [index('idx_agents_team').on(table.teamId)],
+)
 
 export const activity = sqliteTable(
 	'activity',
@@ -112,39 +120,51 @@ export const usage = sqliteTable(
 	],
 )
 
-export const prds = sqliteTable('prds', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	teamId: text('team_id')
-		.notNull()
-		.references(() => teams.id),
-	agentId: text('agent_id').notNull(),
-	content: text('content').notNull(),
-	createdAt: integer('created_at').notNull(),
-})
+export const prds = sqliteTable(
+	'prds',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		teamId: text('team_id')
+			.notNull()
+			.references(() => teams.id),
+		agentId: text('agent_id').notNull(),
+		content: text('content').notNull(),
+		createdAt: integer('created_at').notNull(),
+	},
+	table => [index('idx_prds_team').on(table.teamId)],
+)
 
-export const designDocs = sqliteTable('design_docs', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	teamId: text('team_id')
-		.notNull()
-		.references(() => teams.id),
-	agentId: text('agent_id').notNull(),
-	content: text('content').notNull(),
-	createdAt: integer('created_at').notNull(),
-})
+export const designDocs = sqliteTable(
+	'design_docs',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		teamId: text('team_id')
+			.notNull()
+			.references(() => teams.id),
+		agentId: text('agent_id').notNull(),
+		content: text('content').notNull(),
+		createdAt: integer('created_at').notNull(),
+	},
+	table => [index('idx_design_docs_team').on(table.teamId)],
+)
 
-export const agentTasks = sqliteTable('agent_tasks', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	teamId: text('team_id')
-		.notNull()
-		.references(() => teams.id),
-	agentId: text('agent_id').references(() => agents.id),
-	idString: text('id_string').notNull(),
-	title: text('title').notNull(),
-	priority: integer('priority').notNull(),
-	status: text('status').notNull().default('pending'),
-	blockedBy: text('blocked_by'),
-	createdAt: integer('created_at').notNull(),
-})
+export const agentTasks = sqliteTable(
+	'agent_tasks',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		teamId: text('team_id')
+			.notNull()
+			.references(() => teams.id),
+		agentId: text('agent_id').references(() => agents.id),
+		idString: text('id_string').notNull(),
+		title: text('title').notNull(),
+		priority: integer('priority').notNull(),
+		status: text('status').notNull().default('pending'),
+		blockedBy: text('blocked_by'),
+		createdAt: integer('created_at').notNull(),
+	},
+	table => [index('idx_agent_tasks_team').on(table.teamId)],
+)
 
 export const teamDependencies = sqliteTable(
 	'team_dependencies',
@@ -159,12 +179,16 @@ export const teamDependencies = sqliteTable(
 	table => [index('idx_team_deps_team').on(table.teamId)],
 )
 
-export const agentNotes = sqliteTable('agent_notes', {
-	id: integer('id').primaryKey({ autoIncrement: true }),
-	teamId: text('team_id')
-		.notNull()
-		.references(() => teams.id),
-	agentId: text('agent_id').notNull(),
-	content: text('content').notNull(),
-	createdAt: integer('created_at').notNull(),
-})
+export const agentNotes = sqliteTable(
+	'agent_notes',
+	{
+		id: integer('id').primaryKey({ autoIncrement: true }),
+		teamId: text('team_id')
+			.notNull()
+			.references(() => teams.id),
+		agentId: text('agent_id').notNull(),
+		content: text('content').notNull(),
+		createdAt: integer('created_at').notNull(),
+	},
+	table => [index('idx_agent_notes_team').on(table.teamId)],
+)

@@ -96,13 +96,14 @@ class HIDInput {
         }
     }
 
-    private var activeDevice: DeviceHID? {
+    private func device(for deviceId: String?) -> DeviceHID? {
+        if let deviceId = deviceId, let d = devices[deviceId] { return d }
         guard let id = activeDeviceId else { return nil }
         return devices[id]
     }
 
-    func sendTouch(x: Double, y: Double, phase: String) {
-        guard let mouseFn = mouseFn, let device = activeDevice else { return }
+    func sendTouch(x: Double, y: Double, phase: String, deviceId: String? = nil) {
+        guard let mouseFn = mouseFn, let device = device(for: deviceId) else { return }
 
         // On modern Xcode, IndigoHIDMessageForMouseNSEvent already produces proper
         // touch digitizer messages (eventType=2) with dual payloads.
@@ -125,7 +126,7 @@ class HIDInput {
 
         // The function already sets xRatio/yRatio correctly when given pixel coordinates.
         // Send as-is — the message is already a proper touch digitizer event.
-        sendIndigoMessage(msg)
+        sendIndigoMessage(msg, deviceId: deviceId)
     }
 
     // Button event sources (from SimulatorKit)
@@ -133,60 +134,60 @@ class HIDInput {
     private static let buttonSourceLock: Int32 = 0x1
     private static let buttonTargetHardware: Int32 = 0x33
 
-    func sendButton(name: String) {
+    func sendButton(name: String, deviceId: String? = nil) {
         let source: Int32
         switch name {
         case "home": source = HIDInput.buttonSourceHome
         case "lock": source = HIDInput.buttonSourceLock
         case "appSwitcher":
-            sendAppSwitcher()
+            sendAppSwitcher(deviceId: deviceId)
             return
         default: return
         }
 
-        pressButton(source: source)
+        pressButton(source: source, deviceId: deviceId)
     }
 
-    private func pressButton(source: Int32) {
+    private func pressButton(source: Int32, deviceId: String? = nil) {
         guard let buttonFn = buttonFn else { return }
         // Down
         if let msg = buttonFn(source, 1, HIDInput.buttonTargetHardware) {
-            sendIndigoMessage(msg)
+            sendIndigoMessage(msg, deviceId: deviceId)
         }
         // Up (slight delay for the device to register)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [self] in
             if let msg = buttonFn(source, 2, HIDInput.buttonTargetHardware) {
-                sendIndigoMessage(msg)
+                sendIndigoMessage(msg, deviceId: deviceId)
             }
         }
     }
 
-    private func sendAppSwitcher() {
+    private func sendAppSwitcher(deviceId: String? = nil) {
         // Double-press Home to trigger app switcher
-        pressButton(source: HIDInput.buttonSourceHome)
+        pressButton(source: HIDInput.buttonSourceHome, deviceId: deviceId)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [self] in
-            pressButton(source: HIDInput.buttonSourceHome)
+            pressButton(source: HIDInput.buttonSourceHome, deviceId: deviceId)
         }
     }
 
-    func sendKeyDown(keyCode: UInt32) {
+    func sendKeyDown(keyCode: UInt32, deviceId: String? = nil) {
         guard let keyboardFn = keyboardFn else { return }
         // IndigoHIDMessageForKeyboardArbitrary(keyCode, op=1 for down)
         guard let msg = keyboardFn(keyCode, 1) else { return }
-        sendIndigoMessage(msg)
+        sendIndigoMessage(msg, deviceId: deviceId)
     }
 
-    func sendKeyUp(keyCode: UInt32) {
+    func sendKeyUp(keyCode: UInt32, deviceId: String? = nil) {
         guard let keyboardFn = keyboardFn else { return }
         // IndigoHIDMessageForKeyboardArbitrary(keyCode, op=2 for up)
         guard let msg = keyboardFn(keyCode, 2) else { return }
-        sendIndigoMessage(msg)
+        sendIndigoMessage(msg, deviceId: deviceId)
     }
 
     // MARK: - Private
 
-    private func sendIndigoMessage(_ msg: UnsafeMutableRawPointer) {
-        guard let device = activeDevice else { return }
+    private func sendIndigoMessage(_ msg: UnsafeMutableRawPointer, deviceId: String? = nil) {
+        guard let device = device(for: deviceId) else { return }
         let client = device.client
 
         let sendSel = NSSelectorFromString("sendWithMessage:freeWhenDone:completionQueue:completion:")

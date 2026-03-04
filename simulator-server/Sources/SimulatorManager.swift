@@ -153,9 +153,9 @@ class SimulatorManager {
         }
     }
 
-    func paste(text: String) {
+    func paste(text: String, deviceId: String? = nil) {
         // Find the booted device UDID for simctl
-        guard let udid = bootedDevices.keys.first else { return }
+        guard let udid = deviceId ?? bootedDevices.keys.first else { return }
 
         // Set the simulator pasteboard via simctl pbcopy
         let process = Process()

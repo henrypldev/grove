@@ -130,14 +130,23 @@ export function getTeamDeviceUdid(teamId: string): string | null {
 	return teamDevices.get(teamId) ?? null
 }
 
+const rediscoverMissCache = new Map<string, number>()
+const REDISCOVER_MISS_TTL = 30_000
+
 /** Rediscover a team's simulator device from simctl without booting it */
 export async function rediscoverTeamDevice(
 	teamId: string,
 ): Promise<string | null> {
 	if (teamDevices.has(teamId)) return teamDevices.get(teamId)!
+	const lastMiss = rediscoverMissCache.get(teamId)
+	if (lastMiss && Date.now() - lastMiss < REDISCOVER_MISS_TTL) return null
 	const deviceName = `grove-team-${teamId}`
 	const existing = await findExistingDevice(deviceName)
-	if (!existing) return null
+	if (!existing) {
+		rediscoverMissCache.set(teamId, Date.now())
+		return null
+	}
+	rediscoverMissCache.delete(teamId)
 	teamDevices.set(teamId, existing.udid)
 	log('simulator', 'rediscovered device', {
 		teamId,

@@ -131,7 +131,7 @@ func handleTextMessage(_ data: Data, on connection: NWConnection) {
             sendError("Missing touch fields", on: connection)
             return
         }
-        HIDInput.shared.sendTouch(x: x, y: y, phase: phase)
+        HIDInput.shared.sendTouch(x: x, y: y, phase: phase, deviceId: msg.deviceId)
 
     case "key":
         guard let keyCode = msg.keyCode, let isDown = msg.isDown else {
@@ -139,9 +139,9 @@ func handleTextMessage(_ data: Data, on connection: NWConnection) {
             return
         }
         if isDown {
-            HIDInput.shared.sendKeyDown(keyCode: keyCode)
+            HIDInput.shared.sendKeyDown(keyCode: keyCode, deviceId: msg.deviceId)
         } else {
-            HIDInput.shared.sendKeyUp(keyCode: keyCode)
+            HIDInput.shared.sendKeyUp(keyCode: keyCode, deviceId: msg.deviceId)
         }
 
     case "button":
@@ -149,14 +149,14 @@ func handleTextMessage(_ data: Data, on connection: NWConnection) {
             sendError("Missing button field", on: connection)
             return
         }
-        HIDInput.shared.sendButton(name: button)
+        HIDInput.shared.sendButton(name: button, deviceId: msg.deviceId)
 
     case "paste":
         guard let text = msg.text else {
             sendError("Missing text field", on: connection)
             return
         }
-        SimulatorManager.shared.paste(text: text)
+        SimulatorManager.shared.paste(text: text, deviceId: msg.deviceId)
 
     case "openurl":
         guard let text = msg.text else {

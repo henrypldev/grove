@@ -46,6 +46,8 @@ interface SimulatorProcess {
 	lastBooted: Map<string, string>
 	/** Tracks which device produced the most recent binary frames */
 	activeStreamDevice: string | null
+	/** Tracks which devices have been sent a boot command */
+	bootedDevices: Set<string>
 }
 
 export interface SimulatorWsData {
@@ -59,7 +61,6 @@ export const SIMULATOR_MAX_PAYLOAD = 1024 * 1024
 
 let sim: SimulatorProcess | null = null
 let initPromise: Promise<void> | null = null
-const bootedDevices = new Set<string>()
 
 function findFreePort(): number {
 	return 9876 + Math.floor(Math.random() * 1000)
@@ -149,6 +150,7 @@ async function spawnSimulator(): Promise<SimulatorProcess> {
 		lastFrame: new Map(),
 		lastBooted: new Map(),
 		activeStreamDevice: null,
+		bootedDevices: new Set(),
 	}
 
 	sim = entry
@@ -169,7 +171,6 @@ function teardown() {
 		log('simulator-relay', `teardown: error killing process: ${err}`)
 	}
 	sim = null
-	bootedDevices.clear()
 }
 
 function connectUpstream(entry: SimulatorProcess): Promise<void> {
@@ -204,13 +205,18 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 				}
 			} else {
 				// Cache booted messages and track active streaming device
-				try {
-					const msg = JSON.parse(event.data as string)
-					if (msg.type === 'booted' && msg.deviceId) {
-						entry.lastBooted.set(msg.deviceId, event.data as string)
-						entry.activeStreamDevice = msg.deviceId
+				const text = event.data as string
+				if (text.includes('"booted"')) {
+					try {
+						const msg = JSON.parse(text)
+						if (msg.type === 'booted' && msg.deviceId) {
+							entry.lastBooted.set(msg.deviceId, text)
+							entry.activeStreamDevice = msg.deviceId
+						}
+					} catch (err) {
+						log('simulator-relay', `failed to parse upstream message: ${err}`)
 					}
-				} catch {}
+				}
 				// Forward text messages to all clients (they filter by deviceId themselves)
 				for (const client of entry.clients) {
 					try {
@@ -277,8 +283,8 @@ export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 				} catch {}
 			}
 			// Auto-boot the device so streaming starts immediately on connection
-			if (deviceId && !bootedDevices.has(deviceId) && sim.upstreamWs) {
-				bootedDevices.add(deviceId)
+			if (deviceId && !sim.bootedDevices.has(deviceId) && sim.upstreamWs) {
+				sim.bootedDevices.add(deviceId)
 				try {
 					sim.upstreamWs.send(JSON.stringify({ type: 'boot', deviceId }))
 					log('simulator-relay', `auto-booted device ${deviceId}`)
@@ -293,24 +299,29 @@ export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 }
 
 export function handleSimulatorMessage(
-	_ws: ServerWebSocket<SimulatorWsData>,
+	ws: ServerWebSocket<SimulatorWsData>,
 	data: string | Buffer,
 ) {
 	// Wait for upstream to be ready, then forward
 	ensureReady()
 		.then(() => {
 			if (!sim?.upstreamWs) return
-			// Clear boot tracking when a device is shut down so it can be re-booted
-			if (typeof data === 'string') {
+			let forwarded = data
+			// Inject deviceId into client messages so the simulator server routes to the correct device
+			if (typeof data === 'string' && ws.data.deviceId) {
 				try {
 					const msg = JSON.parse(data)
+					if (!msg.deviceId) {
+						msg.deviceId = ws.data.deviceId
+						forwarded = JSON.stringify(msg)
+					}
 					if (msg.type === 'shutdown' && msg.deviceId) {
-						bootedDevices.delete(msg.deviceId)
+						sim.bootedDevices.delete(msg.deviceId)
 					}
 				} catch {}
 			}
 			try {
-				sim.upstreamWs.send(data)
+				sim.upstreamWs.send(forwarded)
 			} catch (err) {
 				log('simulator-relay', `error forwarding message upstream: ${err}`)
 			}

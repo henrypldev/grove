@@ -27,7 +27,7 @@ import {
 	startTeamStep,
 	stopTeamStep,
 } from '../../api/setup-v2'
-import { getTeamDeviceUdid, rediscoverTeamDevice } from '../../api/simulator'
+import { rediscoverTeamDevice } from '../../api/simulator'
 import { createWorktree } from '../../api/worktrees'
 import { generateId, getTerminalHost } from '../../config'
 import { dbInsertActivity, dbListActivitySince } from '../../db/activity'
@@ -107,9 +107,7 @@ export async function getTeam(params: {
 	const port = getTeamPort(params.id)
 	const portAlive = port && isPortActive(port)
 	const devUrl = portAlive ? `https://${await getTerminalHost()}:${port}` : null
-	const simulatorUdid =
-		getTeamDeviceUdid(params.id) ??
-		(await rediscoverTeamDevice(params.id))
+	const simulatorUdid = await rediscoverTeamDevice(params.id)
 	const expoBuildStatus = getExpoBuildStatus(params.id)
 	const expoDevServerStatus = getExpoDevServerStatus(params.id)
 	const repo = dbGetRepo(team.repoId)

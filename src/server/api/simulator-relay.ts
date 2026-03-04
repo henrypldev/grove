@@ -39,6 +39,7 @@ interface SimulatorProcess {
 	upstreamWs: WebSocket | null
 	upstreamReady: Promise<void> | null
 	clients: Set<ServerWebSocket<SimulatorWsData>>
+	clientsByDevice: Map<string, Set<ServerWebSocket<SimulatorWsData>>>
 	reconnectAttempts: number
 	/** Last frame received per device, sent immediately to new clients */
 	lastFrame: Map<string, ArrayBuffer>
@@ -145,6 +146,7 @@ async function spawnSimulator(): Promise<SimulatorProcess> {
 		upstreamWs: null,
 		upstreamReady: null,
 		clients: new Set(),
+		clientsByDevice: new Map(),
 		reconnectAttempts: 0,
 		lastFrame: new Map(),
 		lastBooted: new Map(),
@@ -194,20 +196,35 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 				const idLen = view.getUint16(0)
 				if (buf.byteLength < 2 + idLen) return
 				const deviceId = textDecoder.decode(buf.slice(2, 2 + idLen))
-				const frameData = buf.slice(2 + idLen)
+				const frameView = new Uint8Array(buf, 2 + idLen)
 
-				// Cache frame per device
-				entry.lastFrame.set(deviceId, frameData)
+				// Cache a copy per device (underlying buffer may be reused)
+				entry.lastFrame.set(deviceId, buf.slice(2 + idLen))
 
-				// Forward only to clients subscribed to this device
-				for (const client of entry.clients) {
-					if (client.data.deviceId && client.data.deviceId !== deviceId)
-						continue
-					try {
-						client.send(frameData)
-					} catch (err) {
-						log('simulator-relay', `error sending to client: ${err}`)
-						entry.clients.delete(client)
+				// Forward to clients subscribed to this device
+				const deviceClients = entry.clientsByDevice.get(deviceId)
+				if (deviceClients) {
+					for (const client of deviceClients) {
+						try {
+							client.send(frameView)
+						} catch (err) {
+							log('simulator-relay', `error sending to client: ${err}`)
+							entry.clients.delete(client)
+							deviceClients.delete(client)
+						}
+					}
+				}
+				// Also send to clients with no deviceId (they receive all frames)
+				const nullClients = entry.clientsByDevice.get('')
+				if (nullClients) {
+					for (const client of nullClients) {
+						try {
+							client.send(frameView)
+						} catch (err) {
+							log('simulator-relay', `error sending to client: ${err}`)
+							entry.clients.delete(client)
+							nullClients.delete(client)
+						}
 					}
 				}
 			} else {
@@ -276,6 +293,14 @@ export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 				sim.releaseTimer = null
 			}
 			sim.clients.add(ws)
+			// Index client by deviceId (use '' for null deviceId)
+			const deviceKey = ws.data.deviceId ?? ''
+			let deviceSet = sim.clientsByDevice.get(deviceKey)
+			if (!deviceSet) {
+				deviceSet = new Set()
+				sim.clientsByDevice.set(deviceKey, deviceSet)
+			}
+			deviceSet.add(ws)
 			// Replay cached booted message so reconnecting clients get screen dimensions
 			const deviceId = ws.data.deviceId
 			if (deviceId && sim.lastBooted.has(deviceId)) {
@@ -340,6 +365,12 @@ export function handleSimulatorMessage(
 export function handleSimulatorClose(ws: ServerWebSocket<SimulatorWsData>) {
 	if (!sim) return
 	sim.clients.delete(ws)
+	const deviceKey = ws.data.deviceId ?? ''
+	const deviceSet = sim.clientsByDevice.get(deviceKey)
+	if (deviceSet) {
+		deviceSet.delete(ws)
+		if (deviceSet.size === 0) sim.clientsByDevice.delete(deviceKey)
+	}
 	sim.refCount = Math.max(0, sim.refCount - 1)
 	log('simulator-relay', `client disconnected (refCount=${sim.refCount})`)
 

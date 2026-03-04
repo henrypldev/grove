@@ -7,7 +7,7 @@ import {
 	type SimulatorWsData,
 } from '../api/simulator-relay'
 import {
-	dbGetActivitySinceId,
+	dbGetActivitySinceIdForTeam,
 	subscribeToGlobalActivity,
 	subscribeToTeamActivity,
 } from '../db/activity'
@@ -33,19 +33,21 @@ const teamUnsubscribers = new Map<string, () => void>()
 const teamLogUnsubscribers = new Map<string, () => void>()
 
 export function broadcastToChannel(channel: string, message: WsServerMessage) {
+	const serialized = JSON.stringify(message)
 	for (const client of clients.values()) {
 		if (client.channels.has(channel)) {
 			try {
-				client.ws.send(JSON.stringify(message))
+				client.ws.send(serialized)
 			} catch {}
 		}
 	}
 }
 
 export function broadcastAll(message: WsServerMessage) {
+	const serialized = JSON.stringify(message)
 	for (const client of clients.values()) {
 		try {
-			client.ws.send(JSON.stringify(message))
+			client.ws.send(serialized)
 		} catch {}
 	}
 }
@@ -141,9 +143,7 @@ export const wsHandlers = {
 				const channel = msg.channel
 				if (channel.startsWith('team:')) {
 					const teamId = channel.slice(5)
-					const items = dbGetActivitySinceId(msg.sinceId).filter(
-						e => e.teamId === teamId,
-					)
+					const items = dbGetActivitySinceIdForTeam(msg.sinceId, teamId)
 					ws.send(
 						JSON.stringify({
 							type: 'replay:batch',

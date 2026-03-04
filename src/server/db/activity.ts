@@ -78,6 +78,19 @@ export function dbGetActivitySinceId(sinceId: number): TeamActivity[] {
 		.all()
 }
 
+export function dbGetActivitySinceIdForTeam(
+	sinceId: number,
+	teamId: string,
+): TeamActivity[] {
+	return getDb()
+		.select()
+		.from(activity)
+		.where(and(gt(activity.id, sinceId), eq(activity.teamId, teamId)))
+		.orderBy(asc(activity.id))
+		.limit(500)
+		.all()
+}
+
 export function dbGetLatestActivityByType(
 	teamId: string,
 	type: string,

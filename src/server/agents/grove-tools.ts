@@ -66,7 +66,15 @@ function parseConflictFiles(mergeTreeOutput: string): string[] {
 	return files
 }
 
-export function createGroveTools(teamId: string, agentId: string) {
+interface GroveToolOptions {
+	expo?: { worktreePath: string; repoId: string }
+}
+
+export function createGroveTools(
+	teamId: string,
+	agentId: string,
+	options?: GroveToolOptions,
+) {
 	return createSdkMcpServer({
 		name: 'grove',
 		version: '1.0.0',
@@ -331,6 +339,69 @@ export function createGroveTools(teamId: string, agentId: string) {
 					}
 				},
 			),
+			...(options?.expo
+				? [
+						tool(
+							'trigger_build',
+							'Trigger an iOS native build via expo run:ios. Delegates to server-side build infrastructure for log streaming.',
+							{},
+							async () => {
+								const { rebuildExpoBuild } = await import('../api/expo-build')
+								await rebuildExpoBuild(teamId, options.expo?.worktreePath)
+								return {
+									content: [{ type: 'text' as const, text: 'build triggered' }],
+								}
+							},
+						),
+						tool(
+							'get_build_status',
+							'Get current iOS build status: building, done, failed, stopped, or null',
+							{},
+							async () => {
+								const { getExpoBuildStatus } = await import('../api/expo-build')
+								const status = getExpoBuildStatus(teamId)
+								return {
+									content: [
+										{
+											type: 'text' as const,
+											text: status ?? 'no active build',
+										},
+									],
+								}
+							},
+						),
+						tool(
+							'get_build_output',
+							'Get iOS build output for diagnosis. Returns last N lines.',
+							{
+								tail_lines: z
+									.number()
+									.optional()
+									.describe('Number of lines from end (default 100)'),
+							},
+							async ({ tail_lines }) => {
+								const { getExpoBuildOutput } = await import('../api/expo-build')
+								const output = getExpoBuildOutput(teamId)
+								if (!output) {
+									return {
+										content: [
+											{
+												type: 'text' as const,
+												text: 'no build output available',
+											},
+										],
+									}
+								}
+								const lines = output.split('\n')
+								const n = tail_lines ?? 100
+								const tail = lines.slice(-n).join('\n')
+								return {
+									content: [{ type: 'text' as const, text: tail }],
+								}
+							},
+						),
+					]
+				: []),
 		],
 	})
 }

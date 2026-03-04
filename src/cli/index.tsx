@@ -11,7 +11,12 @@ import { DepsCheck } from './components/DepsCheck.js'
 import { Running } from './components/Running.js'
 import { loadConfig, loadPid, saveConfig, savePid } from './config.js'
 import { runCommand } from './run.js'
-import { getTailscaleInfo, startServe, stopServe } from './tunnel.js'
+import {
+	SERVE_PATH,
+	getTailscaleInfo,
+	startServe,
+	stopServe,
+} from './tunnel.js'
 
 interface ParsedArgs {
 	port?: number
@@ -151,7 +156,7 @@ function App({ background, port }: AppProps) {
 
 			await new Promise(resolve => setTimeout(resolve, 1500))
 
-			setServerUrl(`https://${info.hostname}/grove`)
+			setServerUrl(`https://${info.hostname}${SERVE_PATH}`)
 			setTerminalHost(info.ip)
 			setState('running')
 		} else {
@@ -167,7 +172,7 @@ function App({ background, port }: AppProps) {
 					return
 				}
 
-				setServerUrl(`https://${info.hostname}/grove`)
+				setServerUrl(`https://${info.hostname}${SERVE_PATH}`)
 				setTerminalHost(info.ip)
 				setState('running')
 			} catch (err) {

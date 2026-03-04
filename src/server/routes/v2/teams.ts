@@ -581,13 +581,25 @@ export async function handleV2Teams(
 			)
 
 		let text: string | undefined
+		let answers: Record<string, string> | undefined
 		let contentBlocks: SDKUserMessage['message']['content'] | undefined
 
 		const contentType = req.headers.get('content-type') ?? ''
 		if (contentType.includes('multipart/form-data')) {
 			const formData = await req.formData()
+			const answersRaw = formData.get('answers') as string | undefined
+			if (answersRaw) {
+				try {
+					answers = JSON.parse(answersRaw) as Record<string, string>
+				} catch {
+					return Response.json(
+						{ error: 'Invalid answers JSON' },
+						{ status: 400, headers },
+					)
+				}
+			}
 			text = formData.get('text') as string | undefined
-			if (!text)
+			if (!text && !answers)
 				return Response.json(
 					{ error: 'Missing text' },
 					{ status: 400, headers },
@@ -612,7 +624,7 @@ export async function handleV2Teams(
 						})
 					}
 				}
-				if (blocks.length > 0) {
+				if (blocks.length > 0 && text) {
 					blocks.push({ type: 'text', text })
 					contentBlocks = blocks as SDKUserMessage['message']['content']
 				}
@@ -623,15 +635,16 @@ export async function handleV2Teams(
 				answers?: Record<string, string>
 			}
 			text = body.text
-			if (body.answers) {
-				const { resolveUserReply } = await import('../../agents/grove-tools')
-				if (resolveUserReply(team.id, body.answers)) {
-					const event = dbInsertActivity(team.id, null, 'user:answers', {
-						answers: body.answers,
-					})
-					return Response.json(event, { headers })
-				}
-			}
+			answers = body.answers
+		}
+
+		if (answers) {
+			const { resolveUserReply } = await import('../../agents/grove-tools')
+			resolveUserReply(team.id, answers)
+			const event = dbInsertActivity(team.id, null, 'user:answers', {
+				answers,
+			})
+			return Response.json(event, { headers })
 		}
 
 		if (!text)

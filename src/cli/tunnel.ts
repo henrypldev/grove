@@ -25,11 +25,17 @@ export function getTailscaleInfo(): TailscaleInfo | null {
 	}
 }
 
+export const SERVE_PATH =
+	process.env.NODE_ENV === 'development' ? '/grove-dev' : '/grove'
+
 export function startServe(port: number): boolean {
 	try {
-		execSync(`tailscale serve --bg --set-path /grove localhost:${port}`, {
-			stdio: 'inherit',
-		})
+		execSync(
+			`tailscale serve --bg --set-path ${SERVE_PATH} localhost:${port}`,
+			{
+				stdio: 'inherit',
+			},
+		)
 		return true
 	} catch {
 		return false
@@ -38,7 +44,7 @@ export function startServe(port: number): boolean {
 
 export function stopServe(): void {
 	try {
-		spawnSync('tailscale', ['serve', '--set-path', '/grove', 'off'], {
+		spawnSync('tailscale', ['serve', '--set-path', SERVE_PATH, 'off'], {
 			stdio: 'ignore',
 		})
 	} catch {
@@ -49,8 +55,9 @@ export function stopServe(): void {
 export function isServeEnabled(): boolean {
 	try {
 		const result = execSync('tailscale serve status', { encoding: 'utf-8' })
-		return result.includes('/grove')
+		return result.includes(SERVE_PATH)
 	} catch {
 		return false
 	}
 }
+

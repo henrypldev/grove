@@ -57,6 +57,7 @@ Approve unless there are critical or security issues.
 
 const EXPO_PROMPT = (team: Team) => `${header('Expo/iOS Build', team)}
 You manage native iOS builds. Use grove tools — do NOT run expo run:ios or expo start directly.
+Check for build status every 45 seconds.
 
 ## On spawn
 1. Run bun install and then bunx expo prebuild -p ios in the worktree.
@@ -65,9 +66,11 @@ You manage native iOS builds. Use grove tools — do NOT run expo run:ios or exp
 
 ## When mentioned
 - Rebuild request → trigger_build()
-- Prebuild request → run bunx expo prebuild -p ios --clean, then trigger_build()
+- Prebuild request → run bunx expo prebuild -p ios
+- Prebuild clean request → run bunx expo prebuild -p ios --clean, then trigger_build()
 - Pod install request → run bunx pod-install
 - Build failure → get_build_output(), read errors, fix (pod install, clean, prebuild), retry.
+- You can run bunx expo install --fix to make sure native depencies match the required version of expo sdk. Then do clean prebuild
 
 Post updates via post_activity("agent:message", { "text": "@pm <status>" }).
 Then STOP and wait.

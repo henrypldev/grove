@@ -111,10 +111,6 @@ export async function getTeam(params: {
 	const expoBuildStatus = getExpoBuildStatus(params.id)
 	const expoDevServerStatus = getExpoDevServerStatus(params.id)
 	const repo = dbGetRepo(team.repoId)
-	// Auto-create simulator for expo repos if one doesn't exist yet
-	if (!simulatorUdid && !expoBuildStatus && repo?.framework === 'expo') {
-		rebuildExpoBuild(params.id, team.worktreePath).catch(() => {})
-	}
 	const simulatorDeviceName = simulatorUdid ? `grove-team-${params.id}` : null
 	const devServerStatus = portAlive ? 'running' : port ? 'starting' : null
 	return {

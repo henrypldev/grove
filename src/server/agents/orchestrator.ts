@@ -3,7 +3,7 @@ import { computeDiff, getHeadSha } from '../api/diff'
 import { checkFingerprintAndRebuild, stopExpoBuild } from '../api/expo-build'
 import { stopExpoDevServer } from '../api/expo-dev-server'
 import { clearTeamPort, getTeamPort } from '../api/ports'
-import { deleteTeamDevice } from '../api/simulator'
+import { createTeamDevice, deleteTeamDevice } from '../api/simulator'
 import { unregisterTeamServe } from '../api/tailscale-serve'
 import { deleteWorktree } from '../api/worktrees'
 import { log } from '../config'
@@ -161,6 +161,11 @@ export async function onNewTeam(
 			})
 			dbUpdateTeamStatus(team.id, 'idle', summary ?? undefined)
 		}
+	})
+
+	// Create a simulator device for every team
+	createTeamDevice(team.id).catch(err => {
+		log('orchestrator', 'simulator creation failed', { teamId: team.id, err })
 	})
 
 	// Auto-spawn expo agent for native repos

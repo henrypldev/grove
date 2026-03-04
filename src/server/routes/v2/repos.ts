@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import pkg from '../../../../package.json'
-import { detectSetupSteps } from '../../agents/setup-detector'
+import { detectRepo } from '../../agents/setup-detector'
 import {
 	cloneRepo,
 	getGitHubOrgs,
@@ -273,19 +273,14 @@ export function deleteScript(params: { id: string }) {
 // --- Private helpers ---
 
 function triggerDetection(repo: Repo) {
-	detectSetupSteps(repo.id, repo.path)
+	detectRepo(repo.id, repo.path)
 		.then(result => {
 			if (result) {
 				emitGlobalActivity('repo:setup-detected', {
 					repoId: repo.id,
-					steps: result.steps,
-					scripts: result.scripts ?? [],
-					envVars: result.envVars ?? [],
-					fingerprint: result.fingerprint ?? null,
-					needsNativeBuild: result.needsNativeBuild ?? false,
+					envVars: result.envVars,
+					framework: result.framework ?? null,
 				})
-			} else {
-				emitGlobalActivity('repo:setup-detection-failed', { repoId: repo.id })
 			}
 		})
 		.catch(err => {
@@ -293,7 +288,6 @@ function triggerDetection(repo: Repo) {
 				repoId: repo.id,
 				err,
 			})
-			emitGlobalActivity('repo:setup-detection-failed', { repoId: repo.id })
 		})
 }
 

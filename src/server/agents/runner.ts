@@ -4,6 +4,7 @@ import type {
 	PostToolUseHookInput,
 	PreToolUseHookInput,
 	Query,
+	SettingSource,
 } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
 import { generateId, log } from '../config'
@@ -42,6 +43,7 @@ export interface AgentRunOptions {
 	canUseTool?: CanUseTool
 	mcpTools?: ReturnType<typeof createGroveTools>
 	onPostBash?: (command: string) => void
+	settingSources?: SettingSource[]
 	onDone?: (agentId: string) => void
 	onError?: (agentId: string, error: unknown) => void
 }
@@ -96,7 +98,8 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 				maxBudgetUsd: opts.maxBudgetUsd ?? 5,
 				permissionMode: 'bypassPermissions',
 				...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
-				...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+				allowedTools: [...(opts.allowedTools ?? []), 'Skill'],
+				settingSources: opts.settingSources ?? ['user', 'project'],
 				...(opts.canUseTool ? { canUseTool: opts.canUseTool } : {}),
 				hooks: buildHooks(agent, pending, opts),
 			},
@@ -173,7 +176,8 @@ export async function spawnPersistentAgent(
 			maxBudgetUsd: opts.maxBudgetUsd ?? 5,
 			permissionMode: 'bypassPermissions',
 			...(opts.mcpTools ? { mcpServers: { grove: opts.mcpTools } } : {}),
-			...(opts.allowedTools ? { allowedTools: opts.allowedTools } : {}),
+			allowedTools: [...(opts.allowedTools ?? []), 'Skill'],
+			settingSources: opts.settingSources ?? ['user', 'project'],
 			...(opts.canUseTool ? { canUseTool: opts.canUseTool } : {}),
 			hooks: buildHooks(agent, pending, opts),
 		},

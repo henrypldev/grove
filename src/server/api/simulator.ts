@@ -130,6 +130,23 @@ export function getTeamDeviceUdid(teamId: string): string | null {
 	return teamDevices.get(teamId) ?? null
 }
 
+/** Rediscover a team's simulator device from simctl without booting it */
+export async function rediscoverTeamDevice(
+	teamId: string,
+): Promise<string | null> {
+	if (teamDevices.has(teamId)) return teamDevices.get(teamId)!
+	const deviceName = `grove-team-${teamId}`
+	const existing = await findExistingDevice(deviceName)
+	if (!existing) return null
+	teamDevices.set(teamId, existing.udid)
+	log('simulator', 'rediscovered device', {
+		teamId,
+		udid: existing.udid,
+		state: existing.state,
+	})
+	return existing.udid
+}
+
 export function hasActiveSimulators(): boolean {
 	return teamDevices.size > 0
 }

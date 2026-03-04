@@ -40,8 +40,12 @@ interface SimulatorProcess {
 	upstreamReady: Promise<void> | null
 	clients: Set<ServerWebSocket<SimulatorWsData>>
 	reconnectAttempts: number
-	/** Last frame received from the simulator, sent immediately to new clients */
-	lastFrame: ArrayBuffer | null
+	/** Last frame received per device, sent immediately to new clients */
+	lastFrame: Map<string, ArrayBuffer>
+	/** Last booted message per device, replayed to new clients */
+	lastBooted: Map<string, string>
+	/** Tracks which device produced the most recent binary frames */
+	activeStreamDevice: string | null
 }
 
 export interface SimulatorWsData {
@@ -142,7 +146,9 @@ async function spawnSimulator(): Promise<SimulatorProcess> {
 		upstreamReady: null,
 		clients: new Set(),
 		reconnectAttempts: 0,
-		lastFrame: null,
+		lastFrame: new Map(),
+		lastBooted: new Map(),
+		activeStreamDevice: null,
 	}
 
 	sim = entry
@@ -182,18 +188,37 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 
 		ws.onmessage = event => {
 			if (event.data instanceof ArrayBuffer) {
-				entry.lastFrame = event.data
-			}
-			for (const client of entry.clients) {
-				try {
-					if (event.data instanceof ArrayBuffer) {
+				// Cache frame for the active device
+				if (entry.activeStreamDevice) {
+					entry.lastFrame.set(entry.activeStreamDevice, event.data)
+				}
+				// Only forward binary frames to clients subscribed to the active device
+				for (const client of entry.clients) {
+					if (client.data.deviceId && client.data.deviceId !== entry.activeStreamDevice) continue
+					try {
 						client.send(event.data)
-					} else {
-						client.send(event.data as string)
+					} catch (err) {
+						log('simulator-relay', `error sending to client: ${err}`)
+						entry.clients.delete(client)
 					}
-				} catch (err) {
-					log('simulator-relay', `error sending to client: ${err}`)
-					entry.clients.delete(client)
+				}
+			} else {
+				// Cache booted messages and track active streaming device
+				try {
+					const msg = JSON.parse(event.data as string)
+					if (msg.type === 'booted' && msg.deviceId) {
+						entry.lastBooted.set(msg.deviceId, event.data as string)
+						entry.activeStreamDevice = msg.deviceId
+					}
+				} catch {}
+				// Forward text messages to all clients (they filter by deviceId themselves)
+				for (const client of entry.clients) {
+					try {
+						client.send(event.data as string)
+					} catch (err) {
+						log('simulator-relay', `error sending to client: ${err}`)
+						entry.clients.delete(client)
+					}
 				}
 			}
 		}
@@ -239,13 +264,19 @@ export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 				sim.releaseTimer = null
 			}
 			sim.clients.add(ws)
-			if (sim.lastFrame) {
+			// Replay cached booted message so reconnecting clients get screen dimensions
+			const deviceId = ws.data.deviceId
+			if (deviceId && sim.lastBooted.has(deviceId)) {
 				try {
-					ws.send(sim.lastFrame)
+					ws.send(sim.lastBooted.get(deviceId)!)
+				} catch {}
+			}
+			if (deviceId && sim.lastFrame.has(deviceId)) {
+				try {
+					ws.send(sim.lastFrame.get(deviceId)!)
 				} catch {}
 			}
 			// Auto-boot the device so streaming starts immediately on connection
-			const deviceId = ws.data.deviceId
 			if (deviceId && !bootedDevices.has(deviceId) && sim.upstreamWs) {
 				bootedDevices.add(deviceId)
 				try {

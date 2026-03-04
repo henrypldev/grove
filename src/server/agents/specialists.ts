@@ -33,6 +33,10 @@ Run typecheck and lint/format (check package.json for commands). Only commit if 
 ## Follow-ups
 - Rework: fix, run quality gates, commit, post dev:complete.
 - PR request: commit, gh pr create, then post_event("dev:pr-created", { "url": "URL" }) and message @pm.
+
+## Extra
+
+- Use the /simplify skill before submitting your work
 `
 
 const QA_PROMPT = (team: Team) => `${header('QA', team)}
@@ -55,7 +59,7 @@ const EXPO_PROMPT = (team: Team) => `${header('Expo/iOS Build', team)}
 You manage native iOS builds. Use grove tools — do NOT run expo run:ios or expo start directly.
 
 ## On spawn
-1. Run bunx pod-install in the worktree.
+1. Run bun install and then bunx expo prebuild -p ios in the worktree.
 2. trigger_build() to start the initial iOS build.
 3. Monitor with get_build_status(). If failed, get_build_output(), diagnose, fix, rebuild.
 

@@ -23,12 +23,13 @@ import { resolveUserReply } from './grove-tools'
 import { respawnPm, spawnPm } from './pm'
 import {
 	spawnDeveloper,
+	spawnExpoAgent,
 	spawnQaAgent,
 	spawnReviewerAgent,
 	spawnTeamLead,
 } from './specialists'
 
-const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer)\b/g
+const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer|expo)\b/g
 
 const devBaseCommit = new Map<string, string>()
 
@@ -161,6 +162,14 @@ export async function onNewTeam(
 			dbUpdateTeamStatus(team.id, 'idle', summary ?? undefined)
 		}
 	})
+
+	// Auto-spawn expo agent for native repos
+	const repo = dbGetRepo(team.repoId)
+	if (repo?.needsNativeBuild) {
+		spawnExpoAgent(team, repo.id).catch(err => {
+			log('orchestrator', 'expo agent spawn failed', { teamId: team.id, err })
+		})
+	}
 }
 
 export async function routeMessageToAgents(
@@ -393,4 +402,8 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 		await spawnDeveloper(team, { onPostBash: makeOnPostBash(team) })
 	} else if (role === 'qa') await spawnQaAgent(team)
 	else if (role === 'reviewer') await spawnReviewerAgent(team)
+	else if (role === 'expo') {
+		const repo = dbGetRepo(team.repoId)
+		if (repo) await spawnExpoAgent(team, repo.id)
+	}
 }

@@ -6,7 +6,18 @@ import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import { GROVE_DIR } from '../config'
 import * as schema from './schema'
 
-export const DB_PATH = join(GROVE_DIR, 'db.sqlite')
+export const DB_FILES = {
+	production: 'db.sqlite',
+	development: 'dev.sqlite',
+	test: 'test.sqlite',
+} as const
+
+function getDbFilename(): string {
+	const env = Bun.env.NODE_ENV ?? 'production'
+	return DB_FILES[env as keyof typeof DB_FILES] ?? DB_FILES.production
+}
+
+export const DB_PATH = join(GROVE_DIR, getDbFilename())
 
 export type DrizzleDb = BunSQLiteDatabase<typeof schema>
 

@@ -1,12 +1,22 @@
 import { Database } from 'bun:sqlite'
+import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { drizzle } from 'drizzle-orm/bun-sqlite'
 import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
-import { _injectDb } from '../index'
+import { GROVE_DIR } from '../../config'
+import { DB_FILES, _injectDb } from '../index'
 import * as schema from '../schema'
 
+const TEST_DB_PATH = join(GROVE_DIR, DB_FILES.test)
+
 export function makeTestDb() {
-	const sqlite = new Database(':memory:')
+	// Delete existing test db to start fresh
+	for (const path of [TEST_DB_PATH, `${TEST_DB_PATH}-wal`, `${TEST_DB_PATH}-shm`]) {
+		rmSync(path, { force: true })
+	}
+
+	mkdirSync(GROVE_DIR, { recursive: true })
+	const sqlite = new Database(TEST_DB_PATH, { create: true })
 	sqlite.run('PRAGMA journal_mode = WAL')
 	sqlite.run('PRAGMA foreign_keys = ON')
 
@@ -14,7 +24,7 @@ export function makeTestDb() {
 	migrate(db, { migrationsFolder: join(import.meta.dir, '../../../../drizzle') })
 
 	// Migration 0008 uses ALTER TABLE RENAME which doesn't work reliably
-	// with Drizzle's in-memory SQLite migrator. Fix it manually.
+	// with Drizzle's SQLite migrator. Fix it manually.
 	const tables = sqlite.query("SELECT name FROM sqlite_master WHERE type='table' AND name='events'").all()
 	if (tables.length > 0) {
 		sqlite.run('ALTER TABLE `events` RENAME TO `activity`')

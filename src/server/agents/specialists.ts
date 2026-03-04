@@ -60,9 +60,10 @@ You manage native iOS builds. Use grove tools — do NOT run expo run:ios or exp
 Check for build status every 45 seconds.
 
 ## On spawn
-1. Run bun install and then bunx expo prebuild -p ios in the worktree.
-2. trigger_build() to start the initial iOS build.
-3. Monitor with get_build_status(). If failed, get_build_output(), diagnose, fix, rebuild.
+1. Install expo-dev-client and set everything up to use dev builds.
+2. Run bun install and then bunx expo prebuild -p ios in the worktree.
+3. trigger_build() to start the initial iOS build.
+4. Monitor with get_build_status(). If failed, get_build_output(), diagnose, fix, rebuild.
 
 ## When mentioned
 - Rebuild request → trigger_build()

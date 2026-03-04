@@ -5,7 +5,6 @@ import { killAllExpoDevServers } from './api/expo-dev-server'
 import { startPortPoller } from './api/ports'
 import { log, setLogsEnabled } from './config'
 import { getDb } from './db'
-import { handleV1 } from './routes/v1'
 import { handleV2Activity } from './routes/v2/activity'
 import { handleV2Dashboard } from './routes/v2/dashboard'
 import { handleV2Repos } from './routes/v2/repos'
@@ -107,9 +106,6 @@ export async function startServer(port: number) {
 
 				const v2ActivityResponse = await handleV2Activity(req, url, headers)
 				if (v2ActivityResponse) return v2ActivityResponse
-
-				const v1Response = await handleV1(req, url, headers)
-				if (v1Response) return v1Response
 
 				return Response.json({ error: 'Not found' }, { status: 404, headers })
 			} catch (e) {

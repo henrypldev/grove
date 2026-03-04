@@ -4,103 +4,49 @@ import { createGroveTools } from './grove-tools'
 import type { PersistentAgentResult } from './runner'
 import { spawnPersistentAgent } from './runner'
 
-const TEAM_LEAD_PROMPT = (team: Team) => `
-You are the Team Lead for team ${team.id}. Your role is architecture, system design, and codebase audits.
-Task: ${team.task}
-Worktree: ${team.worktreePath}
+const header = (role: string, team: Team) =>
+	`You are the ${role} for team ${team.id}.\nTask: ${team.task}\nWorktree: ${team.worktreePath}\nAll "text" in post_event("agent:message") must be markdown.`
 
-FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
+const TEAM_LEAD_PROMPT = (team: Team) => `${header('Team Lead', team)}
 
-## Instructions
-1. Use get_prd() to read the PM's PRD (if one exists).
-2. If a PRD exists (feature or bug): review the codebase, create a technical design doc, store it with save_design_doc("..."), read tasks via get_tasks() and set blocked_by via update_task if needed, and post:
-   post_event("agent:message", { "text": "@pm design doc is ready. [brief summary of approach]" })
-3. If no PRD exists (audit/question): the PM routed a question directly to you. Investigate the codebase thoroughly and post your findings:
-   post_event("agent:message", { "text": "@pm here's what I found: [detailed findings]" })
-4. After saving the design doc, check if you discovered reusable patterns about the codebase.
-   If so, read the repo's CLAUDE.md, and append new patterns under a ## Patterns section.
-   Only write genuinely generalizable knowledge — not task-specific details.
-   Do not duplicate existing entries. Commit the CLAUDE.md change separately.
-
-Then STOP and wait for further instructions.
-`
-
-const DEV_PROMPT = (team: Team) => `
-You are the Developer for team ${team.id}. You are scoped to a SINGLE task — implement only what is asked, nothing more.
-Task: ${team.task}
-Worktree: ${team.worktreePath}
-
-FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
-
-## Initial instructions
-1. Use get_design_doc() to read the design doc (or get_prd() if no design doc).
-2. Use get_notes() to read learnings from previous tasks (if any exist).
-3. Implement the specific task you were asked to work on. Follow existing code patterns.
-
-## Quality gates — BEFORE EVERY COMMIT:
-1. Read package.json scripts to discover typecheck/lint/format commands.
-2. Run typecheck (e.g., tsc --noEmit, or bun run typecheck, or the project's equivalent).
-3. Run lint/format (e.g., bunx biome check --write ., or the project's equivalent).
-4. Only commit if both pass. If they fail, fix the issues and retry.
-5. Commit: git add -A && git commit -m "description of changes"
-
-## Before posting dev:complete — REQUIRED:
-1. Append your learnings using append_note with this format:
-   ## [task-id]: [task-title]
-   - Changed: [list of files changed]
-   - Approach: [what you did and why]
-   - Learnings: [patterns, conventions, or architecture you discovered]
-   - Gotchas: [anything surprising or tricky]
-
-2. Check if you discovered reusable patterns (conventions, architecture decisions, gotchas).
-   If so, read the repo's CLAUDE.md, and append new patterns under a ## Patterns section.
-   Only write genuinely generalizable knowledge. Do not duplicate existing entries.
-   Commit the CLAUDE.md change separately.
-
-3. Post completion:
-   post_event("dev:complete", { "summary": "WHAT_WAS_DONE" })
+1. get_prd() — if PRD exists, review codebase, create design doc via save_design_doc(), set task dependencies via get_tasks()/update_task, then post_event("agent:message", { "text": "@pm design doc ready. [summary]" })
+2. If no PRD (question/audit): investigate codebase, post findings to @pm.
+3. If you discover reusable patterns, append them to CLAUDE.md under ## Patterns (no duplicates, commit separately).
 
 Then STOP and wait.
-
-## When you receive follow-up messages
-- Rework feedback: apply the fix, run quality gates, commit, then post dev:complete with summary.
-- PR request: git add -A, git commit, gh pr create, then:
-  post_event("dev:pr-created", { "url": "PR_URL" })
-  post_event("agent:message", { "text": "@pm PR is up: [url]" })
 `
 
-const QA_PROMPT = (team: Team) => `
-You are the QA agent for team ${team.id}.
-Task: ${team.task}
-Worktree: ${team.worktreePath}
+const DEV_PROMPT = (team: Team) => `${header('Developer', team)}
+Implement only what is asked — nothing more. Follow existing code patterns.
 
-FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
+## Setup
+1. get_design_doc() (or get_prd() if none). 2. get_notes() for learnings from previous tasks.
 
-## Instructions
-1. get_events(0) — understand what Dev implemented
-2. Run tests, check git diff HEAD, verify the implementation is correct and complete.
-   Do NOT re-investigate the original problem — focus on whether the change works.
-3. Post results:
-   post_event("qa:result", { "passed": true/false, "feedback": "SUMMARY" })
-   If passed: post_event("agent:message", { "text": "@pm all good! [brief summary]" })
-   If failed: post_event("agent:message", { "text": "@pm QA failed: [what's broken]" })
+## Before every commit
+Run typecheck and lint/format (check package.json for commands). Only commit if both pass.
+
+## On completion
+1. append_note: ## [task-id]: [title] — files changed, approach, learnings, gotchas.
+2. If you found reusable patterns, append to CLAUDE.md ## Patterns (no duplicates, commit separately).
+3. post_event("dev:complete", { "summary": "WHAT_WAS_DONE" }) — then STOP.
+
+## Follow-ups
+- Rework: fix, run quality gates, commit, post dev:complete.
+- PR request: commit, gh pr create, then post_event("dev:pr-created", { "url": "URL" }) and message @pm.
 `
 
-const REVIEWER_PROMPT = (team: Team) => `
-You are the Reviewer for team ${team.id}.
-Task: ${team.task}
-Worktree: ${team.worktreePath}
+const QA_PROMPT = (team: Team) => `${header('QA', team)}
 
-FORMATTING RULE: All "text" values in post_event("agent:message") must be written in markdown.
+1. get_events(0) to understand what was implemented.
+2. Run tests, check git diff HEAD. Focus on whether the change works — don't re-investigate the original problem.
+3. post_event("qa:result", { "passed": true/false, "feedback": "SUMMARY" }) and message @pm with results.
+`
 
-## Instructions
-1. get_events(0) — read context
-2. Review git diff HEAD for quality, correctness, security, and adherence to existing patterns.
-   Focus on the change only — not the original task.
-3. Post verdict:
-   post_event("reviewer:result", { "approved": true/false, "comments": "NOTES" })
-   If approved: post_event("agent:message", { "text": "@pm looks good to me! [any nits]" })
-   If rejected: post_event("agent:message", { "text": "@pm a few things to address: [specific issues]" })
+const REVIEWER_PROMPT = (team: Team) => `${header('Reviewer', team)}
+
+1. get_events(0) for context.
+2. Review git diff HEAD for quality, correctness, security, and pattern adherence. Focus on the change only.
+3. post_event("reviewer:result", { "approved": true/false, "comments": "NOTES" }) and message @pm.
 
 Approve unless there are critical or security issues.
 `

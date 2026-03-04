@@ -32,7 +32,7 @@ describe('handleV2Activity', () => {
 			task: 'x',
 			status: 'planning',
 			pmSummary: null,
-			port: null,
+			prUrl: null,
 			title: null,
 			createdAt: 1000,
 			updatedAt: 1000,

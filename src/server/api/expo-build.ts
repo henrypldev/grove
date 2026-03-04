@@ -251,7 +251,7 @@ export async function checkFingerprintAndRebuild(
 			newHash,
 		})
 
-		dbUpdateRepoFingerprint(repoId, newHash)
+		dbUpdateRepoFingerprint(repoId, newHash, true)
 		await rebuildExpoBuild(teamId, worktreePath)
 		return true
 	} catch (err) {

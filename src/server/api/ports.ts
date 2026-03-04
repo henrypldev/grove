@@ -22,7 +22,7 @@ export async function allocatePort(): Promise<number | null> {
 		})
 		const port = server.port
 		server.stop(true)
-		return port
+		return port ?? null
 	} catch {
 		return null
 	}

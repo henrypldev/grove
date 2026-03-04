@@ -346,8 +346,11 @@ export function createGroveTools(
 							'Trigger an iOS native build via expo run:ios. Delegates to server-side build infrastructure for log streaming.',
 							{},
 							async () => {
+								const worktreePath = options.expo?.worktreePath
+								if (!worktreePath)
+									throw new Error('expo worktreePath not configured')
 								const { rebuildExpoBuild } = await import('../api/expo-build')
-								await rebuildExpoBuild(teamId, options.expo?.worktreePath)
+								await rebuildExpoBuild(teamId, worktreePath)
 								return {
 									content: [{ type: 'text' as const, text: 'build triggered' }],
 								}

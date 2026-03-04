@@ -47,6 +47,7 @@ interface SimulatorProcess {
 export interface SimulatorWsData {
 	type: 'simulator'
 	clientId: string
+	deviceId: string | null
 }
 
 /** Max incoming message size from clients (1MB) */
@@ -54,6 +55,7 @@ export const SIMULATOR_MAX_PAYLOAD = 1024 * 1024
 
 let sim: SimulatorProcess | null = null
 let initPromise: Promise<void> | null = null
+const bootedDevices = new Set<string>()
 
 function findFreePort(): number {
 	return 9876 + Math.floor(Math.random() * 1000)
@@ -161,6 +163,7 @@ function teardown() {
 		log('simulator-relay', `teardown: error killing process: ${err}`)
 	}
 	sim = null
+	bootedDevices.clear()
 }
 
 function connectUpstream(entry: SimulatorProcess): Promise<void> {
@@ -241,6 +244,15 @@ export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 					ws.send(sim.lastFrame)
 				} catch {}
 			}
+			// Auto-boot the device so streaming starts immediately on connection
+			const deviceId = ws.data.deviceId
+			if (deviceId && !bootedDevices.has(deviceId) && sim.upstreamWs) {
+				bootedDevices.add(deviceId)
+				try {
+					sim.upstreamWs.send(JSON.stringify({ type: 'boot', deviceId }))
+					log('simulator-relay', `auto-booted device ${deviceId}`)
+				} catch {}
+			}
 			log('simulator-relay', `client connected (refCount=${sim.refCount})`)
 		})
 		.catch(err => {
@@ -257,6 +269,15 @@ export function handleSimulatorMessage(
 	ensureReady()
 		.then(() => {
 			if (!sim?.upstreamWs) return
+			// Clear boot tracking when a device is shut down so it can be re-booted
+			if (typeof data === 'string') {
+				try {
+					const msg = JSON.parse(data)
+					if (msg.type === 'shutdown' && msg.deviceId) {
+						bootedDevices.delete(msg.deviceId)
+					}
+				} catch {}
+			}
 			try {
 				sim.upstreamWs.send(data)
 			} catch (err) {

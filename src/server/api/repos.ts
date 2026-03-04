@@ -1,7 +1,9 @@
 import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { readFramework } from '../agents/setup-detector'
-import { generateId, loadConfig, log, type Repo, saveConfig } from '../config'
+import { generateId, log } from '../config'
+import { dbGetRepoByPath } from '../db/repos'
+import type { Repo } from '../types'
 import { detectEnvVars } from './worktrees'
 
 export function withSetupFile<T extends Repo>(
@@ -11,15 +13,6 @@ export function withSetupFile<T extends Repo>(
 		...repo,
 		hasSetupFile: existsSync(join(repo.path, '.grove', 'setup.json')),
 	}
-}
-
-export async function getRepos(): Promise<
-	(Repo & { hasSetupFile: boolean })[]
-> {
-	log('repos', 'getting repos')
-	const config = await loadConfig()
-	log('repos', 'found repos', { count: config.repos.length })
-	return config.repos.map(withSetupFile)
 }
 
 export async function addRepo(path: string): Promise<Repo | string> {
@@ -38,14 +31,8 @@ export async function addRepo(path: string): Promise<Repo | string> {
 		return `Path is not a git repository: ${path}`
 	}
 
-	const config = await loadConfig()
-
-	const existing = config.repos.find(r => r.path === path)
+	const existing = dbGetRepoByPath(path)
 	if (existing) {
-		if (!existing.framework) {
-			const framework = await readFramework(path)
-			if (framework) existing.framework = framework
-		}
 		log('repos', 'repo already exists', { id: existing.id })
 		return existing
 	}
@@ -62,23 +49,6 @@ export async function addRepo(path: string): Promise<Repo | string> {
 		envVars: envVars.length > 0 ? envVars : undefined,
 	}
 
-	config.repos.push(repo)
-	await saveConfig(config)
-
 	log('repos', 'repo added', { id: repo.id, name: repo.name })
 	return repo
-}
-
-export async function deleteRepo(id: string): Promise<true | string> {
-	log('repos', 'deleting repo', { id })
-	const config = await loadConfig()
-	const index = config.repos.findIndex(r => r.id === id)
-	if (index === -1) {
-		log('repos', 'repo not found', { id })
-		return `Repo not found: ${id}`
-	}
-	config.repos.splice(index, 1)
-	await saveConfig(config)
-	log('repos', 'repo deleted', { id })
-	return true
 }

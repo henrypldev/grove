@@ -42,6 +42,10 @@ export async function addRepo(path: string): Promise<Repo | string> {
 
 	const existing = config.repos.find(r => r.path === path)
 	if (existing) {
+		if (!existing.framework) {
+			const framework = await readFramework(path)
+			if (framework) existing.framework = framework
+		}
 		log('repos', 'repo already exists', { id: existing.id })
 		return existing
 	}

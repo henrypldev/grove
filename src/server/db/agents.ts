@@ -62,6 +62,7 @@ export function dbInsertAgent(agent: Agent): void {
 
 export function dbUpdateAgentActivity(
 	id: string,
+	teamId: string,
 	activity: string | null,
 ): void {
 	getDb()
@@ -69,18 +70,16 @@ export function dbUpdateAgentActivity(
 		.set({ activity, updatedAt: Date.now() })
 		.where(eq(agents.id, id))
 		.run()
-	const agent = dbGetAgent(id)
-	if (agent) {
-		broadcastToChannel(`team:${agent.teamId}`, {
-			type: 'agent:update',
-			channel: `team:${agent.teamId}`,
-			data: { id, teamId: agent.teamId, activity },
-		})
-	}
+	broadcastToChannel(`team:${teamId}`, {
+		type: 'agent:update',
+		channel: `team:${teamId}`,
+		data: { id, teamId, activity },
+	})
 }
 
 export function dbUpdateAgentStatus(
 	id: string,
+	teamId: string,
 	status: AgentStatus,
 	currentTask?: string | null,
 ): void {
@@ -89,19 +88,16 @@ export function dbUpdateAgentStatus(
 		.set({ status, currentTask: currentTask ?? null, updatedAt: Date.now() })
 		.where(eq(agents.id, id))
 		.run()
-	const agent = dbGetAgent(id)
-	if (agent) {
-		broadcastToChannel(`team:${agent.teamId}`, {
-			type: 'agent:update',
-			channel: `team:${agent.teamId}`,
-			data: {
-				id,
-				teamId: agent.teamId,
-				status,
-				currentTask: currentTask ?? null,
-			},
-		})
-	}
+	broadcastToChannel(`team:${teamId}`, {
+		type: 'agent:update',
+		channel: `team:${teamId}`,
+		data: {
+			id,
+			teamId,
+			status,
+			currentTask: currentTask ?? null,
+		},
+	})
 }
 
 export function dbUpdateAgentSessionId(id: string, sessionId: string): void {

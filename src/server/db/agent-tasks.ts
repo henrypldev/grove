@@ -6,20 +6,21 @@ export function dbInsertTasks(
 	teamId: string,
 	tasks: { idString: string; title: string; priority: number }[],
 ): void {
-	const db = getDb()
+	if (tasks.length === 0) return
 	const now = Date.now()
-	for (const t of tasks) {
-		db.insert(agentTasks)
-			.values({
+	getDb()
+		.insert(agentTasks)
+		.values(
+			tasks.map(t => ({
 				teamId,
 				idString: t.idString,
 				title: t.title,
 				priority: t.priority,
 				status: 'pending',
 				createdAt: now,
-			})
-			.run()
-	}
+			})),
+		)
+		.run()
 }
 
 export function dbListTasks(teamId: string) {

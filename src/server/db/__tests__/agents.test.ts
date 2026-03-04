@@ -71,7 +71,7 @@ describe('db/agents', () => {
 
 	test('updateStatus changes status', () => {
 		dbInsertAgent(AGENT)
-		dbUpdateAgentStatus('a1', 'done')
+		dbUpdateAgentStatus('a1', 't1', 'done')
 		expect(dbGetAgent('a1')?.status).toBe('done')
 	})
 
@@ -90,9 +90,9 @@ describe('db/agents', () => {
 
 	test('updateActivity sets and clears activity', () => {
 		dbInsertAgent({ ...AGENT, activity: null })
-		dbUpdateAgentActivity('a1', 'writing code')
+		dbUpdateAgentActivity('a1', 't1', 'writing code')
 		expect(dbGetAgent('a1')?.activity).toBe('writing code')
-		dbUpdateAgentActivity('a1', null)
+		dbUpdateAgentActivity('a1', 't1', null)
 		expect(dbGetAgent('a1')?.activity).toBeNull()
 	})
 

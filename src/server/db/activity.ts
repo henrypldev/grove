@@ -26,13 +26,14 @@ export function dbInsertActivity(
 	payload: Record<string, unknown>,
 ): TeamActivity {
 	const now = Date.now()
+	const payloadStr = JSON.stringify(payload)
 	const result = getDb()
 		.insert(activity)
 		.values({
 			teamId,
 			agentId,
 			type,
-			payload: JSON.stringify(payload),
+			payload: payloadStr,
 			createdAt: now,
 		})
 		.run() as unknown as { lastInsertRowid: number }
@@ -41,7 +42,7 @@ export function dbInsertActivity(
 		teamId,
 		agentId,
 		type,
-		payload: JSON.stringify(payload),
+		payload: payloadStr,
 		createdAt: now,
 	}
 	for (const fn of listeners.get(teamId) ?? []) fn(item)

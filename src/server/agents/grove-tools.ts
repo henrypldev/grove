@@ -46,10 +46,10 @@ export function waitForUserReply(
 	questions: Question[],
 ): Promise<Record<string, string>> {
 	dbInsertActivity(teamId, agentId, 'pm:questions', { questions })
-	dbUpdateAgentStatus(agentId, 'waiting')
+	dbUpdateAgentStatus(agentId, teamId, 'waiting')
 	return new Promise<Record<string, string>>(resolve => {
 		pendingUserReplies.set(teamId, (answers: Record<string, string>) => {
-			dbUpdateAgentStatus(agentId, 'working')
+			dbUpdateAgentStatus(agentId, teamId, 'working')
 			resolve(answers)
 		})
 	})

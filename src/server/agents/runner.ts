@@ -79,7 +79,7 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 
 	runAgentSession(agent, opts).catch(err => {
 		log('agent', `unhandled error in ${opts.role}`, { agentId, err })
-		dbUpdateAgentStatus(agentId, 'error')
+		dbUpdateAgentStatus(agentId, opts.teamId, 'error')
 		opts.onError?.(agentId, err)
 	})
 
@@ -87,7 +87,7 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 }
 
 async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
-	dbUpdateAgentStatus(agent.id, 'working')
+	dbUpdateAgentStatus(agent.id, agent.teamId, 'working')
 	const pending = new Map<string, ToolCall>()
 
 	try {
@@ -120,16 +120,16 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 			if (message.type === 'result') {
 				recordUsage(agent, message as unknown as Record<string, unknown>)
 				if (message.subtype === 'success') {
-					dbUpdateAgentStatus(agent.id, 'done')
+					dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 					opts.onDone?.(agent.id)
 				} else {
-					dbUpdateAgentStatus(agent.id, 'error')
+					dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 					opts.onError?.(agent.id, new Error(message.subtype))
 				}
 			}
 		}
 	} catch (err) {
-		dbUpdateAgentStatus(agent.id, 'error')
+		dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 		opts.onError?.(agent.id, err)
 		throw err
 	}
@@ -159,7 +159,7 @@ export async function spawnPersistentAgent(
 		updatedAt: now,
 	}
 	dbInsertAgent(agent)
-	dbUpdateAgentStatus(agent.id, 'working')
+	dbUpdateAgentStatus(agent.id, agent.teamId, 'working')
 
 	const messageQueue = new MessageQueue()
 	const pending = new Map<string, ToolCall>()
@@ -191,7 +191,7 @@ export async function spawnPersistentAgent(
 
 	processMessages(q, agent, opts, messageQueue).catch(err => {
 		log('agent', `unhandled error in persistent ${opts.role}`, { agentId, err })
-		dbUpdateAgentStatus(agentId, 'error')
+		dbUpdateAgentStatus(agentId, opts.teamId, 'error')
 		opts.onError?.(agentId, err)
 	})
 
@@ -226,28 +226,28 @@ async function processMessages(
 				recordUsage(agent, message as unknown as Record<string, unknown>)
 				if (messageQueue) {
 					if (message.subtype === 'success') {
-						dbUpdateAgentStatus(agent.id, 'idle')
+						dbUpdateAgentStatus(agent.id, agent.teamId, 'idle')
 					} else {
-						dbUpdateAgentStatus(agent.id, 'error')
+						dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 						opts.onError?.(agent.id, new Error(message.subtype))
 					}
 				} else {
 					if (message.subtype === 'success') {
-						dbUpdateAgentStatus(agent.id, 'done')
+						dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 						opts.onDone?.(agent.id)
 					} else {
-						dbUpdateAgentStatus(agent.id, 'error')
+						dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 						opts.onError?.(agent.id, new Error(message.subtype))
 					}
 				}
 			}
 		}
 		if (messageQueue) {
-			dbUpdateAgentStatus(agent.id, 'done')
+			dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 			opts.onDone?.(agent.id)
 		}
 	} catch (err) {
-		dbUpdateAgentStatus(agent.id, 'error')
+		dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 		opts.onError?.(agent.id, err)
 		throw err
 	}
@@ -269,7 +269,7 @@ function buildHooks(
 							input: h.tool_input,
 						})
 						const activity = activityFromToolName(h.tool_name)
-						dbUpdateAgentActivity(agent.id, activity)
+						dbUpdateAgentActivity(agent.id, agent.teamId, activity)
 						emitEphemeralActivity(
 							agent.teamId,
 							agent.id,
@@ -307,7 +307,7 @@ function buildHooks(
 								opts.onPostBash((call.input as { command: string }).command)
 							}
 						}
-						dbUpdateAgentActivity(agent.id, null)
+						dbUpdateAgentActivity(agent.id, agent.teamId, null)
 						emitEphemeralActivity(
 							agent.teamId,
 							agent.id,
@@ -335,7 +335,7 @@ function buildHooks(
 							agentToolAccumulator.set(agent.id, arr)
 							pending.delete(h.tool_use_id)
 						}
-						dbUpdateAgentActivity(agent.id, null)
+						dbUpdateAgentActivity(agent.id, agent.teamId, null)
 						emitEphemeralActivity(
 							agent.teamId,
 							agent.id,
@@ -387,10 +387,10 @@ export async function respawnAgent(
 	if (!agent) return false
 	const retries = dbIncrementAgentRetry(agentId)
 	if (retries > 3) {
-		dbUpdateAgentStatus(agentId, 'error')
+		dbUpdateAgentStatus(agentId, agent.teamId, 'error')
 		return false
 	}
-	dbUpdateAgentStatus(agentId, 'planning')
+	dbUpdateAgentStatus(agentId, agent.teamId, 'planning')
 	runAgentSession(agent, {
 		teamId: agent.teamId,
 		role: agent.role,

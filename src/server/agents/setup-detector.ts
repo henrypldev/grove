@@ -17,7 +17,7 @@ const FRAMEWORKS: [string, string][] = [
 	['express', 'express'],
 ]
 
-export function detectFramework(
+function detectFramework(
 	deps: Record<string, string>,
 	devDeps: Record<string, string>,
 ): string | null {

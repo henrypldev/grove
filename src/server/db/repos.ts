@@ -13,6 +13,11 @@ export function dbGetRepo(id: string): Repo | null {
 	return row ? toRepo(row) : null
 }
 
+export function dbGetRepoByPath(path: string): Repo | null {
+	const row = getDb().select().from(repos).where(eq(repos.path, path)).get()
+	return row ? toRepo(row) : null
+}
+
 export function dbInsertRepo(repo: Repo): void {
 	getDb()
 		.insert(repos)

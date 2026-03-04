@@ -165,7 +165,7 @@ export async function onNewTeam(
 
 	// Auto-spawn expo agent for native repos
 	const repo = dbGetRepo(team.repoId)
-	if (repo?.needsNativeBuild) {
+	if (repo?.framework === 'expo' || repo?.needsNativeBuild) {
 		spawnExpoAgent(team, repo.id).catch(err => {
 			log('orchestrator', 'expo agent spawn failed', { teamId: team.id, err })
 		})

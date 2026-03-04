@@ -18,6 +18,8 @@ class FrameStreamer {
     private let ciContext = CIContext(options: [.useSoftwareRenderer: false])
     private let targetFPS: Double = 60.0
     private let jpegQuality: CGFloat = 0.3
+    private let encodingQueue = DispatchQueue(label: "com.grove.frame-encoding", qos: .userInteractive)
+    private let reusableData = NSMutableData(capacity: 256 * 1024) ?? NSMutableData()
 
     func startStreaming(device: AnyObject, deviceId: String, connection: NWConnection) {
         guard let surface = getIOSurface(from: device) else {
@@ -40,7 +42,7 @@ class FrameStreamer {
         withUnsafeBytes(of: len) { devicePrefix.append(contentsOf: $0) }
         devicePrefix.append(deviceIdData)
 
-        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInteractive))
+        let timer = DispatchSource.makeTimerSource(queue: self.encodingQueue)
         timer.schedule(deadline: .now(), repeating: interval)
 
         timer.setEventHandler { [weak self] in
@@ -123,9 +125,9 @@ class FrameStreamer {
             return nil
         }
 
-        let mutableData = NSMutableData()
+        reusableData.length = 0
         guard let destination = CGImageDestinationCreateWithData(
-            mutableData as CFMutableData,
+            reusableData as CFMutableData,
             "public.jpeg" as CFString,
             1,
             nil
@@ -137,6 +139,6 @@ class FrameStreamer {
         CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
         CGImageDestinationFinalize(destination)
 
-        return mutableData as Data
+        return Data(reusableData)
     }
 }

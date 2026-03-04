@@ -100,9 +100,10 @@ func receiveMessage(on connection: NWConnection) {
     }
 }
 
+private let jsonDecoder = JSONDecoder()
+
 func handleTextMessage(_ data: Data, on connection: NWConnection) {
-    let decoder = JSONDecoder()
-    guard let msg = try? decoder.decode(ClientMessage.self, from: data) else {
+    guard let msg = try? jsonDecoder.decode(ClientMessage.self, from: data) else {
         sendError("Invalid message format", on: connection)
         return
     }

@@ -142,45 +142,48 @@ class SimulatorManager {
         let udid = deviceId ?? bootedDevices.keys.first
         guard let udid else { return }
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = ["simctl", "openurl", udid, url]
-        do {
-            try process.run()
-            process.waitUntilExit()
-        } catch {
-            print("[OpenURL] Failed: \(error)")
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+            process.arguments = ["simctl", "openurl", udid, url]
+            do {
+                try process.run()
+                process.waitUntilExit()
+            } catch {
+                print("[OpenURL] Failed: \(error)")
+            }
         }
     }
 
     func paste(text: String, deviceId: String? = nil) {
-        // Find the booted device UDID for simctl
         guard let udid = deviceId ?? bootedDevices.keys.first else { return }
 
-        // Set the simulator pasteboard via simctl pbcopy
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
-        process.arguments = ["simctl", "pbcopy", udid]
-        let pipe = Pipe()
-        process.standardInput = pipe
-        do {
-            try process.run()
-            pipe.fileHandleForWriting.write(Data(text.utf8))
-            pipe.fileHandleForWriting.closeFile()
-            process.waitUntilExit()
-        } catch {
-            print("[Paste] Failed to set pasteboard: \(error)")
-            return
-        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+            process.arguments = ["simctl", "pbcopy", udid]
+            let pipe = Pipe()
+            process.standardInput = pipe
+            do {
+                try process.run()
+                pipe.fileHandleForWriting.write(Data(text.utf8))
+                pipe.fileHandleForWriting.closeFile()
+                process.waitUntilExit()
+            } catch {
+                print("[Paste] Failed to set pasteboard: \(error)")
+                return
+            }
 
-        // Simulate Cmd+V via HID (Meta down, V down, V up, Meta up)
-        let metaKey: UInt32 = 0xe3  // Left GUI/Cmd
-        let vKey: UInt32 = 0x19     // V
-        HIDInput.shared.sendKeyDown(keyCode: metaKey, deviceId: udid)
-        HIDInput.shared.sendKeyDown(keyCode: vKey, deviceId: udid)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            HIDInput.shared.sendKeyUp(keyCode: vKey, deviceId: udid)
-            HIDInput.shared.sendKeyUp(keyCode: metaKey, deviceId: udid)
+            DispatchQueue.main.async {
+                let metaKey: UInt32 = 0xe3
+                let vKey: UInt32 = 0x19
+                HIDInput.shared.sendKeyDown(keyCode: metaKey, deviceId: udid)
+                HIDInput.shared.sendKeyDown(keyCode: vKey, deviceId: udid)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    HIDInput.shared.sendKeyUp(keyCode: vKey, deviceId: udid)
+                    HIDInput.shared.sendKeyUp(keyCode: metaKey, deviceId: udid)
+                }
+            }
         }
     }
 

@@ -51,6 +51,24 @@ const REVIEWER_PROMPT = (team: Team) => `${header('Reviewer', team)}
 Approve unless there are critical or security issues.
 `
 
+const EXPO_PROMPT = (team: Team) => `${header('Expo/iOS Build', team)}
+You manage native iOS builds. Use grove tools — do NOT run expo run:ios or expo start directly.
+
+## On spawn
+1. Run bunx pod-install in the worktree.
+2. trigger_build() to start the initial iOS build.
+3. Monitor with get_build_status(). If failed, get_build_output(), diagnose, fix, rebuild.
+
+## When mentioned
+- Rebuild request → trigger_build()
+- Prebuild request → run bunx expo prebuild -p ios --clean, then trigger_build()
+- Pod install request → run bunx pod-install
+- Build failure → get_build_output(), read errors, fix (pod install, clean, prebuild), retry.
+
+Post updates via post_activity("agent:message", { "text": "@pm <status>" }).
+Then STOP and wait.
+`
+
 export async function spawnTeamLead(
 	team: Team,
 ): Promise<PersistentAgentResult> {
@@ -112,5 +130,24 @@ export async function spawnReviewerAgent(
 		cwd: team.worktreePath,
 		maxBudgetUsd: 10,
 		mcpTools: createGroveTools(team.id, agentId),
+	})
+}
+
+export async function spawnExpoAgent(
+	team: Team,
+	repoId: string,
+): Promise<PersistentAgentResult> {
+	log('agent', 'spawning expo', { teamId: team.id })
+	const agentId = generateId()
+	return spawnPersistentAgent({
+		agentId,
+		teamId: team.id,
+		role: 'expo',
+		prompt: EXPO_PROMPT(team),
+		cwd: team.worktreePath,
+		maxBudgetUsd: 5,
+		mcpTools: createGroveTools(team.id, agentId, {
+			expo: { worktreePath: team.worktreePath, repoId },
+		}),
 	})
 }

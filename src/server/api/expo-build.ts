@@ -14,6 +14,8 @@ type ExpoBuildStatus = 'building' | 'done' | 'failed' | 'stopped'
 interface ActiveExpoBuild {
 	teamId: string
 	worktreePath: string
+	deviceUdid: string
+	port: number
 	process: ReturnType<typeof Bun.spawn> | null
 	output: string
 	status: ExpoBuildStatus
@@ -76,6 +78,75 @@ async function patchExpoHeadless(worktreePath: string) {
 	)
 }
 
+async function getIOSBundleId(worktreePath: string): Promise<string | null> {
+	try {
+		const proc = Bun.spawn(
+			['sh', '-c', 'bunx expo config --json --type prebuild'],
+			{
+				cwd: worktreePath,
+				stdout: 'pipe',
+				stderr: 'ignore',
+			},
+		)
+		const output = await new Response(proc.stdout).text()
+		await proc.exited
+		if (proc.exitCode !== 0) return null
+		const config = JSON.parse(output)
+		return config?.ios?.bundleIdentifier ?? null
+	} catch {
+		return null
+	}
+}
+
+async function ensureAppConnected(
+	deviceUdid: string,
+	port: number,
+	worktreePath: string,
+): Promise<void> {
+	const bundleId = await getIOSBundleId(worktreePath)
+	if (!bundleId) {
+		log('expo', 'could not determine bundle ID, skipping RCT_jsLocation')
+		return
+	}
+
+	log('expo', 'setting RCT_jsLocation and relaunching app', {
+		bundleId,
+		port,
+		deviceUdid,
+	})
+
+	// Write Metro URL to app preferences so it always knows where to connect
+	const writeProc = Bun.spawn(
+		[
+			'xcrun',
+			'simctl',
+			'spawn',
+			deviceUdid,
+			'defaults',
+			'write',
+			bundleId,
+			'RCT_jsLocation',
+			`localhost:${port}`,
+		],
+		{ stdout: 'ignore', stderr: 'ignore' },
+	)
+	await writeProc.exited
+
+	// Terminate the app (may have launched with a broken deep link)
+	const termProc = Bun.spawn(
+		['xcrun', 'simctl', 'terminate', deviceUdid, bundleId],
+		{ stdout: 'ignore', stderr: 'ignore' },
+	)
+	await termProc.exited
+
+	// Relaunch — app will read RCT_jsLocation from NSUserDefaults
+	const launchProc = Bun.spawn(
+		['xcrun', 'simctl', 'launch', deviceUdid, bundleId],
+		{ stdout: 'ignore', stderr: 'ignore' },
+	)
+	await launchProc.exited
+}
+
 async function patchFile(
 	filePath: string,
 	pattern: RegExp,
@@ -125,6 +196,8 @@ export async function startExpoBuild(
 	const build: ActiveExpoBuild = {
 		teamId,
 		worktreePath,
+		deviceUdid,
+		port,
 		process: proc,
 		output: '',
 		status: 'building',
@@ -139,7 +212,7 @@ export async function startExpoBuild(
 		streamOutput(proc.stderr, build),
 	])
 
-	proc.exited.then(exitCode => {
+	proc.exited.then(async exitCode => {
 		const b = activeBuilds.get(teamId)
 		if (!b || b.status !== 'building') return
 
@@ -147,6 +220,12 @@ export async function startExpoBuild(
 		b.status = exitCode === 0 ? 'done' : 'failed'
 		log('expo', `build ${b.status}`, { teamId, exitCode })
 		emitProgress(teamId, b.status)
+
+		// After successful build, set RCT_jsLocation and relaunch so the app
+		// reliably connects to Metro (deep link URL is flaky)
+		if (b.status === 'done') {
+			await ensureAppConnected(b.deviceUdid, b.port, b.worktreePath)
+		}
 	})
 }
 

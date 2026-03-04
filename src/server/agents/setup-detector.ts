@@ -17,7 +17,7 @@ const FRAMEWORKS: [string, string][] = [
 	['express', 'express'],
 ]
 
-function detectFramework(
+export function detectFramework(
 	deps: Record<string, string>,
 	devDeps: Record<string, string>,
 ): string | null {
@@ -58,7 +58,7 @@ export async function detectRepo(
 	}
 }
 
-async function readFramework(repoPath: string): Promise<string | null> {
+export async function readFramework(repoPath: string): Promise<string | null> {
 	try {
 		const pkg = await Bun.file(join(repoPath, 'package.json')).json()
 		return detectFramework(pkg.dependencies ?? {}, pkg.devDependencies ?? {})

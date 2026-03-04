@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
+import { readFramework } from '../agents/setup-detector'
 import { generateId, loadConfig, log, type Repo, saveConfig } from '../config'
 import { detectEnvVars } from './worktrees'
 
@@ -45,11 +46,15 @@ export async function addRepo(path: string): Promise<Repo | string> {
 		return existing
 	}
 
-	const envVars = await detectEnvVars(path)
+	const [envVars, framework] = await Promise.all([
+		detectEnvVars(path),
+		readFramework(path),
+	])
 	const repo: Repo = {
 		id: generateId(),
 		path,
 		name: basename(path),
+		framework: framework ?? undefined,
 		envVars: envVars.length > 0 ? envVars : undefined,
 	}
 

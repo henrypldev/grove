@@ -44,8 +44,6 @@ interface SimulatorProcess {
 	lastFrame: Map<string, ArrayBuffer>
 	/** Last booted message per device, replayed to new clients */
 	lastBooted: Map<string, string>
-	/** Tracks which device produced the most recent binary frames */
-	activeStreamDevice: string | null
 	/** Tracks which devices have been sent a boot command */
 	bootedDevices: Set<string>
 }
@@ -59,6 +57,7 @@ export interface SimulatorWsData {
 /** Max incoming message size from clients (1MB) */
 export const SIMULATOR_MAX_PAYLOAD = 1024 * 1024
 
+const textDecoder = new TextDecoder()
 let sim: SimulatorProcess | null = null
 let initPromise: Promise<void> | null = null
 
@@ -149,7 +148,6 @@ async function spawnSimulator(): Promise<SimulatorProcess> {
 		reconnectAttempts: 0,
 		lastFrame: new Map(),
 		lastBooted: new Map(),
-		activeStreamDevice: null,
 		bootedDevices: new Set(),
 	}
 
@@ -189,29 +187,37 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 
 		ws.onmessage = event => {
 			if (event.data instanceof ArrayBuffer) {
-				// Cache frame for the active device
-				if (entry.activeStreamDevice) {
-					entry.lastFrame.set(entry.activeStreamDevice, event.data)
-				}
-				// Only forward binary frames to clients subscribed to the active device
+				// Parse deviceId prefix: [2-byte BE length][deviceId UTF-8][JPEG data]
+				const buf = event.data
+				if (buf.byteLength < 2) return
+				const view = new DataView(buf)
+				const idLen = view.getUint16(0)
+				if (buf.byteLength < 2 + idLen) return
+				const deviceId = textDecoder.decode(buf.slice(2, 2 + idLen))
+				const frameData = buf.slice(2 + idLen)
+
+				// Cache frame per device
+				entry.lastFrame.set(deviceId, frameData)
+
+				// Forward only to clients subscribed to this device
 				for (const client of entry.clients) {
-					if (client.data.deviceId && client.data.deviceId !== entry.activeStreamDevice) continue
+					if (client.data.deviceId && client.data.deviceId !== deviceId)
+						continue
 					try {
-						client.send(event.data)
+						client.send(frameData)
 					} catch (err) {
 						log('simulator-relay', `error sending to client: ${err}`)
 						entry.clients.delete(client)
 					}
 				}
 			} else {
-				// Cache booted messages and track active streaming device
+				// Cache booted messages per device
 				const text = event.data as string
 				if (text.includes('"booted"')) {
 					try {
 						const msg = JSON.parse(text)
 						if (msg.type === 'booted' && msg.deviceId) {
 							entry.lastBooted.set(msg.deviceId, text)
-							entry.activeStreamDevice = msg.deviceId
 						}
 					} catch (err) {
 						log('simulator-relay', `failed to parse upstream message: ${err}`)

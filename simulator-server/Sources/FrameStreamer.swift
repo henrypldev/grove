@@ -33,6 +33,12 @@ class FrameStreamer {
         var lastSeed: UInt32 = 0
         let interval = 1.0 / targetFPS
         var isEncoding = false
+        // Pre-compute deviceId prefix: [2-byte big-endian length][deviceId UTF-8]
+        let deviceIdData = Data(deviceId.utf8)
+        var devicePrefix = Data()
+        let len = UInt16(deviceIdData.count).bigEndian
+        withUnsafeBytes(of: len) { devicePrefix.append(contentsOf: $0) }
+        devicePrefix.append(deviceIdData)
 
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue.global(qos: .userInteractive))
         timer.schedule(deadline: .now(), repeating: interval)
@@ -51,7 +57,9 @@ class FrameStreamer {
             // Convert IOSurface → JPEG
             isEncoding = true
             if let jpegData = self.encodeFrame(surface: surface) {
-                sendBinary(jpegData, on: connection)
+                var prefixed = devicePrefix
+                prefixed.append(jpegData)
+                sendBinary(prefixed, on: connection)
             }
             isEncoding = false
         }

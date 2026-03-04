@@ -176,11 +176,11 @@ class SimulatorManager {
         // Simulate Cmd+V via HID (Meta down, V down, V up, Meta up)
         let metaKey: UInt32 = 0xe3  // Left GUI/Cmd
         let vKey: UInt32 = 0x19     // V
-        HIDInput.shared.sendKeyDown(keyCode: metaKey)
-        HIDInput.shared.sendKeyDown(keyCode: vKey)
+        HIDInput.shared.sendKeyDown(keyCode: metaKey, deviceId: udid)
+        HIDInput.shared.sendKeyDown(keyCode: vKey, deviceId: udid)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            HIDInput.shared.sendKeyUp(keyCode: vKey)
-            HIDInput.shared.sendKeyUp(keyCode: metaKey)
+            HIDInput.shared.sendKeyUp(keyCode: vKey, deviceId: udid)
+            HIDInput.shared.sendKeyUp(keyCode: metaKey, deviceId: udid)
         }
     }
 

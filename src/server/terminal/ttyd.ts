@@ -129,7 +129,6 @@ export async function stopSession(sessionId: string): Promise<boolean> {
 }
 
 export async function cleanupStaleSessions() {
-	log('ttyd', 'cleaning up stale sessions')
 	const state = await loadSessions()
 	const validSessions: SessionData[] = []
 
@@ -146,10 +145,6 @@ export async function cleanupStaleSessions() {
 		}
 	}
 
-	log('ttyd', 'cleanup complete', {
-		before: state.sessions.length,
-		after: validSessions.length,
-	})
 	state.sessions = validSessions
 	await saveSessions(state)
 }

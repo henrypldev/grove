@@ -40,6 +40,8 @@ interface SimulatorProcess {
 	upstreamReady: Promise<void> | null
 	clients: Set<ServerWebSocket<SimulatorWsData>>
 	reconnectAttempts: number
+	/** Last frame received from the simulator, sent immediately to new clients */
+	lastFrame: ArrayBuffer | null
 }
 
 export interface SimulatorWsData {
@@ -138,6 +140,7 @@ async function spawnSimulator(): Promise<SimulatorProcess> {
 		upstreamReady: null,
 		clients: new Set(),
 		reconnectAttempts: 0,
+		lastFrame: null,
 	}
 
 	sim = entry
@@ -175,6 +178,9 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 		}
 
 		ws.onmessage = event => {
+			if (event.data instanceof ArrayBuffer) {
+				entry.lastFrame = event.data
+			}
 			for (const client of entry.clients) {
 				try {
 					if (event.data instanceof ArrayBuffer) {
@@ -230,6 +236,11 @@ export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 				sim.releaseTimer = null
 			}
 			sim.clients.add(ws)
+			if (sim.lastFrame) {
+				try {
+					ws.send(sim.lastFrame)
+				} catch {}
+			}
 			log('simulator-relay', `client connected (refCount=${sim.refCount})`)
 		})
 		.catch(err => {

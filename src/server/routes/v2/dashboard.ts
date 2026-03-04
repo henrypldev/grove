@@ -1,108 +1,133 @@
 import { getTeamPort, isPortActive } from '../../api/ports'
-import { dbListAgentsByTeam } from '../../db/agents'
+import { dbListAllAgents } from '../../db/agents'
 import { dbGetLatestLogByType } from '../../db/logs'
 import { dbGetMetrics } from '../../db/metrics'
 import { dbListTeams } from '../../db/teams'
 import type { DashboardResult } from '../../types'
 
-export function getDashboard(): DashboardResult {
+async function gitText(args: string[], cwd: string): Promise<string> {
+	try {
+		const proc = Bun.spawn(args, { cwd, stdout: 'pipe' })
+		const text = await new Response(proc.stdout).text()
+		await proc.exited
+		return text.trim()
+	} catch {
+		return ''
+	}
+}
+
+export async function getDashboard(): Promise<DashboardResult> {
 	const teams = dbListTeams()
-	const dashboard = teams.map(team => {
-		const agents = dbListAgentsByTeam(team.id)
-		const envReady = dbGetLatestLogByType(team.id, 'env:ready')
-		let envInfo: Record<string, unknown> | null = null
-		if (envReady) {
-			try {
-				envInfo = JSON.parse(envReady.payload)
-			} catch {}
+	const allAgents = dbListAllAgents()
+	const agentsByTeam = new Map<string, typeof allAgents>()
+	for (const agent of allAgents) {
+		const list = agentsByTeam.get(agent.teamId)
+		if (list) {
+			list.push(agent)
+		} else {
+			agentsByTeam.set(agent.teamId, [agent])
 		}
+	}
 
-		let behindMain = 0
-		let lastCommit = ''
-		try {
-			const behind = Bun.spawnSync(
-				['git', 'rev-list', 'HEAD..origin/main', '--count'],
-				{ cwd: team.worktreePath },
-			)
-			behindMain = Number.parseInt(behind.stdout.toString().trim(), 10) || 0
-		} catch {}
-		try {
-			const log = Bun.spawnSync(['git', 'log', '-1', '--format=%s'], {
-				cwd: team.worktreePath,
-			})
-			lastCommit = log.stdout.toString().trim()
-		} catch {}
+	const dashboard = await Promise.all(
+		teams.map(async team => {
+			const agents = agentsByTeam.get(team.id) ?? []
+			const envReady = dbGetLatestLogByType(team.id, 'env:ready')
+			let envInfo: Record<string, unknown> | null = null
+			if (envReady) {
+				try {
+					envInfo = JSON.parse(envReady.payload)
+				} catch {}
+			}
 
-		const port = getTeamPort(team.id)
-		return {
-			id: team.id,
-			title: team.title,
-			status: team.status,
-			repoId: team.repoId,
-			port: port && isPortActive(port) ? port : null,
-			agents: agents.map(a => ({
-				id: a.id,
-				role: a.role,
-				status: a.status,
-				activity: a.activity,
-			})),
-			env: envInfo,
-			behindMain,
-			lastCommit,
-		}
-	})
+			const [behindText, lastCommit] = await Promise.all([
+				gitText(
+					['git', 'rev-list', 'HEAD..origin/main', '--count'],
+					team.worktreePath,
+				),
+				gitText(['git', 'log', '-1', '--format=%s'], team.worktreePath),
+			])
+			const behindMain = Number.parseInt(behindText, 10) || 0
+
+			const port = getTeamPort(team.id)
+			return {
+				id: team.id,
+				title: team.title,
+				status: team.status,
+				repoId: team.repoId,
+				port: port && isPortActive(port) ? port : null,
+				agents: agents.map(a => ({
+					id: a.id,
+					role: a.role,
+					status: a.status,
+					activity: a.activity,
+				})),
+				env: envInfo,
+				behindMain,
+				lastCommit,
+			}
+		}),
+	)
 	const metrics = dbGetMetrics()
 	return { teams: dashboard, metrics }
 }
 
-export function getConflicts() {
+export async function getConflicts() {
 	const teams = dbListTeams()
-	const conflicts: Record<string, Record<string, string[]>> = {}
+	const results = await Promise.all(
+		teams.map(async team => {
+			const teamConflicts: Record<string, string[]> = {}
 
-	for (const team of teams) {
-		const teamConflicts: Record<string, string[]> = {}
-		try {
-			const mergeBase = Bun.spawnSync(
+			// Check conflicts with main
+			const mainBase = await gitText(
 				['git', 'merge-base', 'HEAD', 'origin/main'],
-				{ cwd: team.worktreePath },
+				team.worktreePath,
 			)
-			const base = mergeBase.stdout.toString().trim()
-			if (base) {
-				const check = Bun.spawnSync(
-					['git', 'merge-tree', base, 'HEAD', 'origin/main'],
-					{ cwd: team.worktreePath },
+			if (mainBase) {
+				const output = await gitText(
+					['git', 'merge-tree', mainBase, 'HEAD', 'origin/main'],
+					team.worktreePath,
 				)
-				const output = check.stdout.toString()
 				const files = parseConflictFiles(output)
 				if (files.length > 0) teamConflicts.main = files
 			}
-		} catch {}
 
-		for (const other of teams) {
-			if (other.id === team.id) continue
-			try {
-				const branchName = `grove-team-${other.id}`
-				const mergeBase = Bun.spawnSync(
-					['git', 'merge-base', 'HEAD', `origin/${branchName}`],
-					{ cwd: team.worktreePath },
-				)
-				const base = mergeBase.stdout.toString().trim()
-				if (!base) continue
-				const check = Bun.spawnSync(
-					['git', 'merge-tree', base, 'HEAD', `origin/${branchName}`],
-					{ cwd: team.worktreePath },
-				)
-				const output = check.stdout.toString()
-				const files = parseConflictFiles(output)
-				if (files.length > 0) teamConflicts[`team-${other.id}`] = files
-			} catch {}
-		}
+			// Check conflicts with other teams in parallel
+			const otherTeams = teams.filter(t => t.id !== team.id)
+			const otherResults = await Promise.all(
+				otherTeams.map(async other => {
+					const branchName = `grove-team-${other.id}`
+					const base = await gitText(
+						['git', 'merge-base', 'HEAD', `origin/${branchName}`],
+						team.worktreePath,
+					)
+					if (!base) return null
+					const output = await gitText(
+						['git', 'merge-tree', base, 'HEAD', `origin/${branchName}`],
+						team.worktreePath,
+					)
+					const files = parseConflictFiles(output)
+					if (files.length > 0) {
+						return { key: `team-${other.id}`, files }
+					}
+					return null
+				}),
+			)
 
+			for (const result of otherResults) {
+				if (result) teamConflicts[result.key] = result.files
+			}
+
+			return { teamId: team.id, teamConflicts }
+		}),
+	)
+
+	const conflicts: Record<string, Record<string, string[]>> = {}
+	for (const { teamId, teamConflicts } of results) {
 		if (Object.keys(teamConflicts).length > 0) {
-			conflicts[team.id] = teamConflicts
+			conflicts[teamId] = teamConflicts
 		}
 	}
-
 	return conflicts
 }
 

@@ -4,6 +4,15 @@ import { broadcastToChannel } from '../websocket'
 import { getDb } from './index'
 import { agents } from './schema'
 
+export function dbListAllAgents(): Agent[] {
+	const rows = getDb()
+		.select()
+		.from(agents)
+		.orderBy(asc(agents.spawnedAt))
+		.all()
+	return rows.map(toAgent)
+}
+
 export function dbListAgentsByTeam(teamId: string): Agent[] {
 	const rows = getDb()
 		.select()

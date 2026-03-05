@@ -111,7 +111,7 @@ This launches the command in the current directory, sets up a secure terminal se
 ```
 -b, --background    Start server in background
 -h, --help          Show help message
---port <number>     Set server port (default: 4000)
+--port <number>     Set server port (default: random available port)
 ```
 
 ## How it works

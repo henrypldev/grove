@@ -102,8 +102,13 @@ export async function createTeamDevice(teamId: string): Promise<string> {
 }
 
 export async function deleteTeamDevice(teamId: string): Promise<void> {
-	const udid = teamDevices.get(teamId)
-	if (!udid) return
+	let udid = teamDevices.get(teamId)
+	if (!udid) {
+		const deviceName = `grove-team-${teamId}`
+		const existing = await findExistingDevice(deviceName)
+		if (!existing) return
+		udid = existing.udid
+	}
 
 	try {
 		const shutdown = Bun.spawn(['xcrun', 'simctl', 'shutdown', udid], {

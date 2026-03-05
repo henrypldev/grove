@@ -5,6 +5,9 @@ import { dbGetMetrics } from '../../db/metrics'
 import { dbListTeams } from '../../db/teams'
 import type { DashboardResult } from '../../types'
 
+const lastFetchByRepo = new Map<string, number>()
+const FETCH_TTL_MS = 30_000
+
 async function gitText(args: string[], cwd: string): Promise<string> {
 	try {
 		const proc = Bun.spawn(args, { cwd, stdout: 'pipe' })
@@ -28,6 +31,24 @@ export async function getDashboard(): Promise<DashboardResult> {
 			agentsByTeam.set(agent.teamId, [agent])
 		}
 	}
+
+	// Fetch origin/main once per repo (with TTL) so rev-list comparisons are current
+	const now = Date.now()
+	const reposToFetch = new Map<string, string>()
+	for (const team of teams) {
+		if (!reposToFetch.has(team.repoId)) {
+			const last = lastFetchByRepo.get(team.repoId) ?? 0
+			if (now - last > FETCH_TTL_MS) {
+				reposToFetch.set(team.repoId, team.worktreePath)
+			}
+		}
+	}
+	await Promise.all(
+		Array.from(reposToFetch.entries()).map(async ([repoId, cwd]) => {
+			await gitText(['git', 'fetch', 'origin', 'main'], cwd)
+			lastFetchByRepo.set(repoId, Date.now())
+		}),
+	)
 
 	const dashboard = await Promise.all(
 		teams.map(async team => {

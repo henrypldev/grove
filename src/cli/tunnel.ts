@@ -26,7 +26,7 @@ export function getTailscaleInfo(): TailscaleInfo | null {
 }
 
 export const SERVE_PATH =
-	process.env.NODE_ENV === 'development' ? '/grove-dev' : '/grove'
+	process.env.GROVE_DEV === '1' ? '/grove-dev' : '/grove'
 
 export function startServe(port: number): boolean {
 	try {

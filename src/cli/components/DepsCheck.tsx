@@ -71,9 +71,11 @@ export function DepsCheck({ onComplete }: Props) {
 		} else {
 			console.log('\nInstall manually:')
 			for (const dep of missing) {
-				const cmd = dep.isCask
-					? `brew install --cask ${dep.brewPackage}`
-					: `brew install ${dep.brewPackage}`
+				const cmd =
+					dep.installHint ??
+					(dep.isCask
+						? `brew install --cask ${dep.brewPackage}`
+						: `brew install ${dep.brewPackage}`)
 				console.log(`  ${cmd}`)
 			}
 			process.exit(1)

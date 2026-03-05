@@ -5,12 +5,16 @@ export interface Dependency {
 	command: string
 	brewPackage: string
 	isCask?: boolean
+	installHint?: string
 }
 
 export const DEPENDENCIES: Dependency[] = [
-	{ name: 'claude', command: 'claude', brewPackage: 'claude-code' },
-	{ name: 'tmux', command: 'tmux', brewPackage: 'tmux' },
-	{ name: 'ttyd', command: 'ttyd', brewPackage: 'ttyd' },
+	{
+		name: 'claude',
+		command: 'claude',
+		brewPackage: 'claude-code',
+		installHint: 'curl -fsSL https://claude.ai/install.sh | bash',
+	},
 	{
 		name: 'tailscale',
 		command: 'tailscale',

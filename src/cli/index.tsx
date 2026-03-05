@@ -12,8 +12,8 @@ import { Running } from './components/Running.js'
 import { loadConfig, loadPid, saveConfig, savePid } from './config.js'
 import { runCommand } from './run.js'
 import {
-	SERVE_PATH,
 	getTailscaleInfo,
+	SERVE_PATH,
 	startServe,
 	stopServe,
 } from './tunnel.js'
@@ -26,6 +26,7 @@ interface ParsedArgs {
 	help: boolean
 	logs: boolean
 	start: boolean
+	doctor: boolean
 	run?: string
 }
 
@@ -42,6 +43,7 @@ function parseArgs(): ParsedArgs {
 	const help = args.includes('--help') || args.includes('-h')
 	const logs = args.includes('logs')
 	const start = args.includes('start')
+	const doctor = args.includes('doctor') || args.includes('--doctor')
 
 	let run: string | undefined
 	const runIndex = args.indexOf('run')
@@ -49,7 +51,7 @@ function parseArgs(): ParsedArgs {
 		run = args.slice(runIndex + 1).join(' ')
 	}
 
-	return { port, background, daemon, stop, help, logs, start, run }
+	return { port, background, daemon, stop, help, logs, start, doctor, run }
 }
 
 function printHelp() {
@@ -63,6 +65,7 @@ Commands:
   stop                Stop background server and kill all sessions
   run <command>       Run a CLI agent (e.g., grove run claude) with mobile access
   logs                Tail the server log file
+  doctor              Check that all dependencies are installed
 
 Options:
   -b, --background    Start server in background and free terminal
@@ -249,6 +252,29 @@ if (args.logs) {
 		proc.kill()
 		process.exit(0)
 	})
+} else if (args.doctor) {
+	const { checkDependencies, isTailscaleRunning, DEPENDENCIES } =
+		await import('./deps.js')
+	const { found, missing } = checkDependencies()
+	const foundSet = new Set(found.map(d => d.name))
+	for (const dep of DEPENDENCIES) {
+		if (foundSet.has(dep.name)) {
+			console.log(`✓ ${dep.name}`)
+		} else {
+			const hint =
+				dep.installHint ??
+				(dep.isCask
+					? `brew install --cask ${dep.brewPackage}`
+					: `brew install ${dep.brewPackage}`)
+			console.log(`✗ ${dep.name} — install with: ${hint}`)
+		}
+	}
+	if (isTailscaleRunning()) {
+		console.log('✓ tailscale running')
+	} else {
+		console.log('✗ tailscale not running')
+	}
+	process.exit(missing.length > 0 ? 1 : 0)
 } else if (args.run) {
 	runCommand(args.run)
 } else if (args.stop) {

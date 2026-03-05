@@ -3,7 +3,7 @@ import { onNewTeam, startOrchestrator } from './agents/orchestrator'
 import { killAllExpoBuilds } from './api/expo-build'
 import { killAllExpoDevServers } from './api/expo-dev-server'
 import { startPortPoller } from './api/ports'
-import { getTerminalHost, getTailscaleId, log, setLogsEnabled } from './config'
+import { getTailscaleId, getTerminalHost, log, setLogsEnabled } from './config'
 import { getDb } from './db'
 import { handleV2Activity } from './routes/v2/activity'
 import { handleV2Dashboard } from './routes/v2/dashboard'
@@ -74,9 +74,7 @@ export async function startServer(port: number) {
 
 			if (path === '/v2/identity' && method === 'GET') {
 				const tailscaleId = getTailscaleId()
-				return logResponse(
-					Response.json({ tailscaleId }, { headers }),
-				)
+				return logResponse(Response.json({ tailscaleId }, { headers }))
 			}
 
 			if (path === '/update' && method === 'POST') {
@@ -132,7 +130,7 @@ export async function startServer(port: number) {
 			}
 
 			function logResponse(response: Response) {
-				log('http', `${method} ${response.status} ${path}`)
+				log('http', `${method} ${path} ${response.status}`)
 				return response
 			}
 		},

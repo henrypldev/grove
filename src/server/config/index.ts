@@ -24,9 +24,16 @@ export function setLogsEnabled(enabled: boolean) {
 	logsEnabled = enabled
 }
 
+function serializeErrors(_key: string, value: unknown): unknown {
+	if (value instanceof Error) {
+		return { message: value.message, stack: value.stack, name: value.name }
+	}
+	return value
+}
+
 export function log(context: string, message: string, data?: unknown) {
 	const timestamp = new Date().toISOString().slice(11, 23)
-	const dataStr = data !== undefined ? ` ${JSON.stringify(data)}` : ''
+	const dataStr = data !== undefined ? ` ${JSON.stringify(data, serializeErrors)}` : ''
 	const line = `[${timestamp}] [${context}] ${message}${dataStr}`
 	if (logsEnabled) {
 		console.log(line)

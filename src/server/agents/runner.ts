@@ -123,12 +123,14 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 					dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 					opts.onDone?.(agent.id)
 				} else {
+					log('agent', `${opts.role} finished with error: ${message.subtype}`, { agentId: agent.id, message })
 					dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 					opts.onError?.(agent.id, new Error(message.subtype))
 				}
 			}
 		}
 	} catch (err) {
+		log('agent', `${opts.role} threw error`, { agentId: agent.id, err })
 		dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 		opts.onError?.(agent.id, err)
 		throw err
@@ -228,6 +230,7 @@ async function processMessages(
 					if (message.subtype === 'success') {
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'idle')
 					} else {
+						log('agent', `persistent ${opts.role} finished with error: ${message.subtype}`, { agentId: agent.id, message })
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 						opts.onError?.(agent.id, new Error(message.subtype))
 					}
@@ -236,6 +239,7 @@ async function processMessages(
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 						opts.onDone?.(agent.id)
 					} else {
+						log('agent', `${opts.role} finished with error: ${message.subtype}`, { agentId: agent.id, message })
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 						opts.onError?.(agent.id, new Error(message.subtype))
 					}
@@ -247,6 +251,7 @@ async function processMessages(
 			opts.onDone?.(agent.id)
 		}
 	} catch (err) {
+		log('agent', `${opts.role} threw error`, { agentId: agent.id, err })
 		dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 		opts.onError?.(agent.id, err)
 		throw err

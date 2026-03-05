@@ -1,6 +1,6 @@
 {
   "name": "grove",
-  "version": "0.15.0-beta.8",
+  "version": "0.15.0-beta.9",
   "private": true,
   "workspaces": [
     "docs"

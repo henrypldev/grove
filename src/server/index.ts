@@ -3,7 +3,7 @@ import { onNewTeam, startOrchestrator } from './agents/orchestrator'
 import { killAllExpoBuilds } from './api/expo-build'
 import { killAllExpoDevServers } from './api/expo-dev-server'
 import { startPortPoller } from './api/ports'
-import { log, setLogsEnabled } from './config'
+import { getTerminalHost, getTailscaleId, log, setLogsEnabled } from './config'
 import { getDb } from './db'
 import { handleV2Activity } from './routes/v2/activity'
 import { handleV2Dashboard } from './routes/v2/dashboard'
@@ -17,6 +17,7 @@ export { setLogsEnabled }
 
 export async function startServer(port: number) {
 	getDb()
+	await getTerminalHost()
 	await startOrchestrator()
 	setTeamCreatedHook(onNewTeam)
 	log('server', 'starting up')
@@ -69,6 +70,13 @@ export async function startServer(port: number) {
 
 			if (path === '/version' && method === 'GET') {
 				return logResponse(Response.json({ version: pkg.version }, { headers }))
+			}
+
+			if (path === '/v2/identity' && method === 'GET') {
+				const tailscaleId = getTailscaleId()
+				return logResponse(
+					Response.json({ tailscaleId }, { headers }),
+				)
 			}
 
 			if (path === '/update' && method === 'POST') {

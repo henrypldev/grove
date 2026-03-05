@@ -37,6 +37,7 @@ export function log(context: string, message: string, data?: unknown) {
 }
 
 let cachedTerminalHost: string | null = null
+let cachedTailscaleId: number | null = null
 
 export async function getTerminalHost(): Promise<string> {
 	if (cachedTerminalHost) return cachedTerminalHost
@@ -44,10 +45,20 @@ export async function getTerminalHost(): Promise<string> {
 		cachedTerminalHost = Bun.env.TERMINAL_HOST
 		return cachedTerminalHost
 	}
+	await loadTailscaleStatus()
+	return cachedTerminalHost!
+}
+
+export function getTailscaleId(): number | null {
+	return cachedTailscaleId
+}
+
+async function loadTailscaleStatus() {
+	if (cachedTerminalHost) return
 	const result = await Bun.$`tailscale status --json`.quiet()
 	const status = JSON.parse(result.text())
 	cachedTerminalHost = status.Self.DNSName.replace(/\.$/, '') as string
-	return cachedTerminalHost
+	cachedTailscaleId = status.Self.UserID ?? null
 }
 
 const CERT_DIR = join(GROVE_DIR, 'certs')

@@ -7,7 +7,18 @@ import type {
 	SettingSource,
 } from '@anthropic-ai/claude-agent-sdk'
 import { query } from '@anthropic-ai/claude-agent-sdk'
+import { which } from 'bun'
 import { generateId, log } from '../config'
+
+let cachedClaudePath: string | undefined
+
+async function getClaudeCodePath(): Promise<string | undefined> {
+	if (cachedClaudePath !== undefined) return cachedClaudePath
+	const resolved = which('claude')
+	cachedClaudePath = resolved ?? undefined
+	return cachedClaudePath
+}
+
 import { dbInsertActivity, emitEphemeralActivity } from '../db/activity'
 import {
 	dbGetAgent,
@@ -89,6 +100,7 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 	dbUpdateAgentStatus(agent.id, agent.teamId, 'working')
 	const pending = new Map<string, ToolCall>()
+	const claudePath = await getClaudeCodePath()
 
 	try {
 		for await (const message of query({
@@ -102,6 +114,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 				settingSources: opts.settingSources ?? ['user', 'project'],
 				...(opts.canUseTool ? { canUseTool: opts.canUseTool } : {}),
 				hooks: buildHooks(agent, pending, opts),
+				...(claudePath ? { pathToClaudeCodeExecutable: claudePath } : {}),
 			},
 		})) {
 			if (message.type !== 'user') {
@@ -123,7 +136,10 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 					dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 					opts.onDone?.(agent.id)
 				} else {
-					log('agent', `${opts.role} finished with error: ${message.subtype}`, { agentId: agent.id, message })
+					log('agent', `${opts.role} finished with error: ${message.subtype}`, {
+						agentId: agent.id,
+						message,
+					})
 					dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 					opts.onError?.(agent.id, new Error(message.subtype))
 				}
@@ -165,6 +181,7 @@ export async function spawnPersistentAgent(
 
 	const messageQueue = new MessageQueue()
 	const pending = new Map<string, ToolCall>()
+	const claudePath = await getClaudeCodePath()
 
 	messageQueue.push(opts.prompt)
 	if (opts.contentBlocks) {
@@ -182,6 +199,7 @@ export async function spawnPersistentAgent(
 			settingSources: opts.settingSources ?? ['user', 'project'],
 			...(opts.canUseTool ? { canUseTool: opts.canUseTool } : {}),
 			hooks: buildHooks(agent, pending, opts),
+			...(claudePath ? { pathToClaudeCodeExecutable: claudePath } : {}),
 		},
 	})
 
@@ -230,7 +248,11 @@ async function processMessages(
 					if (message.subtype === 'success') {
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'idle')
 					} else {
-						log('agent', `persistent ${opts.role} finished with error: ${message.subtype}`, { agentId: agent.id, message })
+						log(
+							'agent',
+							`persistent ${opts.role} finished with error: ${message.subtype}`,
+							{ agentId: agent.id, message },
+						)
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 						opts.onError?.(agent.id, new Error(message.subtype))
 					}
@@ -239,7 +261,11 @@ async function processMessages(
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 						opts.onDone?.(agent.id)
 					} else {
-						log('agent', `${opts.role} finished with error: ${message.subtype}`, { agentId: agent.id, message })
+						log(
+							'agent',
+							`${opts.role} finished with error: ${message.subtype}`,
+							{ agentId: agent.id, message },
+						)
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 						opts.onError?.(agent.id, new Error(message.subtype))
 					}

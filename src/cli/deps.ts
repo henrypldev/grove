@@ -8,6 +8,7 @@ export interface Dependency {
 }
 
 export const DEPENDENCIES: Dependency[] = [
+	{ name: 'claude', command: 'claude', brewPackage: 'claude-code' },
 	{ name: 'tmux', command: 'tmux', brewPackage: 'tmux' },
 	{ name: 'ttyd', command: 'ttyd', brewPackage: 'ttyd' },
 	{

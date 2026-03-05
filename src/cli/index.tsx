@@ -9,7 +9,7 @@ import { setLogsEnabled, startServer } from '../server/index'
 import { isRunning, stopAll } from './cleanup.js'
 import { DepsCheck } from './components/DepsCheck.js'
 import { Running } from './components/Running.js'
-import { loadConfig, loadPid, saveConfig, savePid } from './config.js'
+import { loadPid, savePid } from './config.js'
 import { runCommand } from './run.js'
 import {
 	getTailscaleInfo,
@@ -127,15 +127,6 @@ function App({ background, port }: AppProps) {
 	const [serverUrl, setServerUrl] = useState<string>('')
 	const [terminalHost, setTerminalHost] = useState<string>('')
 	const [daemonPid, setDaemonPid] = useState<number | null>(null)
-
-	const args = parseArgs()
-	const config = loadConfig()
-
-	useEffect(() => {
-		if (args.port && args.port !== config.port) {
-			saveConfig({ ...config, port: args.port })
-		}
-	}, [args.port, config])
 
 	const handleDepsComplete = async () => {
 		setState('starting')
@@ -282,8 +273,7 @@ if (args.logs) {
 	console.log(result.stopped ? `✓ ${result.message}` : `✗ ${result.message}`)
 	process.exit(result.stopped ? 0 : 1)
 } else if (args.daemon) {
-	const config = loadConfig()
-	const port = args.port ?? config.port
+	const port = args.port ?? 0
 	runDaemon(port)
 } else if (args.start) {
 	if (isRunning()) {
@@ -293,8 +283,7 @@ if (args.logs) {
 		process.exit(1)
 	}
 
-	const config = loadConfig()
-	const port = args.port ?? config.port
+	const port = args.port ?? 0
 
 	render(<App background={args.background} port={port} />)
 } else {

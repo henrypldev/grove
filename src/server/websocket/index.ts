@@ -6,6 +6,7 @@ import {
 	SIMULATOR_MAX_PAYLOAD,
 	type SimulatorWsData,
 } from '../api/simulator-relay'
+import { log } from '../config'
 import {
 	dbGetActivitySinceIdForTeam,
 	subscribeToGlobalActivity,
@@ -111,6 +112,7 @@ export const wsHandlers = {
 			deviceType: null,
 			channels: new Set(),
 		})
+		log('ws', `open ${clientId}`)
 		ws.send(JSON.stringify({ type: 'connected' } satisfies WsServerMessage))
 	},
 
@@ -123,6 +125,7 @@ export const wsHandlers = {
 		if (!client) return
 		try {
 			const msg = JSON.parse(raw.toString()) as WsClientMessage
+			log('ws', `message ${ws.data.clientId} ${msg.type}`)
 			if (msg.type === 'auth') {
 				client.deviceType = msg.payload.deviceType
 			} else if (msg.type === 'subscribe') {
@@ -165,6 +168,7 @@ export const wsHandlers = {
 			handleSimulatorClose(ws as ServerWebSocket<SimulatorWsData>)
 			return
 		}
+		log('ws', `close ${ws.data.clientId}`)
 		const client = clients.get(ws.data.clientId)
 		if (client) {
 			for (const channel of client.channels) {

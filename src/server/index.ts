@@ -63,14 +63,12 @@ export async function startServer(port: number) {
 				return new Response(null, { headers })
 			}
 
-			log('http', `${method} ${path}`)
-
 			if (path === '/health' && method === 'GET') {
-				return Response.json({ status: 'ok' }, { headers })
+				return logResponse(Response.json({ status: 'ok' }, { headers }))
 			}
 
 			if (path === '/version' && method === 'GET') {
-				return Response.json({ version: pkg.version }, { headers })
+				return logResponse(Response.json({ version: pkg.version }, { headers }))
 			}
 
 			if (path === '/update' && method === 'POST') {
@@ -84,39 +82,50 @@ export async function startServer(port: number) {
 				const exitCode = await proc.exited
 				if (exitCode !== 0) {
 					const stderr = await new Response(proc.stderr).text()
-					return Response.json(
-						{ error: stderr || 'Update failed' },
-						{ status: 500, headers },
+					return logResponse(
+						Response.json(
+							{ error: stderr || 'Update failed' },
+							{ status: 500, headers },
+						),
 					)
 				}
-				return Response.json({ success: true }, { headers })
+				return logResponse(Response.json({ success: true }, { headers }))
 			}
 
 			try {
 				const v2ReposResponse = await handleV2Repos(req, url, headers)
-				if (v2ReposResponse) return v2ReposResponse
+				if (v2ReposResponse) return logResponse(v2ReposResponse)
 
 				const v2DashboardResponse = await handleV2Dashboard(req, url, headers)
-				if (v2DashboardResponse) return v2DashboardResponse
+				if (v2DashboardResponse) return logResponse(v2DashboardResponse)
 
 				const v2UsageResponse = await handleV2Usage(req, url, headers)
-				if (v2UsageResponse) return v2UsageResponse
+				if (v2UsageResponse) return logResponse(v2UsageResponse)
 
 				const v2TeamsResponse = await handleV2Teams(req, url, headers)
-				if (v2TeamsResponse) return v2TeamsResponse
+				if (v2TeamsResponse) return logResponse(v2TeamsResponse)
 
 				const v2ActivityResponse = await handleV2Activity(req, url, headers)
-				if (v2ActivityResponse) return v2ActivityResponse
+				if (v2ActivityResponse) return logResponse(v2ActivityResponse)
 
-				return Response.json({ error: 'Not found' }, { status: 404, headers })
+				return logResponse(
+					Response.json({ error: 'Not found' }, { status: 404, headers }),
+				)
 			} catch (e) {
 				const err =
 					e instanceof Error ? { message: e.message, stack: e.stack } : e
 				log('http', 'error', err)
-				return Response.json(
-					{ error: 'Internal server error' },
-					{ status: 500, headers },
+				return logResponse(
+					Response.json(
+						{ error: 'Internal server error' },
+						{ status: 500, headers },
+					),
 				)
+			}
+
+			function logResponse(response: Response) {
+				log('http', `${method} ${response.status} ${path}`)
+				return response
 			}
 		},
 	})

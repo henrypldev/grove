@@ -215,6 +215,17 @@ export interface UsageResult {
 			numTurns: number
 		}
 	>
+	byAgent: Record<
+		string,
+		{
+			inputTokens: number
+			outputTokens: number
+			cacheReadTokens: number
+			cacheCreationTokens: number
+			costUsd: number
+			numTurns: number
+		}
+	>
 }
 
 export type WsClientMessage =

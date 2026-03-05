@@ -52,6 +52,17 @@ export async function getUsage(params: {
 			numTurns: number
 		}
 	> = {}
+	const byAgent: Record<
+		string,
+		{
+			inputTokens: number
+			outputTokens: number
+			cacheReadTokens: number
+			cacheCreationTokens: number
+			costUsd: number
+			numTurns: number
+		}
+	> = {}
 
 	for (const row of rows) {
 		totalInputTokens += row.inputTokens
@@ -84,6 +95,24 @@ export async function getUsage(params: {
 		byDay[day].cacheReadTokens += row.cacheReadTokens
 		byDay[day].cacheCreationTokens += row.cacheCreationTokens
 		byDay[day].numTurns += row.numTurns
+
+		const role = row.agentRole ?? 'unknown'
+		if (!byAgent[role]) {
+			byAgent[role] = {
+				inputTokens: 0,
+				outputTokens: 0,
+				cacheReadTokens: 0,
+				cacheCreationTokens: 0,
+				costUsd: 0,
+				numTurns: 0,
+			}
+		}
+		byAgent[role].inputTokens += row.inputTokens
+		byAgent[role].outputTokens += row.outputTokens
+		byAgent[role].cacheReadTokens += row.cacheReadTokens
+		byAgent[role].cacheCreationTokens += row.cacheCreationTokens
+		byAgent[role].costUsd += row.costUsd
+		byAgent[role].numTurns += row.numTurns
 	}
 
 	const count = rows.length || 1
@@ -97,6 +126,7 @@ export async function getUsage(params: {
 		avgDurationApiMs: Math.round(totalDurationApiMs / count),
 		byModel,
 		byDay,
+		byAgent,
 	}
 }
 

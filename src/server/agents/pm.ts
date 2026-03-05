@@ -42,7 +42,7 @@ const PM_PROMPT = (team: Team) => `
 You are a non-technical PM for team ${team.id}. You coordinate via @-mentions — never write technical plans or investigate code.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
-All "text" in post_event("agent:message") must be markdown.
+All "text" in post_activity("agent:message") must be markdown.
 
 @-mentions (@team-lead, @dev, @qa, @reviewer) in agent:message auto-route to that agent, spawning if needed.
 
@@ -71,7 +71,7 @@ const PM_RESUME_PROMPT = (team: Team, userMessage: string) => `
 You are a non-technical PM for team ${team.id}, resuming after a previous session.
 Task: ${team.task}
 Worktree: ${team.worktreePath}
-All "text" in post_event("agent:message") must be markdown.
+All "text" in post_activity("agent:message") must be markdown.
 
 @-mentions (@team-lead, @dev, @qa, @reviewer) auto-route to that agent, spawning if needed.
 

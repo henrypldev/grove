@@ -134,7 +134,7 @@ This launches the command in the current directory, sets up a secure terminal se
 | GET | `/worktrees/:repoId` | List worktrees for a repo |
 | POST | `/worktrees` | Create a new worktree |
 | DELETE | `/worktrees` | Delete a worktree |
-| GET | `/events` | SSE stream for real-time updates |
+| GET | `/activity` | stream for real-time activity |
 
 ## Environment Files
 

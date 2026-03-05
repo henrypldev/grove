@@ -15,7 +15,7 @@ import { initWebSocketBridge, wsHandlers } from './websocket'
 
 export { setLogsEnabled }
 
-export async function startServer(port: number) {
+export async function startServer(port: number): Promise<number> {
 	getDb()
 	await getTerminalHost()
 	await startOrchestrator()
@@ -29,7 +29,7 @@ export async function startServer(port: number) {
 		await cleanupStaleSessions()
 	}, 30000)
 
-	Bun.serve({
+	const server = Bun.serve({
 		port,
 		websocket: wsHandlers,
 		async fetch(req, server) {
@@ -136,7 +136,8 @@ export async function startServer(port: number) {
 		},
 	})
 
-	log('server', `listening on http://localhost:${port}`)
+	const actualPort = server.port
+	log('server', `listening on http://localhost:${actualPort}`)
 
 	function shutdown() {
 		log('server', 'shutting down, killing child processes')
@@ -147,10 +148,12 @@ export async function startServer(port: number) {
 
 	process.on('SIGTERM', shutdown)
 	process.on('SIGINT', shutdown)
+
+	return actualPort
 }
 
 if (import.meta.main) {
-	const isDev = Bun.env.NODE_ENV === 'development'
-	const port = Number(Bun.env.PORT) || (isDev ? 4002 : 4001)
+	const isDev = Bun.env.GROVE_DEV === '1'
+	const port = Number(Bun.env.PORT) || (isDev ? 4000 : 0)
 	startServer(port)
 }

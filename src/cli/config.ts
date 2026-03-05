@@ -17,7 +17,7 @@ const CONFIG_FILE = join(CONFIG_DIR, 'cli.json')
 const PID_FILE = join(CONFIG_DIR, 'pid')
 
 const DEFAULT_CONFIG: Config = {
-	port: 3000,
+	port: 0,
 }
 
 export function loadConfig(): Config {

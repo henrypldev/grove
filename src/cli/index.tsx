@@ -70,7 +70,7 @@ Commands:
 Options:
   -b, --background    Start server in background and free terminal
   -h, --help          Show this help message
-  --port <number>     Set server port (default: 3001)
+  --port <number>     Set server port (default: random available port)
 `)
 }
 
@@ -81,10 +81,10 @@ async function runDaemon(port: number) {
 		process.exit(1)
 	}
 
-	await startServer(port)
+	const actualPort = await startServer(port)
 	savePid(process.pid)
 
-	const success = startServe(port)
+	const success = startServe(actualPort)
 	if (!success) {
 		console.error('Failed to start Tailscale Serve')
 		process.exit(1)
@@ -165,10 +165,10 @@ function App({ background, port }: AppProps) {
 		} else {
 			try {
 				setLogsEnabled(false)
-				await startServer(port)
+				const actualPort = await startServer(port)
 				savePid(process.pid)
 
-				const success = startServe(port)
+				const success = startServe(actualPort)
 				if (!success) {
 					setError('Failed to start Tailscale Serve')
 					setState('error')
@@ -210,7 +210,7 @@ function App({ background, port }: AppProps) {
 		return (
 			<Box>
 				<Text>
-					<Spinner type="dots" /> Starting grove server on port {port}...
+					<Spinner type="dots" /> Starting grove server...
 				</Text>
 			</Box>
 		)

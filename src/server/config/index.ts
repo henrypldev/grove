@@ -196,7 +196,6 @@ export function listDirectories(path: string): string[] {
 		const dirs = entries
 			.filter(e => {
 				if (!e.isDirectory()) return false
-				if (e.name.startsWith('.')) return false
 				if (prefix && !e.name.toLowerCase().startsWith(prefix)) return false
 				return true
 			})

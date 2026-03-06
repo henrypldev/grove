@@ -230,15 +230,17 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 			} else {
 				// Cache booted messages per device
 				const text = event.data as string
-				if (text.includes('"booted"')) {
-					try {
-						const msg = JSON.parse(text)
-						if (msg.type === 'booted' && msg.deviceId) {
-							entry.lastBooted.set(msg.deviceId, text)
-						}
-					} catch (err) {
-						log('simulator-relay', `failed to parse upstream message: ${err}`)
+				try {
+					const msg = JSON.parse(text)
+					if (msg.type === 'booted' && msg.deviceId) {
+						entry.lastBooted.set(msg.deviceId, text)
+						entry.bootedDevices.add(msg.deviceId)
+						log('simulator-relay', `device ${msg.deviceId} booted`)
+					} else if (msg.type === 'error') {
+						log('simulator-relay', `upstream error: ${msg.message}`)
 					}
+				} catch (err) {
+					log('simulator-relay', `failed to parse upstream message: ${err}`)
 				}
 				// Forward text messages to all clients (they filter by deviceId themselves)
 				for (const client of entry.clients) {
@@ -255,6 +257,11 @@ function connectUpstream(entry: SimulatorProcess): Promise<void> {
 		ws.onclose = () => {
 			entry.upstreamWs = null
 			entry.upstreamReady = null
+			// Swift server stops all streams on connection close,
+			// so clear cached state to force re-boot on reconnect
+			entry.bootedDevices.clear()
+			entry.lastBooted.clear()
+			entry.lastFrame.clear()
 
 			// Auto-reconnect if clients are still connected
 			if (
@@ -315,12 +322,13 @@ export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 					ws.send(sim.lastFrame.get(deviceId)!)
 				} catch {}
 			}
-			// Auto-boot the device so streaming starts immediately on connection
+			// Auto-boot the device so streaming starts immediately on connection.
+			// Don't add to bootedDevices until we receive 'booted' confirmation
+			// so that failed boots can be retried on reconnect.
 			if (deviceId && !sim.bootedDevices.has(deviceId) && sim.upstreamWs) {
-				sim.bootedDevices.add(deviceId)
 				try {
 					sim.upstreamWs.send(JSON.stringify({ type: 'boot', deviceId }))
-					log('simulator-relay', `auto-booted device ${deviceId}`)
+					log('simulator-relay', `sent boot for device ${deviceId}`)
 				} catch {}
 			}
 			log('simulator-relay', `client connected (refCount=${sim.refCount})`)

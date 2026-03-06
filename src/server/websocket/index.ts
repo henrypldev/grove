@@ -6,6 +6,7 @@ import {
 	SIMULATOR_MAX_PAYLOAD,
 	type SimulatorWsData,
 } from '../api/simulator-relay'
+import { getTeamDeviceUdid } from '../api/simulator'
 import { log } from '../config'
 import {
 	dbGetActivitySinceIdForTeam,
@@ -132,7 +133,31 @@ export const wsHandlers = {
 				for (const channel of msg.channels) {
 					client.channels.add(channel)
 					if (channel.startsWith('team:')) {
-						ensureTeamListener(channel.slice(5))
+						const teamId = channel.slice(5)
+						ensureTeamListener(teamId)
+						// Send current simulator state so clients that
+						// subscribed after simulator:ready don't miss it
+						const simUdid = getTeamDeviceUdid(teamId)
+						if (simUdid) {
+							try {
+								ws.send(
+									JSON.stringify({
+										type: 'log',
+										channel,
+										data: {
+											id: 0,
+											teamId,
+											type: 'simulator:ready',
+											payload: JSON.stringify({
+												udid: simUdid,
+												name: `grove-team-${teamId}`,
+											}),
+											createdAt: Date.now(),
+										},
+									} satisfies WsServerMessage),
+								)
+							} catch {}
+						}
 					}
 				}
 			} else if (msg.type === 'unsubscribe') {

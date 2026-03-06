@@ -77,9 +77,9 @@ class SimulatorManager {
 
         let stateRaw = (device.value(forKey: "state") as? Int) ?? 0
         if stateRaw == 3 {
-            // Already booted — just attach
+            // Already booted — attach and poll for IOSurface readiness
             bootedDevices[deviceId] = device
-            startStreaming(device: device, deviceId: deviceId, connection: connection)
+            pollForReady(device: device, deviceId: deviceId, connection: connection)
             return
         }
 

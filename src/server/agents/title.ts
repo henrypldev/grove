@@ -17,7 +17,9 @@ export async function generateTeamTitle(task: string): Promise<string> {
 			maxTurns: 1,
 			allowedTools: [],
 			...(claudePath ? { pathToClaudeCodeExecutable: claudePath } : {}),
+			// biome-ignore lint/suspicious/noExplicitAny: SDK options type is too strict for optional fields
 		} as any)
+		// biome-ignore lint/suspicious/noExplicitAny: accessing SDK result internals
 		return (result as any).result?.trim() || fallback
 	} catch {
 		return fallback

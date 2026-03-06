@@ -210,7 +210,9 @@ export async function startExpoBuild(
 	Promise.all([
 		streamOutput(proc.stdout, build),
 		streamOutput(proc.stderr, build),
-	])
+	]).catch(err => {
+		log('expo', 'stream error', { teamId, error: err?.message ?? err })
+	})
 
 	proc.exited.then(async exitCode => {
 		const b = activeBuilds.get(teamId)

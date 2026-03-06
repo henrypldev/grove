@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { computeDiff, getHeadSha } from '../api/diff'
 import { checkFingerprintAndRebuild, stopExpoBuild } from '../api/expo-build'
@@ -61,6 +63,44 @@ function closeStaleAgent(
 	return agent
 }
 
+function detectPackageManager(worktreePath: string): string {
+	if (
+		existsSync(join(worktreePath, 'bun.lockb')) ||
+		existsSync(join(worktreePath, 'bun.lock'))
+	)
+		return 'bun'
+	if (existsSync(join(worktreePath, 'pnpm-lock.yaml'))) return 'pnpm'
+	if (existsSync(join(worktreePath, 'yarn.lock'))) return 'yarn'
+	return 'npm'
+}
+
+function runInstallInBackground(team: Team) {
+	const pm = detectPackageManager(team.worktreePath)
+	log('orchestrator', `running ${pm} install`, { teamId: team.id })
+
+	const proc = Bun.spawn([pm, 'install'], {
+		cwd: team.worktreePath,
+		stdout: 'pipe',
+		stderr: 'pipe',
+	})
+
+	proc.exited.then(exitCode => {
+		if (exitCode === 0) {
+			log('orchestrator', `${pm} install done`, { teamId: team.id })
+			dbInsertActivity(team.id, null, 'deps:installed', { pm })
+		} else {
+			log('orchestrator', `${pm} install failed`, {
+				teamId: team.id,
+				exitCode,
+			})
+			dbInsertActivity(team.id, null, 'deps:install-failed', {
+				pm,
+				exitCode,
+			})
+		}
+	})
+}
+
 export async function startOrchestrator() {
 	log('orchestrator', 'starting')
 }
@@ -71,17 +111,19 @@ export async function onNewTeam(
 ) {
 	log('orchestrator', 'spawning team', { teamId: team.id })
 
-	await spawnPm(team, {
+	const pmRef = { agentId: '' }
+	const { agent: initialPm } = await spawnPm(team, {
 		onDone: () => {
 			log('orchestrator', 'pm process exited', { teamId: team.id })
-			closeAgent(team.id, 'pm')
+			closeAgent(team.id, 'pm', pmRef.agentId)
 		},
 		onError: () => {
 			dbUpdateTeamStatus(team.id, 'blocked')
-			closeAgent(team.id, 'pm')
+			closeAgent(team.id, 'pm', pmRef.agentId)
 		},
 		contentBlocks,
 	})
+	pmRef.agentId = initialPm.id
 
 	subscribeToTeamActivity(team.id, async event => {
 		if (event.type !== 'agent:message') return
@@ -168,13 +210,21 @@ export async function onNewTeam(
 		log('orchestrator', 'simulator creation failed', { teamId: team.id, err })
 	})
 
-	// Auto-spawn expo agent for native repos
-	const repo = dbGetRepo(team.repoId)
-	if (repo?.framework === 'expo' || repo?.needsNativeBuild) {
-		spawnExpoAgent(team, repo.id).catch(err => {
-			log('orchestrator', 'expo agent spawn failed', { teamId: team.id, err })
-		})
-	}
+	// Run package install in background, then post activity to spawn expo agent
+	runInstallInBackground(team)
+
+	subscribeToTeamActivity(team.id, async event => {
+		if (event.type !== 'deps:installed') return
+		const repo = dbGetRepo(team.repoId)
+		if (repo?.framework === 'expo' || repo?.needsNativeBuild) {
+			spawnExpoAgent(team, repo.id).catch(err => {
+				log('orchestrator', 'expo agent spawn failed', {
+					teamId: team.id,
+					err,
+				})
+			})
+		}
+	})
 }
 
 export async function routeMessageToAgents(
@@ -190,23 +240,29 @@ export async function routeMessageToAgents(
 		mentions.add(match[1])
 	}
 
-	const pmCallbacks = {
-		onDone: () => {
-			log('orchestrator', 'pm process exited', { teamId: team.id })
-			closeAgent(team.id, 'pm')
-		},
-		onError: () => {
-			dbUpdateTeamStatus(team.id, 'blocked')
-			closeAgent(team.id, 'pm')
-		},
-		contentBlocks,
+	function makePmCallbacks() {
+		const ref = { agentId: '' }
+		const callbacks = {
+			onDone: () => {
+				log('orchestrator', 'pm process exited', { teamId: team.id })
+				closeAgent(team.id, 'pm', ref.agentId)
+			},
+			onError: () => {
+				dbUpdateTeamStatus(team.id, 'blocked')
+				closeAgent(team.id, 'pm', ref.agentId)
+			},
+			contentBlocks,
+		}
+		return { ref, callbacks }
 	}
 
 	if (mentions.size === 0) {
 		const pmAgent = closeStaleAgent(team.id, 'pm')
 		if (!pmAgent) {
 			log('orchestrator', 'pm not found, respawning', { teamId: team.id })
-			await respawnPm(team, text, pmCallbacks)
+			const { ref, callbacks } = makePmCallbacks()
+			const { agent } = await respawnPm(team, text, callbacks)
+			ref.agentId = agent.id
 			return
 		}
 		if (pmAgent.agentId !== senderAgentId) {
@@ -231,7 +287,9 @@ export async function routeMessageToAgents(
 			const pmAgent = closeStaleAgent(team.id, 'pm')
 			if (!pmAgent) {
 				log('orchestrator', 'pm not found, respawning', { teamId: team.id })
-				await respawnPm(team, text, pmCallbacks)
+				const { ref: pmRef, callbacks: pmCbs } = makePmCallbacks()
+				const { agent: pmResult } = await respawnPm(team, text, pmCbs)
+				pmRef.agentId = pmResult.id
 				continue
 			}
 			if (pmAgent.agentId !== senderAgentId) {

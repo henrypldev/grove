@@ -13,7 +13,7 @@ export const DB_FILES = {
 } as const
 
 function getDbFilename(): string {
-	const env = Bun.env.NODE_ENV ?? 'production'
+	const env = Bun.env.GROVE_ENV
 	return DB_FILES[env as keyof typeof DB_FILES] ?? DB_FILES.production
 }
 
@@ -31,7 +31,8 @@ export function getDb(): DrizzleDb {
 	sqlite.run('PRAGMA foreign_keys = ON')
 	seedMigrationsForExistingDb(sqlite)
 	const db = drizzle(sqlite, { schema })
-	db.dialect.migrate(migrations, db.session, {})
+	// biome-ignore lint/suspicious/noExplicitAny: drizzle internals not exposed on public type
+	;(db as any).dialect.migrate(migrations, (db as any).session, {})
 	_db = db
 	return _db
 }

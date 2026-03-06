@@ -25,8 +25,10 @@ export async function startServer(port: number): Promise<number> {
 	initWebSocketBridge()
 	startPortPoller()
 
-	setInterval(async () => {
-		await cleanupStaleSessions()
+	setInterval(() => {
+		cleanupStaleSessions().catch(err => {
+			log('server', 'cleanup error', { error: err?.message ?? err })
+		})
 	}, 30000)
 
 	const server = Bun.serve({
@@ -149,11 +151,32 @@ export async function startServer(port: number): Promise<number> {
 	process.on('SIGTERM', shutdown)
 	process.on('SIGINT', shutdown)
 
-	return actualPort
+	process.on('uncaughtException', err => {
+		log('server', 'uncaught exception', {
+			error: err?.message ?? err,
+			stack: err?.stack,
+		})
+	})
+	process.on('unhandledRejection', (reason: unknown) => {
+		const err = reason instanceof Error ? reason : new Error(String(reason))
+		log('server', 'unhandled rejection', {
+			error: err.message,
+			stack: err.stack,
+		})
+	})
+
+	// biome-ignore lint/style/noNonNullAssertion: port is always set after Bun.serve
+	return actualPort!
 }
 
+export const PORTS = {
+	production: 0,
+	development: 4000,
+	test: 4001,
+} as const
+
 if (import.meta.main) {
-	const isDev = Bun.env.GROVE_DEV === '1'
-	const port = Number(Bun.env.PORT) || (isDev ? 4000 : 0)
+	const port =
+		Number(Bun.env.PORT) || PORTS[Bun.env.GROVE_ENV as keyof typeof PORTS] || 0
 	startServer(port)
 }

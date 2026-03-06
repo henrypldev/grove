@@ -52,6 +52,7 @@ export class MessageQueue implements AsyncIterable<SDKUserMessage> {
 		return {
 			next: () => {
 				if (this.buffer.length > 0) {
+					// biome-ignore lint/style/noNonNullAssertion: length checked above
 					return Promise.resolve({ value: this.buffer.shift()!, done: false })
 				}
 				if (this.closed) {

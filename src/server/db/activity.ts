@@ -3,8 +3,25 @@ import type { TeamActivity } from '../types'
 import { getDb } from './index'
 import { activity, pmReports } from './schema'
 
-type ActivityListener = (item: TeamActivity) => void
+type ActivityListener = (item: TeamActivity) => void | Promise<void>
 const listeners = new Map<string, Set<ActivityListener>>()
+
+function safeCall<T>(
+	label: string,
+	fn: (arg: T) => void | Promise<void>,
+	arg: T,
+) {
+	try {
+		const result = fn(arg)
+		if (result && typeof result === 'object' && 'catch' in result) {
+			;(result as Promise<void>).catch(err => {
+				console.error(`[activity] ${label} async error`, err)
+			})
+		}
+	} catch (err) {
+		console.error(`[activity] ${label} sync error`, err)
+	}
+}
 
 export function subscribeToTeamActivity(
 	teamId: string,
@@ -45,7 +62,9 @@ export function dbInsertActivity(
 		payload: payloadStr,
 		createdAt: now,
 	}
-	for (const fn of listeners.get(teamId) ?? []) fn(item)
+	for (const fn of listeners.get(teamId) ?? []) {
+		safeCall('team listener', fn, item)
+	}
 	return item
 }
 
@@ -110,7 +129,7 @@ export function dbGetLatestActivityByType(
 type GlobalActivityListener = (item: {
 	type: string
 	payload: Record<string, unknown>
-}) => void
+}) => void | Promise<void>
 const globalListeners = new Set<GlobalActivityListener>()
 
 export function subscribeToGlobalActivity(
@@ -127,7 +146,9 @@ export function emitGlobalActivity(
 	payload: Record<string, unknown>,
 ): void {
 	const item = { type, payload }
-	for (const fn of globalListeners) fn(item)
+	for (const fn of globalListeners) {
+		safeCall('global listener', fn, item)
+	}
 }
 
 export function emitEphemeralActivity(
@@ -144,7 +165,9 @@ export function emitEphemeralActivity(
 		payload: JSON.stringify(payload),
 		createdAt: Date.now(),
 	}
-	for (const fn of listeners.get(teamId) ?? []) fn(item)
+	for (const fn of listeners.get(teamId) ?? []) {
+		safeCall('ephemeral listener', fn, item)
+	}
 }
 
 export function dbInsertPmReport(teamId: string, summary: string): void {

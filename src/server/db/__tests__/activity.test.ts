@@ -91,7 +91,9 @@ describe('db/activity', () => {
 
 	test('emitEphemeralActivity fires listeners without persisting', () => {
 		const received: unknown[] = []
-		const unsub = subscribeToTeamActivity('t1', ev => received.push(ev))
+		const unsub = subscribeToTeamActivity('t1', ev => {
+			received.push(ev)
+		})
 
 		emitEphemeralActivity('t1', 'a1', 'agent:status_change', {
 			status: 'working',

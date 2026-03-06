@@ -429,6 +429,8 @@ export async function respawnAgent(
 		cwd,
 		onDone,
 		onError,
-	}).catch(() => {})
+	}).catch(err => {
+		log('agent', `respawn session error for ${agent.role}`, { agentId, err })
+	})
 	return true
 }

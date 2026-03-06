@@ -110,7 +110,6 @@ export async function getTeam(params: {
 	const simulatorUdid = await rediscoverTeamDevice(params.id)
 	const expoBuildStatus = getExpoBuildStatus(params.id)
 	const expoDevServerStatus = getExpoDevServerStatus(params.id)
-	const repo = dbGetRepo(team.repoId)
 	const simulatorDeviceName = simulatorUdid ? `grove-team-${params.id}` : null
 	const devServerStatus = portAlive ? 'running' : port ? 'starting' : null
 	return {

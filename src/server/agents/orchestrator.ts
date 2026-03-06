@@ -71,17 +71,19 @@ export async function onNewTeam(
 ) {
 	log('orchestrator', 'spawning team', { teamId: team.id })
 
-	await spawnPm(team, {
+	const pmRef = { agentId: '' }
+	const { agent: initialPm } = await spawnPm(team, {
 		onDone: () => {
 			log('orchestrator', 'pm process exited', { teamId: team.id })
-			closeAgent(team.id, 'pm')
+			closeAgent(team.id, 'pm', pmRef.agentId)
 		},
 		onError: () => {
 			dbUpdateTeamStatus(team.id, 'blocked')
-			closeAgent(team.id, 'pm')
+			closeAgent(team.id, 'pm', pmRef.agentId)
 		},
 		contentBlocks,
 	})
+	pmRef.agentId = initialPm.id
 
 	subscribeToTeamActivity(team.id, async event => {
 		if (event.type !== 'agent:message') return
@@ -190,23 +192,29 @@ export async function routeMessageToAgents(
 		mentions.add(match[1])
 	}
 
-	const pmCallbacks = {
-		onDone: () => {
-			log('orchestrator', 'pm process exited', { teamId: team.id })
-			closeAgent(team.id, 'pm')
-		},
-		onError: () => {
-			dbUpdateTeamStatus(team.id, 'blocked')
-			closeAgent(team.id, 'pm')
-		},
-		contentBlocks,
+	function makePmCallbacks() {
+		const ref = { agentId: '' }
+		const callbacks = {
+			onDone: () => {
+				log('orchestrator', 'pm process exited', { teamId: team.id })
+				closeAgent(team.id, 'pm', ref.agentId)
+			},
+			onError: () => {
+				dbUpdateTeamStatus(team.id, 'blocked')
+				closeAgent(team.id, 'pm', ref.agentId)
+			},
+			contentBlocks,
+		}
+		return { ref, callbacks }
 	}
 
 	if (mentions.size === 0) {
 		const pmAgent = closeStaleAgent(team.id, 'pm')
 		if (!pmAgent) {
 			log('orchestrator', 'pm not found, respawning', { teamId: team.id })
-			await respawnPm(team, text, pmCallbacks)
+			const { ref, callbacks } = makePmCallbacks()
+			const { agent } = await respawnPm(team, text, callbacks)
+			ref.agentId = agent.id
 			return
 		}
 		if (pmAgent.agentId !== senderAgentId) {
@@ -231,7 +239,9 @@ export async function routeMessageToAgents(
 			const pmAgent = closeStaleAgent(team.id, 'pm')
 			if (!pmAgent) {
 				log('orchestrator', 'pm not found, respawning', { teamId: team.id })
-				await respawnPm(team, text, pmCallbacks)
+				const { ref: pmRef, callbacks: pmCbs } = makePmCallbacks()
+				const { agent: pmResult } = await respawnPm(team, text, pmCbs)
+				pmRef.agentId = pmResult.id
 				continue
 			}
 			if (pmAgent.agentId !== senderAgentId) {

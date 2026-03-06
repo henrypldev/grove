@@ -34,11 +34,14 @@ export function getAllAgents(teamId: string): RegisteredAgent[] {
 	return team ? [...team.values()] : []
 }
 
-export function closeAgent(teamId: string, role: string) {
+export function closeAgent(teamId: string, role: string, agentId?: string) {
 	const team = registry.get(teamId)
 	if (!team) return
 	const entry = team.get(role)
 	if (entry) {
+		// If agentId is provided, only close if it matches the current agent
+		// This prevents a stale callback from closing a newly-spawned replacement
+		if (agentId && entry.agentId !== agentId) return
 		entry.queue.close()
 		entry.query.close()
 		team.delete(role)

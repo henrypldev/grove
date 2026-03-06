@@ -92,7 +92,9 @@ export async function startExpoDevServer(
 	Promise.all([
 		streamOutput(proc.stdout, server),
 		streamOutput(proc.stderr, server),
-	])
+	]).catch(err => {
+		log('expo-dev-server', 'stream error', { teamId, error: err?.message ?? err })
+	})
 
 	// Monitor for port becoming active → mark as running
 	const pollId = setInterval(async () => {

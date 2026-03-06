@@ -25,8 +25,10 @@ export async function startServer(port: number): Promise<number> {
 	initWebSocketBridge()
 	startPortPoller()
 
-	setInterval(async () => {
-		await cleanupStaleSessions()
+	setInterval(() => {
+		cleanupStaleSessions().catch(err => {
+			log('server', 'cleanup error', { error: err?.message ?? err })
+		})
 	}, 30000)
 
 	const server = Bun.serve({
@@ -148,6 +150,14 @@ export async function startServer(port: number): Promise<number> {
 
 	process.on('SIGTERM', shutdown)
 	process.on('SIGINT', shutdown)
+
+	process.on('uncaughtException', err => {
+		log('server', 'uncaught exception', { error: err?.message ?? err, stack: err?.stack })
+	})
+	process.on('unhandledRejection', (reason: unknown) => {
+		const err = reason instanceof Error ? reason : new Error(String(reason))
+		log('server', 'unhandled rejection', { error: err.message, stack: err.stack })
+	})
 
 	return actualPort
 }

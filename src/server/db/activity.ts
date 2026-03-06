@@ -6,7 +6,11 @@ import { activity, pmReports } from './schema'
 type ActivityListener = (item: TeamActivity) => void | Promise<void>
 const listeners = new Map<string, Set<ActivityListener>>()
 
-function safeCall<T>(label: string, fn: (arg: T) => void | Promise<void>, arg: T) {
+function safeCall<T>(
+	label: string,
+	fn: (arg: T) => void | Promise<void>,
+	arg: T,
+) {
 	try {
 		const result = fn(arg)
 		if (result && typeof result === 'object' && 'catch' in result) {

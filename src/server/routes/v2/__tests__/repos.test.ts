@@ -9,8 +9,8 @@ mock.module('@anthropic-ai/claude-agent-sdk', () => ({
 		return Object.assign(gen, { close: () => {} })
 	},
 	unstable_v2_prompt: async () => ({ type: 'result', subtype: 'success' }),
-	createSdkMcpServer: (opts: any) => opts,
-	tool: (...args: any[]) => args,
+	createSdkMcpServer: (opts: Record<string, unknown>) => opts,
+	tool: (...args: unknown[]) => args,
 }))
 
 mock.module('../../../api/repos', () => ({

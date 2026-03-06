@@ -93,7 +93,10 @@ export async function startExpoDevServer(
 		streamOutput(proc.stdout, server),
 		streamOutput(proc.stderr, server),
 	]).catch(err => {
-		log('expo-dev-server', 'stream error', { teamId, error: err?.message ?? err })
+		log('expo-dev-server', 'stream error', {
+			teamId,
+			error: err?.message ?? err,
+		})
 	})
 
 	// Monitor for port becoming active → mark as running

@@ -5,6 +5,7 @@ describe('createGroveTools', () => {
 	it('returns an object with a name property', () => {
 		const tools = createGroveTools('team-1', 'agent-1')
 		expect(
+			// biome-ignore lint/suspicious/noExplicitAny: testing internal properties
 			(tools as any).name ?? (tools as any)._name ?? typeof tools,
 		).toBeTruthy()
 	})

@@ -25,7 +25,8 @@ export function makeTestDb() {
 	sqlite.run('PRAGMA foreign_keys = ON')
 
 	const db = drizzle(sqlite, { schema })
-	db.dialect.migrate(migrations, db.session, {})
+	// biome-ignore lint/suspicious/noExplicitAny: drizzle internals not exposed on public type
+	;(db as any).dialect.migrate(migrations, (db as any).session, {})
 
 	_injectDb(db)
 	return db

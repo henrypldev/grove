@@ -244,8 +244,9 @@ if (args.logs) {
 		process.exit(0)
 	})
 } else if (args.doctor) {
-	const { checkDependencies, isTailscaleRunning, DEPENDENCIES } =
-		await import('./deps.js')
+	const { checkDependencies, isTailscaleRunning, DEPENDENCIES } = await import(
+		'./deps.js'
+	)
 	const { found, missing } = checkDependencies()
 	const foundSet = new Set(found.map(d => d.name))
 	for (const dep of DEPENDENCIES) {

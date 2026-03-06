@@ -45,6 +45,7 @@ describe('db/logs', () => {
 		emitTeamLog(teamId, 'setup', { v: 2 })
 		const latest = dbGetLatestLogByType(teamId, 'setup')
 		expect(latest).not.toBeNull()
+		// biome-ignore lint/style/noNonNullAssertion: asserted not null above
 		expect(JSON.parse(latest!.payload)).toEqual({ v: 2 })
 	})
 

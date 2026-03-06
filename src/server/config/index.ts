@@ -33,7 +33,8 @@ function serializeErrors(_key: string, value: unknown): unknown {
 
 export function log(context: string, message: string, data?: unknown) {
 	const timestamp = new Date().toISOString().slice(11, 23)
-	const dataStr = data !== undefined ? ` ${JSON.stringify(data, serializeErrors)}` : ''
+	const dataStr =
+		data !== undefined ? ` ${JSON.stringify(data, serializeErrors)}` : ''
 	const line = `[${timestamp}] [${context}] ${message}${dataStr}`
 	if (logsEnabled) {
 		console.log(line)
@@ -53,6 +54,7 @@ export async function getTerminalHost(): Promise<string> {
 		return cachedTerminalHost
 	}
 	await loadTailscaleStatus()
+	// biome-ignore lint/style/noNonNullAssertion: loadTailscaleStatus sets cachedTerminalHost
 	return cachedTerminalHost!
 }
 

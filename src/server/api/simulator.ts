@@ -142,6 +142,7 @@ const REDISCOVER_MISS_TTL = 30_000
 export async function rediscoverTeamDevice(
 	teamId: string,
 ): Promise<string | null> {
+	// biome-ignore lint/style/noNonNullAssertion: existence checked by .has()
 	if (teamDevices.has(teamId)) return teamDevices.get(teamId)!
 	const lastMiss = rediscoverMissCache.get(teamId)
 	if (lastMiss && Date.now() - lastMiss < REDISCOVER_MISS_TTL) return null

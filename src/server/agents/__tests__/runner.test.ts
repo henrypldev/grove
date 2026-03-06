@@ -5,7 +5,7 @@ import { dbInsertRepo } from '../../db/repos'
 import { dbInsertTeam } from '../../db/teams'
 
 mock.module('@anthropic-ai/claude-agent-sdk', () => ({
-	query: (_params: any) => {
+	query: (_params: Record<string, unknown>) => {
 		const gen = (async function* () {
 			yield {
 				type: 'result',
@@ -16,8 +16,8 @@ mock.module('@anthropic-ai/claude-agent-sdk', () => ({
 		return Object.assign(gen, { close: () => {} })
 	},
 	unstable_v2_prompt: async () => ({ type: 'result', subtype: 'success' }),
-	createSdkMcpServer: (opts: any) => opts,
-	tool: (...args: any[]) => args,
+	createSdkMcpServer: (opts: Record<string, unknown>) => opts,
+	tool: (...args: unknown[]) => args,
 }))
 
 const { spawnAgent, respawnAgent, activityFromToolName } = await import(

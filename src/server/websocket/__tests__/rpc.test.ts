@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import type { ServerWebSocket } from 'bun'
 
 /**
  * Test handleRpc dispatch logic without mock.module (which leaks globally in Bun).
@@ -18,7 +19,7 @@ function makeMockWs() {
 describe('websocket/rpc', () => {
 	test('unknown method sends error response', async () => {
 		const ws = makeMockWs()
-		await handleRpc(ws as any, {
+		await handleRpc(ws as unknown as ServerWebSocket<unknown>, {
 			id: 'rpc_1',
 			method: 'nonexistent',
 			params: {},
@@ -33,7 +34,11 @@ describe('websocket/rpc', () => {
 		const ws = makeMockWs()
 		// 'version' is a registered method that calls getVersion()
 		// It will fail without DB but we can verify the dispatch + error handling
-		await handleRpc(ws as any, { id: 'rpc_2', method: 'version', params: {} })
+		await handleRpc(ws as unknown as ServerWebSocket<unknown>, {
+			id: 'rpc_2',
+			method: 'version',
+			params: {},
+		})
 		const response = JSON.parse(ws.sent[0])
 		expect(response.type).toBe('rpc:response')
 		expect(response.id).toBe('rpc_2')
@@ -43,7 +48,7 @@ describe('websocket/rpc', () => {
 
 	test('response always includes type and id', async () => {
 		const ws = makeMockWs()
-		await handleRpc(ws as any, {
+		await handleRpc(ws as unknown as ServerWebSocket<unknown>, {
 			id: 'rpc_3',
 			method: 'repos:list',
 			params: {},
@@ -55,7 +60,7 @@ describe('websocket/rpc', () => {
 
 	test('params are passed through to handler', async () => {
 		const ws = makeMockWs()
-		await handleRpc(ws as any, {
+		await handleRpc(ws as unknown as ServerWebSocket<unknown>, {
 			id: 'rpc_4',
 			method: 'teams:get',
 			params: { id: 't1' },

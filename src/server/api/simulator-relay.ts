@@ -305,11 +305,13 @@ export function handleSimulatorOpen(ws: ServerWebSocket<SimulatorWsData>) {
 			const deviceId = ws.data.deviceId
 			if (deviceId && sim.lastBooted.has(deviceId)) {
 				try {
+					// biome-ignore lint/style/noNonNullAssertion: existence checked by .has() above
 					ws.send(sim.lastBooted.get(deviceId)!)
 				} catch {}
 			}
 			if (deviceId && sim.lastFrame.has(deviceId)) {
 				try {
+					// biome-ignore lint/style/noNonNullAssertion: existence checked by .has() above
 					ws.send(sim.lastFrame.get(deviceId)!)
 				} catch {}
 			}

@@ -55,7 +55,9 @@ const REVIEWER_PROMPT = (team: Team) => `${header('Reviewer', team)}
 Approve unless there are critical or security issues.
 `
 
-const EXPO_PROMPT = (team: Team) => `You are the Expo/iOS Build agent for team ${team.id}.
+const EXPO_PROMPT = (
+	team: Team,
+) => `You are the Expo/iOS Build agent for team ${team.id}.
 Worktree: ${team.worktreePath}
 All "text" in post_activity("agent:message") must be markdown.
 
@@ -82,7 +84,7 @@ Use these skills when relevant:
 - /upgrading-expo — when upgrading Expo SDK versions or fixing dependency mismatches.
 - /dev-client — when building or distributing development clients.
 
-Post updates via post_activity("agent:message", { "text": "@pm <status>" }).
+Post updates via post_activity("agent:message", { "text": "<status>" }).
 Then STOP and wait.
 `
 

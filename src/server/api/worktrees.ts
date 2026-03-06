@@ -81,7 +81,9 @@ export async function createWorktree(
 	await Bun.$`mkdir -p ${WORKTREES_DIR}/${repo.name}`.quiet()
 
 	await Bun.$`git -C ${repo.path} fetch origin`.quiet().nothrow()
-	await Bun.$`git -C ${repo.path} pull --ff-only origin ${baseBranch}`.quiet().nothrow()
+	await Bun.$`git -C ${repo.path} pull --ff-only origin ${baseBranch}`
+		.quiet()
+		.nothrow()
 
 	let result =
 		await Bun.$`git -C ${repo.path} worktree add -b ${branch} ${worktreePath} origin/${baseBranch}`

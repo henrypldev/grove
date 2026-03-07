@@ -1,5 +1,6 @@
 import { generateId, log } from '../config'
 import type { Team } from '../types'
+import { registerTaskAgent } from './agent-registry'
 import { createGroveTools } from './grove-tools'
 import type { PersistentAgentResult } from './runner'
 import { spawnPersistentAgent } from './runner'
@@ -13,12 +14,18 @@ const TEAM_LEAD_PROMPT = (team: Team) => `${header('Team Lead', team)}
 2. If no PRD (question/audit): investigate codebase, delegate_to("pm", "<findings>").
 3. If you discover reusable patterns, append them to CLAUDE.md under ## Patterns (no duplicates, commit separately).
 
+## Parallel task design
+When creating tasks, design them so multiple devs can work in parallel:
+- Tasks that touch different files/modules should have NO dependencies between them — mark them as parallelizable by NOT adding blocked_by.
+- Only add blocked_by when a task genuinely depends on another task's output (e.g. task 2 needs types defined in task 1).
+- In the design doc, clearly state which files/modules each task should touch so devs don't overlap.
+
 Post progress updates via post_activity("agent:message", { "text": "<status>" }) as you work — e.g. when starting codebase review, when creating the design doc, and before delegating back.
 
 Then STOP and wait.
 `
 
-const DEV_PROMPT = (team: Team) => `${header('Developer', team)}
+const DEV_PROMPT = (team: Team, taskId?: string) => `${header('Developer', team)}${taskId ? `\nAssigned task: ${taskId}` : ''}
 Implement only what is asked — nothing more. Follow existing code patterns.
 
 ## Setup
@@ -30,7 +37,7 @@ Run typecheck and lint/format (check package.json for commands). Only commit if 
 ## On completion
 1. append_note: ## [task-id]: [title] — files changed, approach, learnings, gotchas.
 2. If you found reusable patterns, append to CLAUDE.md ## Patterns (no duplicates, commit separately).
-3. post_activity("dev:complete", { "summary": "WHAT_WAS_DONE" }) — then STOP.
+3. post_activity("dev:complete", { "summary": "WHAT_WAS_DONE"${taskId ? `, "taskId": "${taskId}"` : ''} }) — then STOP.
 
 ## Follow-ups
 - Rework: fix, run quality gates, commit, post dev:complete.
@@ -126,6 +133,40 @@ export async function spawnDeveloper(
 		mcpTools: createGroveTools(team.id, agentId),
 		onPostBash: options?.onPostBash,
 	})
+}
+
+/**
+ * Spawn a dev agent for a specific task in its own worktree.
+ * Registered in the task registry (not the role registry) so multiple devs can coexist.
+ */
+export async function spawnTaskDeveloper(
+	team: Team,
+	taskId: string,
+	taskWorktreePath: string,
+	options?: { onPostBash?: (command: string) => void },
+): Promise<PersistentAgentResult> {
+	log('agent', `spawning task developer for task ${taskId}`, {
+		teamId: team.id,
+	})
+	const agentId = generateId()
+	const taskTeam: Team = { ...team, worktreePath: taskWorktreePath }
+	const result = await spawnPersistentAgent({
+		agentId,
+		teamId: team.id,
+		role: 'dev',
+		prompt: DEV_PROMPT(taskTeam, taskId),
+		cwd: taskWorktreePath,
+		maxBudgetUsd: 30,
+		mcpTools: createGroveTools(team.id, agentId),
+		onPostBash: options?.onPostBash,
+	})
+	// Register in the task registry instead of the role registry
+	registerTaskAgent(team.id, taskId, {
+		agentId,
+		queue: result.queue,
+		query: result.query,
+	})
+	return result
 }
 
 export async function spawnQaAgent(team: Team): Promise<PersistentAgentResult> {

@@ -7,7 +7,11 @@ import { stopExpoDevServer } from '../api/expo-dev-server'
 import { clearTeamPort, getTeamPort } from '../api/ports'
 import { createTeamDevice, deleteTeamDevice } from '../api/simulator'
 import { unregisterTeamServe } from '../api/tailscale-serve'
-import { deleteWorktree } from '../api/worktrees'
+import {
+	createTaskWorktree,
+	deleteWorktree,
+	mergeTaskWorktree,
+} from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertActivity, subscribeToTeamActivity } from '../db/activity'
 import { dbGetAgent } from '../db/agents'
@@ -18,7 +22,9 @@ import type { AgentRole, Team } from '../types'
 import {
 	closeAgent,
 	closeAllAgents,
+	closeTaskAgent,
 	getAgent,
+	getTaskAgent,
 	type RegisteredAgent,
 } from './agent-registry'
 import { resolveUserReply } from './grove-tools'
@@ -28,6 +34,7 @@ import {
 	spawnExpoAgent,
 	spawnQaAgent,
 	spawnReviewerAgent,
+	spawnTaskDeveloper,
 	spawnTeamLead,
 } from './specialists'
 
@@ -42,6 +49,9 @@ const VALID_ROLES = new Set([
 ])
 
 const devBaseCommit = new Map<string, string>()
+
+/** Track task worktree paths: Map<teamId:taskId, worktreePath> */
+const taskWorktrees = new Map<string, string>()
 
 /** Returns the agent if alive, or undefined after closing a stale one. */
 function closeStaleAgent(
@@ -135,16 +145,7 @@ export async function onNewTeam(
 
 	subscribeToTeamActivity(team.id, async event => {
 		if (event.type === 'task:complete') {
-			log('orchestrator', 'task complete, cycling dev agent', {
-				teamId: team.id,
-			})
-			closeAgent(team.id, 'dev')
-		}
-	})
-
-	subscribeToTeamActivity(team.id, async event => {
-		if (event.type === 'dev:complete') {
-			let payload: { summary?: string }
+			let payload: { taskId?: string }
 			try {
 				payload =
 					typeof event.payload === 'string'
@@ -153,17 +154,94 @@ export async function onNewTeam(
 			} catch {
 				payload = {}
 			}
-			const base = devBaseCommit.get(team.id)
-			const diff = await computeDiff(team.worktreePath, base)
-			devBaseCommit.delete(team.id)
+			if (payload.taskId) {
+				log('orchestrator', `task ${payload.taskId} complete, closing task dev`, {
+					teamId: team.id,
+				})
+				closeTaskAgent(team.id, payload.taskId)
+			} else {
+				log('orchestrator', 'task complete, cycling dev agent', {
+					teamId: team.id,
+				})
+				closeAgent(team.id, 'dev')
+			}
+		}
+	})
+
+	subscribeToTeamActivity(team.id, async event => {
+		if (event.type === 'dev:complete') {
+			let payload: { summary?: string; taskId?: string }
+			try {
+				payload =
+					typeof event.payload === 'string'
+						? JSON.parse(event.payload)
+						: event.payload
+			} catch {
+				payload = {}
+			}
+
+			const taskId = payload.taskId
+			let diff: string | null = null
+
+			if (taskId) {
+				// Parallel dev: merge task worktree back into team worktree
+				const wtKey = `${team.id}:${taskId}`
+				const taskWtPath = taskWorktrees.get(wtKey)
+				if (taskWtPath) {
+					// Compute diff from the task worktree before merging
+					const base = devBaseCommit.get(wtKey)
+					diff = await computeDiff(taskWtPath, base)
+					devBaseCommit.delete(wtKey)
+
+					const mergeResult = await mergeTaskWorktree(
+						team.worktreePath,
+						team.id,
+						taskId,
+					)
+					if (mergeResult !== true) {
+						log('orchestrator', 'task merge conflict', {
+							teamId: team.id,
+							taskId,
+							error: mergeResult,
+						})
+						dbInsertActivity(team.id, event.agentId, 'agent:message', {
+							text: `Merge conflict for task ${taskId}: ${mergeResult}`,
+						})
+						await dispatchToAgent(
+							team,
+							'pm',
+							`Task ${taskId} dev complete but merge conflict: ${mergeResult}. The dev's changes could not be merged automatically.`,
+							event.agentId ?? undefined,
+						)
+						taskWorktrees.delete(wtKey)
+						closeTaskAgent(team.id, taskId)
+						return
+					}
+					taskWorktrees.delete(wtKey)
+					closeTaskAgent(team.id, taskId)
+					log('orchestrator', `task ${taskId} merged successfully`, {
+						teamId: team.id,
+					})
+				}
+			} else {
+				// Legacy single dev: compute diff from team worktree
+				const base = devBaseCommit.get(team.id)
+				diff = await computeDiff(team.worktreePath, base)
+				devBaseCommit.delete(team.id)
+			}
+
+			const summaryText = taskId
+				? `Task ${taskId} dev complete. ${payload.summary ?? ''}`
+				: `Dev complete. ${payload.summary ?? ''}`
+
 			dbInsertActivity(team.id, event.agentId, 'agent:message', {
-				text: `Dev complete. ${payload.summary ?? ''}`,
+				text: summaryText,
 				diff: diff ?? undefined,
 			})
 			await dispatchToAgent(
 				team,
 				'pm',
-				`Dev complete. ${payload.summary ?? ''}`,
+				summaryText,
 				event.agentId ?? undefined,
 			)
 		}
@@ -220,6 +298,51 @@ export async function onNewTeam(
 			})
 		}
 	})
+}
+
+/**
+ * Dispatch a dev to work on a specific task in its own worktree.
+ * Creates a sub-worktree branched off the team's current HEAD.
+ */
+export async function dispatchToTaskDev(
+	team: Team,
+	taskId: string,
+	message: string,
+): Promise<{ dispatched: boolean; error?: string }> {
+	const wtKey = `${team.id}:${taskId}`
+
+	// Check if a task dev already exists for this task
+	const existing = getTaskAgent(team.id, taskId)
+	if (existing && !existing.queue.closed) {
+		log('orchestrator', `task dev already running for task ${taskId}`, {
+			teamId: team.id,
+		})
+		existing.queue.push(message)
+		return { dispatched: true }
+	}
+
+	// Create a sub-worktree for this task
+	const result = await createTaskWorktree(team.worktreePath, team.id, taskId)
+	if (typeof result === 'string') {
+		return { dispatched: false, error: result }
+	}
+
+	taskWorktrees.set(wtKey, result.path)
+	const sha = await getHeadSha(result.path)
+	if (sha) devBaseCommit.set(wtKey, sha)
+
+	log('orchestrator', `spawning task dev for task ${taskId}`, {
+		teamId: team.id,
+		worktreePath: result.path,
+	})
+
+	const persistent = await spawnTaskDeveloper(team, taskId, result.path, {
+		onPostBash: makeOnPostBash(team),
+	})
+	// Send the initial task message
+	persistent.queue.push(message)
+
+	return { dispatched: true }
 }
 
 /**

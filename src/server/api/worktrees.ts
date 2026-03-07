@@ -197,6 +197,108 @@ export async function detectEnvVars(repoPath: string): Promise<EnvVar[]> {
 	return envVars
 }
 
+/**
+ * Create a sub-worktree for a task, branching off the team's current branch.
+ * Used to isolate parallel dev agents working on different tasks.
+ */
+export async function createTaskWorktree(
+	teamWorktreePath: string,
+	teamId: string,
+	taskId: string,
+): Promise<{ path: string; branch: string } | string> {
+	const branch = `grove-team-${teamId}-task-${taskId}`
+	const worktreePath = join(teamWorktreePath, '..', branch)
+
+	log('worktrees', 'creating task worktree', {
+		teamId,
+		taskId,
+		branch,
+		worktreePath,
+	})
+
+	// Create a new branch off the team's current HEAD
+	const result =
+		await Bun.$`git -C ${teamWorktreePath} worktree add -b ${branch} ${worktreePath} HEAD`
+			.quiet()
+			.nothrow()
+
+	if (result.exitCode !== 0) {
+		// Branch may already exist from a previous attempt — try without -b
+		const retry =
+			await Bun.$`git -C ${teamWorktreePath} worktree add ${worktreePath} ${branch}`
+				.quiet()
+				.nothrow()
+		if (retry.exitCode !== 0) {
+			const stderr = retry.stderr.toString().trim()
+			log('worktrees', 'failed to create task worktree', {
+				teamId,
+				taskId,
+				stderr,
+			})
+			return `Failed to create task worktree: ${stderr}`
+		}
+	}
+
+	// Copy .env files from team worktree
+	const envGlob = new Bun.Glob('.env*')
+	for await (const file of envGlob.scan({
+		cwd: teamWorktreePath,
+		dot: true,
+	})) {
+		try {
+			const content = await Bun.file(join(teamWorktreePath, file)).text()
+			await Bun.write(join(worktreePath, file), content)
+		} catch {}
+	}
+
+	log('worktrees', 'task worktree created', { worktreePath, branch })
+	return { path: worktreePath, branch }
+}
+
+/**
+ * Merge a task worktree branch back into the team worktree, then clean up.
+ * Returns true on success, or an error string if the merge conflicts.
+ */
+export async function mergeTaskWorktree(
+	teamWorktreePath: string,
+	teamId: string,
+	taskId: string,
+): Promise<true | string> {
+	const branch = `grove-team-${teamId}-task-${taskId}`
+	const worktreePath = join(teamWorktreePath, '..', branch)
+
+	log('worktrees', 'merging task worktree', { teamId, taskId, branch })
+
+	// Merge the task branch into the team branch
+	const mergeResult =
+		await Bun.$`git -C ${teamWorktreePath} merge ${branch} --no-edit`
+			.quiet()
+			.nothrow()
+
+	if (mergeResult.exitCode !== 0) {
+		const stderr = mergeResult.stderr.toString().trim()
+		log('worktrees', 'task merge failed', { teamId, taskId, stderr })
+		// Abort the failed merge to leave team worktree clean
+		await Bun.$`git -C ${teamWorktreePath} merge --abort`.quiet().nothrow()
+		return `Merge conflict for task ${taskId}: ${stderr}`
+	}
+
+	// Clean up the worktree and branch
+	await Bun.$`git -C ${teamWorktreePath} worktree remove --force ${worktreePath}`
+		.quiet()
+		.nothrow()
+	await Bun.$`git -C ${teamWorktreePath} branch -d ${branch}`
+		.quiet()
+		.nothrow()
+
+	log('worktrees', 'task worktree merged and cleaned up', {
+		teamId,
+		taskId,
+		branch,
+	})
+	return true
+}
+
 export async function deleteWorktree(
 	repoId: string,
 	branch: string,

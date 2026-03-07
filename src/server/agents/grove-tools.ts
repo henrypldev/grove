@@ -164,6 +164,57 @@ export function createGroveTools(
 				},
 			),
 			tool(
+				'delegate_to_task',
+				'Dispatch a dev to work on a specific task in its own isolated worktree. Use this to run multiple dev tasks in parallel. Each task gets a separate dev agent that cannot conflict with others.',
+				{
+					role: z
+						.enum(['dev'])
+						.describe('The target agent role (currently only dev)'),
+					task_id: z
+						.string()
+						.describe('The task ID string (e.g. "1", "2")'),
+					message: z
+						.string()
+						.describe(
+							'The instruction or message to send to the dev agent',
+						),
+				},
+				async ({ role, task_id, message }) => {
+					const { dispatchToTaskDev } = await import('./orchestrator')
+					if (!team) {
+						return {
+							content: [
+								{ type: 'text' as const, text: 'error: team not found' },
+							],
+						}
+					}
+					dbInsertActivity(teamId, agentId, 'agent:delegate', {
+						targetRole: role,
+						taskId: task_id,
+						message,
+					})
+					const result = await dispatchToTaskDev(team, task_id, message)
+					if (!result.dispatched) {
+						return {
+							content: [
+								{
+									type: 'text' as const,
+									text: `dispatch failed: ${result.error}`,
+								},
+							],
+						}
+					}
+					return {
+						content: [
+							{
+								type: 'text' as const,
+								text: `dispatched task ${task_id} to ${role} in isolated worktree`,
+							},
+						],
+					}
+				},
+			),
+			tool(
 				'get_activity',
 				'Get all team activity since a timestamp',
 				{

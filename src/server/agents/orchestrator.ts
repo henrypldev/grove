@@ -134,29 +134,6 @@ export async function onNewTeam(
 	pmRef.agentId = initialPm.id
 
 	subscribeToTeamActivity(team.id, async event => {
-		if (event.type !== 'agent:delegate') return
-
-		let payload: { targetRole?: string; message?: string }
-		try {
-			payload =
-				typeof event.payload === 'string'
-					? JSON.parse(event.payload)
-					: event.payload
-		} catch {
-			return
-		}
-
-		if (!payload.targetRole || !payload.message) return
-
-		await dispatchToAgent(
-			team,
-			payload.targetRole,
-			payload.message,
-			event.agentId ?? undefined,
-		)
-	})
-
-	subscribeToTeamActivity(team.id, async event => {
 		if (event.type === 'task:complete') {
 			log('orchestrator', 'task complete, cycling dev agent', {
 				teamId: team.id,

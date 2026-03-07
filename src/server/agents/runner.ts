@@ -57,6 +57,8 @@ export interface AgentRunOptions {
 	settingSources?: SettingSource[]
 	onDone?: (agentId: string) => void
 	onError?: (agentId: string, error: unknown) => void
+	/** Skip role-based registry registration (used for task-scoped agents that register separately). */
+	skipRoleRegistry?: boolean
 }
 
 export function activityFromToolName(toolName: string): string {
@@ -203,11 +205,13 @@ export async function spawnPersistentAgent(
 		},
 	})
 
-	registerAgent(opts.teamId, opts.role, {
-		agentId,
-		queue: messageQueue,
-		query: q,
-	})
+	if (!opts.skipRoleRegistry) {
+		registerAgent(opts.teamId, opts.role, {
+			agentId,
+			queue: messageQueue,
+			query: q,
+		})
+	}
 
 	processMessages(q, agent, opts, messageQueue).catch(err => {
 		log('agent', `unhandled error in persistent ${opts.role}`, { agentId, err })

@@ -159,8 +159,8 @@ export async function spawnTaskDeveloper(
 		maxBudgetUsd: 30,
 		mcpTools: createGroveTools(team.id, agentId),
 		onPostBash: options?.onPostBash,
+		skipRoleRegistry: true,
 	})
-	// Register in the task registry instead of the role registry
 	registerTaskAgent(team.id, taskId, {
 		agentId,
 		queue: result.queue,

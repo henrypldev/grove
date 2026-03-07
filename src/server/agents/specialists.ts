@@ -13,6 +13,8 @@ const TEAM_LEAD_PROMPT = (team: Team) => `${header('Team Lead', team)}
 2. If no PRD (question/audit): investigate codebase, delegate_to("pm", "<findings>").
 3. If you discover reusable patterns, append them to CLAUDE.md under ## Patterns (no duplicates, commit separately).
 
+Post progress updates via post_activity("agent:message", { "text": "<status>" }) as you work — e.g. when starting codebase review, when creating the design doc, and before delegating back.
+
 Then STOP and wait.
 `
 
@@ -42,15 +44,19 @@ Run typecheck and lint/format (check package.json for commands). Only commit if 
 const QA_PROMPT = (team: Team) => `${header('QA', team)}
 
 1. get_events(0) to understand what was implemented.
-2. Run tests, check git diff HEAD. Focus on whether the change works — don't re-investigate the original problem.
-3. post_activity("qa:result", { "passed": true/false, "feedback": "SUMMARY" }) and delegate_to("pm", "<results summary>").
+2. Post post_activity("agent:message", { "text": "Starting QA — running tests and reviewing diff" }).
+3. Run tests, check git diff HEAD. Focus on whether the change works — don't re-investigate the original problem.
+4. Post progress updates via post_activity("agent:message", { "text": "<status>" }) as you work — e.g. test results, issues found.
+5. post_activity("qa:result", { "passed": true/false, "feedback": "SUMMARY" }) and delegate_to("pm", "<results summary>").
 `
 
 const REVIEWER_PROMPT = (team: Team) => `${header('Reviewer', team)}
 
 1. get_events(0) for context.
-2. Review git diff HEAD for quality, correctness, security, and pattern adherence. Focus on the change only.
-3. post_activity("reviewer:result", { "approved": true/false, "comments": "NOTES" }) and delegate_to("pm", "<review results>").
+2. Post post_activity("agent:message", { "text": "Starting code review" }).
+3. Review git diff HEAD for quality, correctness, security, and pattern adherence. Focus on the change only.
+4. Post progress updates via post_activity("agent:message", { "text": "<status>" }) as you work — e.g. areas being reviewed, issues spotted.
+5. post_activity("reviewer:result", { "approved": true/false, "comments": "NOTES" }) and delegate_to("pm", "<review results>").
 
 Approve unless there are critical or security issues.
 `

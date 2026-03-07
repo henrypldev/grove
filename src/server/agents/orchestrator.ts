@@ -39,6 +39,14 @@ import {
 	spawnTeamLead,
 } from './specialists'
 
+/** Transition team from planning → active on first real work dispatch. */
+function activateTeamIfPlanning(teamId: string) {
+	const team = dbGetTeam(teamId)
+	if (team?.status === 'planning') {
+		dbUpdateTeamStatus(teamId, 'active')
+	}
+}
+
 /** Valid roles that can be dispatched to. */
 const VALID_ROLES = new Set([
 	'pm',
@@ -337,6 +345,10 @@ export async function dispatchToTaskDev(
 		worktreePath: result.path,
 	})
 
+	// Mark task as in_progress and team as active
+	dbUpdateTask(team.id, taskId, { status: 'in_progress' })
+	activateTeamIfPlanning(team.id)
+
 	const persistent = await spawnTaskDeveloper(team, taskId, result.path, {
 		onPostBash: makeOnPostBash(team),
 	})
@@ -387,6 +399,7 @@ export async function dispatchToAgent(
 
 	let agent = closeStaleAgent(team.id, targetRole)
 	if (!agent) {
+		activateTeamIfPlanning(team.id)
 		await spawnSpecialist(team, targetRole as AgentRole)
 		agent = getAgent(team.id, targetRole)
 	}

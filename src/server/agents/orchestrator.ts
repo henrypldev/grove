@@ -15,6 +15,7 @@ import {
 import { log } from '../config'
 import { dbInsertActivity, subscribeToTeamActivity } from '../db/activity'
 import { dbGetAgent } from '../db/agents'
+import { dbUpdateTask } from '../db/agent-tasks'
 import { dbGetRepo } from '../db/repos'
 import { dbGetTeamDependencies } from '../db/team-dependencies'
 import { dbGetTeam, dbUpdateTeamPrUrl, dbUpdateTeamStatus } from '../db/teams'
@@ -339,6 +340,8 @@ export async function dispatchToTaskDev(
 	const persistent = await spawnTaskDeveloper(team, taskId, result.path, {
 		onPostBash: makeOnPostBash(team),
 	})
+	// Link the agent to the task in the DB
+	dbUpdateTask(team.id, taskId, { agentId: persistent.agent.id })
 	// Send the initial task message
 	persistent.queue.push(message)
 

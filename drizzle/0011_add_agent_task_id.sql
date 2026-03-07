@@ -1,0 +1,1 @@
+ALTER TABLE `agents` ADD COLUMN `task_id` text;

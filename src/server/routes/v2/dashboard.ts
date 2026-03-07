@@ -82,6 +82,7 @@ export async function getDashboard(): Promise<DashboardResult> {
 					role: a.role,
 					status: a.status,
 					activity: a.activity,
+					taskId: a.taskId,
 				})),
 				env: envInfo,
 				behindMain,

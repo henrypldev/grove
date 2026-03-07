@@ -97,6 +97,7 @@ export interface Agent {
 	activity: string | null
 	currentTask: string | null
 	sessionId: string | null
+	taskId: string | null
 	retryCount: number
 	spawnedAt: number
 	updatedAt: number
@@ -182,6 +183,7 @@ export interface DashboardTeam {
 		role: string
 		status: string
 		activity: string | null
+		taskId: string | null
 	}>
 	env: Record<string, unknown> | null
 	behindMain: number

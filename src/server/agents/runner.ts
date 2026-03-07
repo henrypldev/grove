@@ -59,6 +59,8 @@ export interface AgentRunOptions {
 	onError?: (agentId: string, error: unknown) => void
 	/** Skip role-based registry registration (used for task-scoped agents that register separately). */
 	skipRoleRegistry?: boolean
+	/** Task ID for task-scoped dev agents (stored in DB for frontend display). */
+	taskId?: string
 }
 
 export function activityFromToolName(toolName: string): string {
@@ -84,6 +86,7 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 		activity: null,
 		currentTask: opts.prompt.slice(0, 200),
 		sessionId: null,
+		taskId: opts.taskId ?? null,
 		retryCount: 0,
 		spawnedAt: now,
 		updatedAt: now,
@@ -174,6 +177,7 @@ export async function spawnPersistentAgent(
 		activity: null,
 		currentTask: opts.prompt.slice(0, 200),
 		sessionId: null,
+		taskId: opts.taskId ?? null,
 		retryCount: 0,
 		spawnedAt: now,
 		updatedAt: now,

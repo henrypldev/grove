@@ -61,6 +61,7 @@ export const agents = sqliteTable(
 		activity: text('activity'),
 		currentTask: text('current_task'),
 		sessionId: text('session_id'),
+		taskId: text('task_id'),
 		retryCount: integer('retry_count').default(0),
 		spawnedAt: integer('spawned_at').notNull(),
 		updatedAt: integer('updated_at').notNull(),

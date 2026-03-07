@@ -164,6 +164,7 @@ export async function spawnTaskDeveloper(
 		mcpTools: createGroveTools(team.id, agentId),
 		onPostBash: options?.onPostBash,
 		skipRoleRegistry: true,
+		taskId,
 	})
 	registerTaskAgent(team.id, taskId, {
 		agentId,

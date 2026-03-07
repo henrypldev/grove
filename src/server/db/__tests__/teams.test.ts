@@ -22,7 +22,7 @@ const TEAM = {
 	repoId: 'r1',
 	worktreePath: '/tmp/wt1',
 	task: 'do something',
-	status: 'planning' as const,
+	status: 'working' as const,
 	pmSummary: null,
 	prUrl: null,
 	title: null,
@@ -45,7 +45,7 @@ describe('db/teams', () => {
 		const got = dbGetTeam('t1')
 		expect(got?.id).toBe('t1')
 		expect(got?.task).toBe('do something')
-		expect(got?.status).toBe('planning')
+		expect(got?.status).toBe('working')
 	})
 
 	test('list excludes archived', () => {
@@ -70,15 +70,15 @@ describe('db/teams', () => {
 
 	test('updateTeamStatus changes status', () => {
 		dbInsertTeam(TEAM)
-		dbUpdateTeamStatus('t1', 'active')
-		expect(dbGetTeam('t1')?.status).toBe('active')
+		dbUpdateTeamStatus('t1', 'working')
+		expect(dbGetTeam('t1')?.status).toBe('working')
 	})
 
 	test('updateTeamStatus with pmSummary', () => {
 		dbInsertTeam(TEAM)
-		dbUpdateTeamStatus('t1', 'active', 'plan done')
+		dbUpdateTeamStatus('t1', 'working', 'plan done')
 		const got = dbGetTeam('t1')
-		expect(got?.status).toBe('active')
+		expect(got?.status).toBe('working')
 		expect(got?.pmSummary).toBe('plan done')
 	})
 

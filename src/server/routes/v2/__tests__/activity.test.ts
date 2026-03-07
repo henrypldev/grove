@@ -30,7 +30,7 @@ describe('handleV2Activity', () => {
 			repoId: 'r1',
 			worktreePath: '/wt',
 			task: 'x',
-			status: 'planning',
+			status: 'working',
 			pmSummary: null,
 			prUrl: null,
 			title: null,

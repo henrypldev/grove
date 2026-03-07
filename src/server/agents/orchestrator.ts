@@ -7,10 +7,15 @@ import { stopExpoDevServer } from '../api/expo-dev-server'
 import { clearTeamPort, getTeamPort } from '../api/ports'
 import { createTeamDevice, deleteTeamDevice } from '../api/simulator'
 import { unregisterTeamServe } from '../api/tailscale-serve'
-import { deleteWorktree } from '../api/worktrees'
+import {
+	createTaskWorktree,
+	deleteWorktree,
+	mergeTaskWorktree,
+} from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertActivity, subscribeToTeamActivity } from '../db/activity'
 import { dbGetAgent } from '../db/agents'
+import { dbUpdateTask } from '../db/agent-tasks'
 import { dbGetRepo } from '../db/repos'
 import { dbGetTeamDependencies } from '../db/team-dependencies'
 import { dbGetTeam, dbUpdateTeamPrUrl, dbUpdateTeamStatus } from '../db/teams'
@@ -18,7 +23,9 @@ import type { AgentRole, Team } from '../types'
 import {
 	closeAgent,
 	closeAllAgents,
+	closeTaskAgent,
 	getAgent,
+	getTaskAgent,
 	type RegisteredAgent,
 } from './agent-registry'
 import { resolveUserReply } from './grove-tools'
@@ -28,12 +35,24 @@ import {
 	spawnExpoAgent,
 	spawnQaAgent,
 	spawnReviewerAgent,
+	spawnTaskDeveloper,
 	spawnTeamLead,
 } from './specialists'
 
-const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer|expo)\b/g
+/** Valid roles that can be dispatched to. */
+const VALID_ROLES = new Set([
+	'pm',
+	'team-lead',
+	'dev',
+	'qa',
+	'reviewer',
+	'expo',
+])
 
 const devBaseCommit = new Map<string, string>()
+
+/** Track task worktree paths: Map<teamId:taskId, worktreePath> */
+const taskWorktrees = new Map<string, string>()
 
 /** Returns the agent if alive, or undefined after closing a stale one. */
 function closeStaleAgent(
@@ -126,36 +145,8 @@ export async function onNewTeam(
 	pmRef.agentId = initialPm.id
 
 	subscribeToTeamActivity(team.id, async event => {
-		if (event.type !== 'agent:message') return
-
-		let payload: { text?: string }
-		try {
-			payload =
-				typeof event.payload === 'string'
-					? JSON.parse(event.payload)
-					: event.payload
-		} catch {
-			return
-		}
-
-		const text = payload.text
-		if (!text) return
-
-		await routeMessageToAgents(team, text, event.agentId ?? undefined)
-	})
-
-	subscribeToTeamActivity(team.id, async event => {
 		if (event.type === 'task:complete') {
-			log('orchestrator', 'task complete, cycling dev agent', {
-				teamId: team.id,
-			})
-			closeAgent(team.id, 'dev')
-		}
-	})
-
-	subscribeToTeamActivity(team.id, async event => {
-		if (event.type === 'dev:complete') {
-			let payload: { summary?: string }
+			let payload: { taskId?: string }
 			try {
 				payload =
 					typeof event.payload === 'string'
@@ -164,13 +155,96 @@ export async function onNewTeam(
 			} catch {
 				payload = {}
 			}
-			const base = devBaseCommit.get(team.id)
-			const diff = await computeDiff(team.worktreePath, base)
-			devBaseCommit.delete(team.id)
+			if (payload.taskId) {
+				log('orchestrator', `task ${payload.taskId} complete, closing task dev`, {
+					teamId: team.id,
+				})
+				closeTaskAgent(team.id, payload.taskId)
+			} else {
+				log('orchestrator', 'task complete, cycling dev agent', {
+					teamId: team.id,
+				})
+				closeAgent(team.id, 'dev')
+			}
+		}
+	})
+
+	subscribeToTeamActivity(team.id, async event => {
+		if (event.type === 'dev:complete') {
+			let payload: { summary?: string; taskId?: string }
+			try {
+				payload =
+					typeof event.payload === 'string'
+						? JSON.parse(event.payload)
+						: event.payload
+			} catch {
+				payload = {}
+			}
+
+			const taskId = payload.taskId
+			let diff: string | null = null
+
+			if (taskId) {
+				// Parallel dev: merge task worktree back into team worktree
+				const wtKey = `${team.id}:${taskId}`
+				const taskWtPath = taskWorktrees.get(wtKey)
+				if (taskWtPath) {
+					// Compute diff from the task worktree before merging
+					const base = devBaseCommit.get(wtKey)
+					diff = await computeDiff(taskWtPath, base)
+					devBaseCommit.delete(wtKey)
+
+					const mergeResult = await mergeTaskWorktree(
+						team.worktreePath,
+						team.id,
+						taskId,
+					)
+					if (mergeResult !== true) {
+						log('orchestrator', 'task merge conflict', {
+							teamId: team.id,
+							taskId,
+							error: mergeResult,
+						})
+						dbInsertActivity(team.id, event.agentId, 'agent:message', {
+							text: `Merge conflict for task ${taskId}: ${mergeResult}`,
+						})
+						await dispatchToAgent(
+							team,
+							'pm',
+							`Task ${taskId} dev complete but merge conflict: ${mergeResult}. The dev's changes could not be merged automatically.`,
+							event.agentId ?? undefined,
+						)
+						taskWorktrees.delete(wtKey)
+						closeTaskAgent(team.id, taskId)
+						return
+					}
+					taskWorktrees.delete(wtKey)
+					closeTaskAgent(team.id, taskId)
+					log('orchestrator', `task ${taskId} merged successfully`, {
+						teamId: team.id,
+					})
+				}
+			} else {
+				// Legacy single dev: compute diff from team worktree
+				const base = devBaseCommit.get(team.id)
+				diff = await computeDiff(team.worktreePath, base)
+				devBaseCommit.delete(team.id)
+			}
+
+			const summaryText = taskId
+				? `Task ${taskId} dev complete. ${payload.summary ?? ''}`
+				: `Dev complete. ${payload.summary ?? ''}`
+
 			dbInsertActivity(team.id, event.agentId, 'agent:message', {
-				text: `@pm done. ${payload.summary ?? ''}`,
+				text: summaryText,
 				diff: diff ?? undefined,
 			})
+			await dispatchToAgent(
+				team,
+				'pm',
+				summaryText,
+				event.agentId ?? undefined,
+			)
 		}
 		if (event.type === 'dev:pr-created') {
 			let payload: { url?: string }
@@ -198,10 +272,10 @@ export async function onNewTeam(
 					return null
 				}
 			})()
-			log('orchestrator', 'pm:summary received, team idle', {
+			log('orchestrator', 'pm:summary received, team done', {
 				teamId: team.id,
 			})
-			dbUpdateTeamStatus(team.id, 'idle', summary ?? undefined)
+			dbUpdateTeamStatus(team.id, 'done', summary ?? undefined)
 		}
 	})
 
@@ -227,104 +301,152 @@ export async function onNewTeam(
 	})
 }
 
-export async function routeMessageToAgents(
+/**
+ * Dispatch a dev to work on a specific task in its own worktree.
+ * Creates a sub-worktree branched off the team's current HEAD.
+ */
+export async function dispatchToTaskDev(
 	team: Team,
+	taskId: string,
+	message: string,
+): Promise<{ dispatched: boolean; error?: string }> {
+	const wtKey = `${team.id}:${taskId}`
+
+	// Check if a task dev already exists for this task
+	const existing = getTaskAgent(team.id, taskId)
+	if (existing && !existing.queue.closed) {
+		log('orchestrator', `task dev already running for task ${taskId}`, {
+			teamId: team.id,
+		})
+		existing.queue.push(message)
+		return { dispatched: true }
+	}
+
+	// Create a sub-worktree for this task
+	const result = await createTaskWorktree(team.worktreePath, team.id, taskId)
+	if (typeof result === 'string') {
+		return { dispatched: false, error: result }
+	}
+
+	taskWorktrees.set(wtKey, result.path)
+	const sha = await getHeadSha(result.path)
+	if (sha) devBaseCommit.set(wtKey, sha)
+
+	log('orchestrator', `spawning task dev for task ${taskId}`, {
+		teamId: team.id,
+		worktreePath: result.path,
+	})
+
+	// Mark task as in_progress
+	dbUpdateTask(team.id, taskId, { status: 'in_progress' })
+
+	const persistent = await spawnTaskDeveloper(team, taskId, result.path, {
+		onPostBash: makeOnPostBash(team),
+	})
+	// Link the agent to the task in the DB
+	dbUpdateTask(team.id, taskId, { agentId: persistent.agent.id })
+	// Send the initial task message
+	persistent.queue.push(message)
+
+	return { dispatched: true }
+}
+
+/**
+ * Dispatch a message to a specific agent role. Used by the `delegate_to` tool
+ * and by the activity listener for structured agent-to-agent routing.
+ */
+export async function dispatchToAgent(
+	team: Team,
+	targetRole: string,
 	text: string,
 	senderAgentId?: string,
 	contentBlocks?: SDKUserMessage['message']['content'],
-) {
-	if (!senderAgentId && resolveUserReply(team.id, text)) return
-
-	const mentions = new Set<string>()
-	for (const match of text.matchAll(MENTION_PATTERN)) {
-		mentions.add(match[1])
+): Promise<{ dispatched: boolean; error?: string }> {
+	if (!VALID_ROLES.has(targetRole)) {
+		return { dispatched: false, error: `Unknown role: ${targetRole}` }
 	}
 
-	function makePmCallbacks() {
-		const ref = { agentId: '' }
-		const callbacks = {
-			onDone: () => {
-				log('orchestrator', 'pm process exited', { teamId: team.id })
-				closeAgent(team.id, 'pm', ref.agentId)
-			},
-			onError: () => {
-				dbUpdateTeamStatus(team.id, 'blocked')
-				closeAgent(team.id, 'pm', ref.agentId)
-			},
-			contentBlocks,
-		}
-		return { ref, callbacks }
-	}
-
-	if (mentions.size === 0) {
+	if (targetRole === 'pm') {
 		const pmAgent = closeStaleAgent(team.id, 'pm')
 		if (!pmAgent) {
 			log('orchestrator', 'pm not found, respawning', { teamId: team.id })
-			const { ref, callbacks } = makePmCallbacks()
+			const { ref, callbacks } = makePmCallbacks(team, contentBlocks)
 			const { agent } = await respawnPm(team, text, callbacks)
 			ref.agentId = agent.id
-			return
+			return { dispatched: true }
 		}
 		if (pmAgent.agentId !== senderAgentId) {
-			log(
-				'orchestrator',
-				`routing to pm (default) from ${senderAgentId ?? 'user'}`,
-				{
-					teamId: team.id,
-				},
-			)
+			log('orchestrator', `routing to pm from ${senderAgentId ?? 'user'}`, {
+				teamId: team.id,
+			})
 			if (contentBlocks) {
 				pmAgent.queue.pushContent(contentBlocks)
 			} else {
 				pmAgent.queue.push(text)
 			}
 		}
-		return
+		return { dispatched: true }
 	}
 
-	for (const role of mentions) {
-		if (role === 'pm') {
-			const pmAgent = closeStaleAgent(team.id, 'pm')
-			if (!pmAgent) {
-				log('orchestrator', 'pm not found, respawning', { teamId: team.id })
-				const { ref: pmRef, callbacks: pmCbs } = makePmCallbacks()
-				const { agent: pmResult } = await respawnPm(team, text, pmCbs)
-				pmRef.agentId = pmResult.id
-				continue
-			}
-			if (pmAgent.agentId !== senderAgentId) {
-				log('orchestrator', `routing to pm from ${senderAgentId ?? 'user'}`, {
-					teamId: team.id,
-				})
-				if (contentBlocks) {
-					pmAgent.queue.pushContent(contentBlocks)
-				} else {
-					pmAgent.queue.push(text)
-				}
-			}
-			continue
-		}
-
-		let agent = closeStaleAgent(team.id, role)
-		if (!agent) {
-			await spawnSpecialist(team, role as AgentRole)
-			agent = getAgent(team.id, role)
-		}
-		if (agent && agent.agentId !== senderAgentId) {
-			log(
-				'orchestrator',
-				`routing to ${role} from ${senderAgentId ?? 'user'}`,
-				{
-					teamId: team.id,
-				},
-			)
-			if (contentBlocks) {
-				agent.queue.pushContent(contentBlocks)
-			} else {
-				agent.queue.push(text)
-			}
-		}
+	let agent = closeStaleAgent(team.id, targetRole)
+	if (!agent) {
+		await spawnSpecialist(team, targetRole as AgentRole)
+		agent = getAgent(team.id, targetRole)
 	}
+	if (agent && agent.agentId !== senderAgentId) {
+		log(
+			'orchestrator',
+			`routing to ${targetRole} from ${senderAgentId ?? 'user'}`,
+			{ teamId: team.id },
+		)
+		if (contentBlocks) {
+			agent.queue.pushContent(contentBlocks)
+		} else {
+			agent.queue.push(text)
+		}
+		return { dispatched: true }
+	}
+	return {
+		dispatched: false,
+		error: `Failed to spawn or find agent for role: ${targetRole}`,
+	}
+}
+
+function makePmCallbacks(
+	team: Team,
+	contentBlocks?: SDKUserMessage['message']['content'],
+) {
+	const ref = { agentId: '' }
+	const callbacks = {
+		onDone: () => {
+			log('orchestrator', 'pm process exited', { teamId: team.id })
+			closeAgent(team.id, 'pm', ref.agentId)
+		},
+		onError: () => {
+			dbUpdateTeamStatus(team.id, 'blocked')
+			closeAgent(team.id, 'pm', ref.agentId)
+		},
+		contentBlocks,
+	}
+	return { ref, callbacks }
+}
+
+/**
+ * Route a message to the appropriate agent.
+ * If targetRole is specified, dispatch directly to that role.
+ * Otherwise, route to PM (default coordinator).
+ */
+export async function routeMessageToAgents(
+	team: Team,
+	text: string,
+	senderAgentId?: string,
+	contentBlocks?: SDKUserMessage['message']['content'],
+	targetRole?: string,
+) {
+	if (!senderAgentId && resolveUserReply(team.id, text)) return
+
+	const role = targetRole ?? 'pm'
+	await dispatchToAgent(team, role, text, senderAgentId, contentBlocks)
 }
 
 export async function closeTeam(teamId: string) {
@@ -378,7 +500,7 @@ function watchTeamForCompletion(depTeamId: string, blockedTeamId: string) {
 				const deps = dbGetTeamDependencies(teamId)
 				const stillBlocked = deps.some(d => {
 					const t = dbGetTeam(d.dependsOnTeamId)
-					return t && t.status !== 'idle' && t.status !== 'done'
+					return t && t.status !== 'done'
 				})
 				if (!stillBlocked) {
 					pendingDevSpawns.delete(teamId)
@@ -443,7 +565,7 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 		const deps = dbGetTeamDependencies(team.id)
 		const unsatisfied = deps.filter(d => {
 			const depTeam = dbGetTeam(d.dependsOnTeamId)
-			return depTeam && depTeam.status !== 'idle' && depTeam.status !== 'done'
+			return depTeam && depTeam.status !== 'done'
 		})
 		if (unsatisfied.length > 0) {
 			log('orchestrator', 'dev blocked by dependencies', {
@@ -455,8 +577,13 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 				watchTeamForCompletion(dep.dependsOnTeamId, team.id)
 			}
 			dbInsertActivity(team.id, null, 'agent:message', {
-				text: '@pm Dev work is waiting for dependent teams to complete.',
+				text: 'Dev work is waiting for dependent teams to complete.',
 			})
+			await dispatchToAgent(
+				team,
+				'pm',
+				'Dev work is waiting for dependent teams to complete.',
+			)
 			return
 		}
 		if (deps.length > 0) await mergeDependencyBranches(team)

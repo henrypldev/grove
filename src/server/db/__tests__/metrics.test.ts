@@ -21,7 +21,7 @@ describe('db/metrics', () => {
 		dbInsertRepo(REPO)
 		dbInsertTeam({ ...TEAM, status: 'done' })
 		dbInsertTeam({ ...TEAM, id: 't2', status: 'archived' })
-		dbInsertTeam({ ...TEAM, id: 't3', status: 'planning' })
+		dbInsertTeam({ ...TEAM, id: 't3', status: 'working' })
 		dbInsertAgent({ ...AGENT, status: 'done' })
 		dbInsertAgent({ ...AGENT, id: 'a2', status: 'working' })
 		const m = dbGetMetrics()

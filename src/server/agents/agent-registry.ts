@@ -9,6 +9,12 @@ export interface RegisteredAgent {
 
 const registry = new Map<string, Map<string, RegisteredAgent>>()
 
+/**
+ * Task-scoped agents: Map<teamId, Map<taskId, RegisteredAgent>>
+ * Used for parallel dev agents, each working on a separate task.
+ */
+const taskRegistry = new Map<string, Map<string, RegisteredAgent>>()
+
 export function registerAgent(
 	teamId: string,
 	role: string,
@@ -22,6 +28,19 @@ export function registerAgent(
 	team.set(role, entry)
 }
 
+export function registerTaskAgent(
+	teamId: string,
+	taskId: string,
+	entry: RegisteredAgent,
+) {
+	let team = taskRegistry.get(teamId)
+	if (!team) {
+		team = new Map()
+		taskRegistry.set(teamId, team)
+	}
+	team.set(taskId, entry)
+}
+
 export function getAgent(
 	teamId: string,
 	role: string,
@@ -29,9 +48,23 @@ export function getAgent(
 	return registry.get(teamId)?.get(role)
 }
 
+export function getTaskAgent(
+	teamId: string,
+	taskId: string,
+): RegisteredAgent | undefined {
+	return taskRegistry.get(teamId)?.get(taskId)
+}
+
+export function getAllTaskAgents(teamId: string): Map<string, RegisteredAgent> {
+	return taskRegistry.get(teamId) ?? new Map()
+}
+
 export function getAllAgents(teamId: string): RegisteredAgent[] {
 	const team = registry.get(teamId)
-	return team ? [...team.values()] : []
+	const roleAgents = team ? [...team.values()] : []
+	const taskAgents = taskRegistry.get(teamId)
+	const taskAgentsList = taskAgents ? [...taskAgents.values()] : []
+	return [...roleAgents, ...taskAgentsList]
 }
 
 export function closeAgent(teamId: string, role: string, agentId?: string) {
@@ -49,12 +82,33 @@ export function closeAgent(teamId: string, role: string, agentId?: string) {
 	if (team.size === 0) registry.delete(teamId)
 }
 
-export function closeAllAgents(teamId: string) {
-	const team = registry.get(teamId)
+export function closeTaskAgent(teamId: string, taskId: string) {
+	const team = taskRegistry.get(teamId)
 	if (!team) return
-	for (const entry of team.values()) {
+	const entry = team.get(taskId)
+	if (entry) {
 		entry.queue.close()
 		entry.query.close()
+		team.delete(taskId)
 	}
-	registry.delete(teamId)
+	if (team.size === 0) taskRegistry.delete(teamId)
+}
+
+export function closeAllAgents(teamId: string) {
+	const team = registry.get(teamId)
+	if (team) {
+		for (const entry of team.values()) {
+			entry.queue.close()
+			entry.query.close()
+		}
+		registry.delete(teamId)
+	}
+	const taskTeam = taskRegistry.get(teamId)
+	if (taskTeam) {
+		for (const entry of taskTeam.values()) {
+			entry.queue.close()
+			entry.query.close()
+		}
+		taskRegistry.delete(teamId)
+	}
 }

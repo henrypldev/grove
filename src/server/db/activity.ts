@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gt, sql } from 'drizzle-orm'
 import type { TeamActivity } from '../types'
+import { dbGetAgent } from './agents'
 import { getDb } from './index'
 import { activity, pmReports } from './schema'
 
@@ -43,7 +44,19 @@ export function dbInsertActivity(
 	payload: Record<string, unknown>,
 ): TeamActivity {
 	const now = Date.now()
-	const payloadStr = JSON.stringify(payload)
+	// Inject agent identity into payload so the frontend can label activity
+	let enriched = payload
+	if (agentId) {
+		const agent = dbGetAgent(agentId)
+		if (agent) {
+			enriched = {
+				agentRole: agent.role,
+				...(agent.taskId ? { taskId: agent.taskId } : {}),
+				...payload,
+			}
+		}
+	}
+	const payloadStr = JSON.stringify(enriched)
 	const result = getDb()
 		.insert(activity)
 		.values({

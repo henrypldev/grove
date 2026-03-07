@@ -44,7 +44,7 @@ export const TEAM = {
 	repoId: 'r1',
 	worktreePath: '/tmp/wt',
 	task: 'task',
-	status: 'planning' as const,
+	status: 'working' as const,
 	pmSummary: null,
 	prUrl: null,
 	title: null,

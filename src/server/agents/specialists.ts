@@ -1,5 +1,6 @@
 import { generateId, log } from '../config'
 import type { Team } from '../types'
+import { registerTaskAgent } from './agent-registry'
 import { createGroveTools } from './grove-tools'
 import type { PersistentAgentResult } from './runner'
 import { spawnPersistentAgent } from './runner'
@@ -9,14 +10,26 @@ const header = (role: string, team: Team) =>
 
 const TEAM_LEAD_PROMPT = (team: Team) => `${header('Team Lead', team)}
 
-1. get_prd() — if PRD exists, review codebase, create design doc via save_design_doc(), set task dependencies via get_tasks()/update_task, then post_activity("agent:message", { "text": "@pm design doc ready. [summary]" })
-2. If no PRD (question/audit): investigate codebase, post findings to @pm.
+1. get_prd() — if PRD exists, review codebase, then:
+   a. Create tasks via create_tasks() with simple IDs. Design for parallelism (see below).
+   b. Set blocked_by on tasks that depend on others via update_task().
+   c. Create design doc via save_design_doc() — include which files/modules each task touches.
+   d. delegate_to("pm", "design doc and tasks ready. [summary]").
+2. If no PRD (question/audit): investigate codebase, delegate_to("pm", "<findings>").
 3. If you discover reusable patterns, append them to CLAUDE.md under ## Patterns (no duplicates, commit separately).
+
+## Parallel task design
+When creating tasks, design them so multiple devs can work in parallel:
+- Tasks that touch different files/modules should have NO dependencies between them — mark them as parallelizable by NOT adding blocked_by.
+- Only add blocked_by when a task genuinely depends on another task's output (e.g. task 2 needs types defined in task 1).
+- In the design doc, clearly state which files/modules each task should touch so devs don't overlap.
+
+Post progress updates via post_activity("agent:message", { "text": "<status>" }) as you work — e.g. when starting codebase review, when creating the design doc, and before delegating back.
 
 Then STOP and wait.
 `
 
-const DEV_PROMPT = (team: Team) => `${header('Developer', team)}
+const DEV_PROMPT = (team: Team, taskId?: string) => `${header('Developer', team)}${taskId ? `\nAssigned task: ${taskId}` : ''}
 Implement only what is asked — nothing more. Follow existing code patterns.
 
 ## Setup
@@ -28,11 +41,11 @@ Run typecheck and lint/format (check package.json for commands). Only commit if 
 ## On completion
 1. append_note: ## [task-id]: [title] — files changed, approach, learnings, gotchas.
 2. If you found reusable patterns, append to CLAUDE.md ## Patterns (no duplicates, commit separately).
-3. post_activity("dev:complete", { "summary": "WHAT_WAS_DONE" }) — then STOP.
+3. post_activity("dev:complete", { "summary": "WHAT_WAS_DONE"${taskId ? `, "taskId": "${taskId}"` : ''} }) — then STOP.
 
 ## Follow-ups
 - Rework: fix, run quality gates, commit, post dev:complete.
-- PR request: commit, gh pr create, then post_activity("dev:pr-created", { "url": "URL" }) and message @pm.
+- PR request: commit, gh pr create, then post_activity("dev:pr-created", { "url": "URL" }) and delegate_to("pm", "PR created: <URL>").
 
 ## Extra
 
@@ -42,15 +55,19 @@ Run typecheck and lint/format (check package.json for commands). Only commit if 
 const QA_PROMPT = (team: Team) => `${header('QA', team)}
 
 1. get_events(0) to understand what was implemented.
-2. Run tests, check git diff HEAD. Focus on whether the change works — don't re-investigate the original problem.
-3. post_activity("qa:result", { "passed": true/false, "feedback": "SUMMARY" }) and message @pm with results.
+2. Post post_activity("agent:message", { "text": "Starting QA — running tests and reviewing diff" }).
+3. Run tests, check git diff HEAD. Focus on whether the change works — don't re-investigate the original problem.
+4. Post progress updates via post_activity("agent:message", { "text": "<status>" }) as you work — e.g. test results, issues found.
+5. post_activity("qa:result", { "passed": true/false, "feedback": "SUMMARY" }) and delegate_to("pm", "<results summary>").
 `
 
 const REVIEWER_PROMPT = (team: Team) => `${header('Reviewer', team)}
 
 1. get_events(0) for context.
-2. Review git diff HEAD for quality, correctness, security, and pattern adherence. Focus on the change only.
-3. post_activity("reviewer:result", { "approved": true/false, "comments": "NOTES" }) and message @pm.
+2. Post post_activity("agent:message", { "text": "Starting code review" }).
+3. Review git diff HEAD for quality, correctness, security, and pattern adherence. Focus on the change only.
+4. Post progress updates via post_activity("agent:message", { "text": "<status>" }) as you work — e.g. areas being reviewed, issues spotted.
+5. post_activity("reviewer:result", { "approved": true/false, "comments": "NOTES" }) and delegate_to("pm", "<review results>").
 
 Approve unless there are critical or security issues.
 `
@@ -120,6 +137,41 @@ export async function spawnDeveloper(
 		mcpTools: createGroveTools(team.id, agentId),
 		onPostBash: options?.onPostBash,
 	})
+}
+
+/**
+ * Spawn a dev agent for a specific task in its own worktree.
+ * Registered in the task registry (not the role registry) so multiple devs can coexist.
+ */
+export async function spawnTaskDeveloper(
+	team: Team,
+	taskId: string,
+	taskWorktreePath: string,
+	options?: { onPostBash?: (command: string) => void },
+): Promise<PersistentAgentResult> {
+	log('agent', `spawning task developer for task ${taskId}`, {
+		teamId: team.id,
+	})
+	const agentId = generateId()
+	const taskTeam: Team = { ...team, worktreePath: taskWorktreePath }
+	const result = await spawnPersistentAgent({
+		agentId,
+		teamId: team.id,
+		role: 'dev',
+		prompt: DEV_PROMPT(taskTeam, taskId),
+		cwd: taskWorktreePath,
+		maxBudgetUsd: 30,
+		mcpTools: createGroveTools(team.id, agentId),
+		onPostBash: options?.onPostBash,
+		skipRoleRegistry: true,
+		taskId,
+	})
+	registerTaskAgent(team.id, taskId, {
+		agentId,
+		queue: result.queue,
+		query: result.query,
+	})
+	return result
 }
 
 export async function spawnQaAgent(team: Team): Promise<PersistentAgentResult> {

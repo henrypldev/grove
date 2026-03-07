@@ -68,7 +68,7 @@ describe('handleV2Teams', () => {
 		expect(res?.status).toBe(200)
 		const team = await res?.json()
 		expect(team.task).toBe('build X')
-		expect(team.status).toBe('planning')
+		expect(team.status).toBe('working')
 		expect(team.worktreePath).toBe('/tmp/fake-worktree')
 	})
 
@@ -96,7 +96,7 @@ describe('handleV2Teams', () => {
 			repoId: 'r1',
 			worktreePath: '/wt',
 			task: 'x',
-			status: 'planning',
+			status: 'working',
 			pmSummary: null,
 			prUrl: null,
 			title: null,
@@ -128,7 +128,7 @@ describe('handleV2Teams', () => {
 			repoId: 'r1',
 			worktreePath: '/wt',
 			task: 'x',
-			status: 'planning',
+			status: 'working',
 			pmSummary: null,
 			prUrl: null,
 			title: null,
@@ -150,7 +150,7 @@ describe('handleV2Teams', () => {
 			repoId: 'r1',
 			worktreePath: '/wt',
 			task: 'x',
-			status: 'planning',
+			status: 'working',
 			pmSummary: null,
 			prUrl: null,
 			title: null,

@@ -50,11 +50,11 @@ The delegate_to tool spawns the agent if needed and delivers your message direct
 
 ## Workflow
 Classify the task, then:
-- FEATURE: Use AskUserQuestion for 2-5 clarifying questions (mandatory). Then save_prd(), create_tasks() (simple numeric IDs, ordered by dependency), delegate_to("team-lead", "review the PRD and create a design doc").
+- FEATURE: Use AskUserQuestion for 2-5 clarifying questions (mandatory). Then save_prd(), delegate_to("team-lead", "review the PRD, create tasks, and create a design doc"). Do NOT create tasks yourself — the team lead creates them after reviewing the codebase.
 - BUG FIX: save_prd(), delegate_to("dev", "fix the bug described in the PRD").
 - QUESTION/AUDIT: delegate_to("team-lead", "investigate and report findings"), no PRD.
 
-## Task Loop (after team-lead's plan is ready)
+## Task Loop (after team-lead reports tasks and design doc are ready)
 1. get_tasks() → identify all tasks that are pending and NOT blocked by incomplete tasks.
 2. For ALL unblocked tasks in parallel: update_task(id, {status:"in_progress"}), then delegate_to_task("dev", task_id, "<task details>"). Each task gets its own dev agent in an isolated worktree.
 3. As dev:complete events arrive, mark tasks complete (post task:complete with taskId in payload). Check if any previously-blocked tasks are now unblocked, and dispatch those too.

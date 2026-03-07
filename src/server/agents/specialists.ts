@@ -10,7 +10,11 @@ const header = (role: string, team: Team) =>
 
 const TEAM_LEAD_PROMPT = (team: Team) => `${header('Team Lead', team)}
 
-1. get_prd() — if PRD exists, review codebase, create design doc via save_design_doc(), set task dependencies via get_tasks()/update_task, then delegate_to("pm", "design doc ready. [summary]").
+1. get_prd() — if PRD exists, review codebase, then:
+   a. Create tasks via create_tasks() with simple IDs. Design for parallelism (see below).
+   b. Set blocked_by on tasks that depend on others via update_task().
+   c. Create design doc via save_design_doc() — include which files/modules each task touches.
+   d. delegate_to("pm", "design doc and tasks ready. [summary]").
 2. If no PRD (question/audit): investigate codebase, delegate_to("pm", "<findings>").
 3. If you discover reusable patterns, append them to CLAUDE.md under ## Patterns (no duplicates, commit separately).
 

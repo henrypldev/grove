@@ -49,14 +49,7 @@ export interface PushToken {
 	registeredAt: string
 }
 
-export type TeamStatus =
-	| 'planning'
-	| 'active'
-	| 'blocked'
-	| 'review'
-	| 'idle'
-	| 'done'
-	| 'archived'
+export type TeamStatus = 'working' | 'blocked' | 'done' | 'archived'
 export type AgentRole =
 	| 'orchestrator'
 	| 'pm'

@@ -39,14 +39,6 @@ import {
 	spawnTeamLead,
 } from './specialists'
 
-/** Transition team from planning → active on first real work dispatch. */
-function activateTeamIfPlanning(teamId: string) {
-	const team = dbGetTeam(teamId)
-	if (team?.status === 'planning') {
-		dbUpdateTeamStatus(teamId, 'active')
-	}
-}
-
 /** Valid roles that can be dispatched to. */
 const VALID_ROLES = new Set([
 	'pm',
@@ -280,10 +272,10 @@ export async function onNewTeam(
 					return null
 				}
 			})()
-			log('orchestrator', 'pm:summary received, team idle', {
+			log('orchestrator', 'pm:summary received, team done', {
 				teamId: team.id,
 			})
-			dbUpdateTeamStatus(team.id, 'idle', summary ?? undefined)
+			dbUpdateTeamStatus(team.id, 'done', summary ?? undefined)
 		}
 	})
 
@@ -345,9 +337,8 @@ export async function dispatchToTaskDev(
 		worktreePath: result.path,
 	})
 
-	// Mark task as in_progress and team as active
+	// Mark task as in_progress
 	dbUpdateTask(team.id, taskId, { status: 'in_progress' })
-	activateTeamIfPlanning(team.id)
 
 	const persistent = await spawnTaskDeveloper(team, taskId, result.path, {
 		onPostBash: makeOnPostBash(team),
@@ -399,7 +390,6 @@ export async function dispatchToAgent(
 
 	let agent = closeStaleAgent(team.id, targetRole)
 	if (!agent) {
-		activateTeamIfPlanning(team.id)
 		await spawnSpecialist(team, targetRole as AgentRole)
 		agent = getAgent(team.id, targetRole)
 	}
@@ -510,7 +500,7 @@ function watchTeamForCompletion(depTeamId: string, blockedTeamId: string) {
 				const deps = dbGetTeamDependencies(teamId)
 				const stillBlocked = deps.some(d => {
 					const t = dbGetTeam(d.dependsOnTeamId)
-					return t && t.status !== 'idle' && t.status !== 'done'
+					return t && t.status !== 'done'
 				})
 				if (!stillBlocked) {
 					pendingDevSpawns.delete(teamId)
@@ -575,7 +565,7 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 		const deps = dbGetTeamDependencies(team.id)
 		const unsatisfied = deps.filter(d => {
 			const depTeam = dbGetTeam(d.dependsOnTeamId)
-			return depTeam && depTeam.status !== 'idle' && depTeam.status !== 'done'
+			return depTeam && depTeam.status !== 'done'
 		})
 		if (unsatisfied.length > 0) {
 			log('orchestrator', 'dev blocked by dependencies', {

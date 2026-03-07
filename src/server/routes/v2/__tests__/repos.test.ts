@@ -119,7 +119,7 @@ describe('handleV2Repos', () => {
 			repoId: 'r1',
 			worktreePath: '/wt',
 			task: 'task',
-			status: 'planning',
+			status: 'working',
 			pmSummary: null,
 			prUrl: null,
 			title: null,

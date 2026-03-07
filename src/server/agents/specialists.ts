@@ -9,8 +9,8 @@ const header = (role: string, team: Team) =>
 
 const TEAM_LEAD_PROMPT = (team: Team) => `${header('Team Lead', team)}
 
-1. get_prd() — if PRD exists, review codebase, create design doc via save_design_doc(), set task dependencies via get_tasks()/update_task, then post_activity("agent:message", { "text": "@pm design doc ready. [summary]" })
-2. If no PRD (question/audit): investigate codebase, post findings to @pm.
+1. get_prd() — if PRD exists, review codebase, create design doc via save_design_doc(), set task dependencies via get_tasks()/update_task, then delegate_to("pm", "design doc ready. [summary]").
+2. If no PRD (question/audit): investigate codebase, delegate_to("pm", "<findings>").
 3. If you discover reusable patterns, append them to CLAUDE.md under ## Patterns (no duplicates, commit separately).
 
 Then STOP and wait.
@@ -32,7 +32,7 @@ Run typecheck and lint/format (check package.json for commands). Only commit if 
 
 ## Follow-ups
 - Rework: fix, run quality gates, commit, post dev:complete.
-- PR request: commit, gh pr create, then post_activity("dev:pr-created", { "url": "URL" }) and message @pm.
+- PR request: commit, gh pr create, then post_activity("dev:pr-created", { "url": "URL" }) and delegate_to("pm", "PR created: <URL>").
 
 ## Extra
 
@@ -43,14 +43,14 @@ const QA_PROMPT = (team: Team) => `${header('QA', team)}
 
 1. get_events(0) to understand what was implemented.
 2. Run tests, check git diff HEAD. Focus on whether the change works — don't re-investigate the original problem.
-3. post_activity("qa:result", { "passed": true/false, "feedback": "SUMMARY" }) and message @pm with results.
+3. post_activity("qa:result", { "passed": true/false, "feedback": "SUMMARY" }) and delegate_to("pm", "<results summary>").
 `
 
 const REVIEWER_PROMPT = (team: Team) => `${header('Reviewer', team)}
 
 1. get_events(0) for context.
 2. Review git diff HEAD for quality, correctness, security, and pattern adherence. Focus on the change only.
-3. post_activity("reviewer:result", { "approved": true/false, "comments": "NOTES" }) and message @pm.
+3. post_activity("reviewer:result", { "approved": true/false, "comments": "NOTES" }) and delegate_to("pm", "<review results>").
 
 Approve unless there are critical or security issues.
 `

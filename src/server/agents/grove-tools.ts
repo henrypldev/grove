@@ -7,6 +7,7 @@ import { dbUpdateAgentStatus } from '../db/agents'
 import { dbGetDesignDoc, dbUpsertDesignDoc } from '../db/design-docs'
 import { dbGetPrd, dbUpsertPrd } from '../db/prds'
 import { dbGetTeam, dbListTeams } from '../db/teams'
+import type { Team } from '../types'
 
 interface QuestionOption {
 	label: string
@@ -75,6 +76,8 @@ export function createGroveTools(
 	agentId: string,
 	options?: GroveToolOptions,
 ) {
+	const team = dbGetTeam(teamId) as Team
+
 	return createSdkMcpServer({
 		name: 'grove',
 		version: '1.0.0',
@@ -98,6 +101,66 @@ export function createGroveTools(
 						payload as Record<string, unknown>,
 					)
 					return { content: [{ type: 'text' as const, text: 'ok' }] }
+				},
+			),
+			tool(
+				'delegate_to',
+				'Dispatch a message to a specific agent role. Spawns the agent if needed. Use this instead of @-mentions to coordinate with other agents.',
+				{
+					role: z
+						.enum([
+							'pm',
+							'team-lead',
+							'dev',
+							'qa',
+							'reviewer',
+							'expo',
+						])
+						.describe('The target agent role'),
+					message: z
+						.string()
+						.describe(
+							'The instruction or message to send to the target agent',
+						),
+				},
+				async ({ role, message }) => {
+					const { dispatchToAgent } = await import('./orchestrator')
+					if (!team) {
+						return {
+							content: [
+								{ type: 'text' as const, text: 'error: team not found' },
+							],
+						}
+					}
+					// Log the delegation as an activity for visibility
+					dbInsertActivity(teamId, agentId, 'agent:delegate', {
+						targetRole: role,
+						message,
+					})
+					const result = await dispatchToAgent(
+						team,
+						role,
+						message,
+						agentId,
+					)
+					if (!result.dispatched) {
+						return {
+							content: [
+								{
+									type: 'text' as const,
+									text: `dispatch failed: ${result.error}`,
+								},
+							],
+						}
+					}
+					return {
+						content: [
+							{
+								type: 'text' as const,
+								text: `dispatched to ${role}`,
+							},
+						],
+					}
 				},
 			),
 			tool(

@@ -578,6 +578,7 @@ export async function handleV2Teams(
 		let text: string | undefined
 		let answers: Record<string, string> | undefined
 		let contentBlocks: SDKUserMessage['message']['content'] | undefined
+		let targetRole: string | undefined
 
 		const contentType = req.headers.get('content-type') ?? ''
 		if (contentType.includes('multipart/form-data')) {
@@ -594,6 +595,7 @@ export async function handleV2Teams(
 				}
 			}
 			text = formData.get('text') as string | undefined
+			targetRole = formData.get('targetRole') as string | undefined
 			if (!text && !answers)
 				return Response.json(
 					{ error: 'Missing text' },
@@ -628,9 +630,11 @@ export async function handleV2Teams(
 			const body = (await req.json()) as {
 				text?: string
 				answers?: Record<string, string>
+				targetRole?: string
 			}
 			text = body.text
 			answers = body.answers
+			targetRole = body.targetRole
 		}
 
 		if (answers) {
@@ -658,7 +662,7 @@ export async function handleV2Teams(
 			...(attachments?.length ? { attachments } : {}),
 		})
 		const { routeMessageToAgents } = await import('../../agents/orchestrator')
-		await routeMessageToAgents(team, text, undefined, contentBlocks)
+		await routeMessageToAgents(team, text, undefined, contentBlocks, targetRole)
 		return Response.json(event, { headers })
 	}
 

@@ -31,7 +31,15 @@ import {
 	spawnTeamLead,
 } from './specialists'
 
-const MENTION_PATTERN = /@(pm|team-lead|dev|qa|reviewer|expo)\b/g
+/** Valid roles that can be dispatched to. */
+const VALID_ROLES = new Set([
+	'pm',
+	'team-lead',
+	'dev',
+	'qa',
+	'reviewer',
+	'expo',
+])
 
 const devBaseCommit = new Map<string, string>()
 
@@ -126,9 +134,9 @@ export async function onNewTeam(
 	pmRef.agentId = initialPm.id
 
 	subscribeToTeamActivity(team.id, async event => {
-		if (event.type !== 'agent:message') return
+		if (event.type !== 'agent:delegate') return
 
-		let payload: { text?: string }
+		let payload: { targetRole?: string; message?: string }
 		try {
 			payload =
 				typeof event.payload === 'string'
@@ -138,10 +146,14 @@ export async function onNewTeam(
 			return
 		}
 
-		const text = payload.text
-		if (!text) return
+		if (!payload.targetRole || !payload.message) return
 
-		await routeMessageToAgents(team, text, event.agentId ?? undefined)
+		await dispatchToAgent(
+			team,
+			payload.targetRole,
+			payload.message,
+			event.agentId ?? undefined,
+		)
 	})
 
 	subscribeToTeamActivity(team.id, async event => {
@@ -168,9 +180,15 @@ export async function onNewTeam(
 			const diff = await computeDiff(team.worktreePath, base)
 			devBaseCommit.delete(team.id)
 			dbInsertActivity(team.id, event.agentId, 'agent:message', {
-				text: `@pm done. ${payload.summary ?? ''}`,
+				text: `Dev complete. ${payload.summary ?? ''}`,
 				diff: diff ?? undefined,
 			})
+			await dispatchToAgent(
+				team,
+				'pm',
+				`Dev complete. ${payload.summary ?? ''}`,
+				event.agentId ?? undefined,
+			)
 		}
 		if (event.type === 'dev:pr-created') {
 			let payload: { url?: string }
@@ -227,104 +245,102 @@ export async function onNewTeam(
 	})
 }
 
-export async function routeMessageToAgents(
+/**
+ * Dispatch a message to a specific agent role. Used by the `delegate_to` tool
+ * and by the activity listener for structured agent-to-agent routing.
+ */
+export async function dispatchToAgent(
 	team: Team,
+	targetRole: string,
 	text: string,
 	senderAgentId?: string,
 	contentBlocks?: SDKUserMessage['message']['content'],
-) {
-	if (!senderAgentId && resolveUserReply(team.id, text)) return
-
-	const mentions = new Set<string>()
-	for (const match of text.matchAll(MENTION_PATTERN)) {
-		mentions.add(match[1])
+): Promise<{ dispatched: boolean; error?: string }> {
+	if (!VALID_ROLES.has(targetRole)) {
+		return { dispatched: false, error: `Unknown role: ${targetRole}` }
 	}
 
-	function makePmCallbacks() {
-		const ref = { agentId: '' }
-		const callbacks = {
-			onDone: () => {
-				log('orchestrator', 'pm process exited', { teamId: team.id })
-				closeAgent(team.id, 'pm', ref.agentId)
-			},
-			onError: () => {
-				dbUpdateTeamStatus(team.id, 'blocked')
-				closeAgent(team.id, 'pm', ref.agentId)
-			},
-			contentBlocks,
-		}
-		return { ref, callbacks }
-	}
-
-	if (mentions.size === 0) {
+	if (targetRole === 'pm') {
 		const pmAgent = closeStaleAgent(team.id, 'pm')
 		if (!pmAgent) {
 			log('orchestrator', 'pm not found, respawning', { teamId: team.id })
-			const { ref, callbacks } = makePmCallbacks()
+			const { ref, callbacks } = makePmCallbacks(team, contentBlocks)
 			const { agent } = await respawnPm(team, text, callbacks)
 			ref.agentId = agent.id
-			return
+			return { dispatched: true }
 		}
 		if (pmAgent.agentId !== senderAgentId) {
-			log(
-				'orchestrator',
-				`routing to pm (default) from ${senderAgentId ?? 'user'}`,
-				{
-					teamId: team.id,
-				},
-			)
+			log('orchestrator', `routing to pm from ${senderAgentId ?? 'user'}`, {
+				teamId: team.id,
+			})
 			if (contentBlocks) {
 				pmAgent.queue.pushContent(contentBlocks)
 			} else {
 				pmAgent.queue.push(text)
 			}
 		}
-		return
+		return { dispatched: true }
 	}
 
-	for (const role of mentions) {
-		if (role === 'pm') {
-			const pmAgent = closeStaleAgent(team.id, 'pm')
-			if (!pmAgent) {
-				log('orchestrator', 'pm not found, respawning', { teamId: team.id })
-				const { ref: pmRef, callbacks: pmCbs } = makePmCallbacks()
-				const { agent: pmResult } = await respawnPm(team, text, pmCbs)
-				pmRef.agentId = pmResult.id
-				continue
-			}
-			if (pmAgent.agentId !== senderAgentId) {
-				log('orchestrator', `routing to pm from ${senderAgentId ?? 'user'}`, {
-					teamId: team.id,
-				})
-				if (contentBlocks) {
-					pmAgent.queue.pushContent(contentBlocks)
-				} else {
-					pmAgent.queue.push(text)
-				}
-			}
-			continue
-		}
-
-		let agent = closeStaleAgent(team.id, role)
-		if (!agent) {
-			await spawnSpecialist(team, role as AgentRole)
-			agent = getAgent(team.id, role)
-		}
-		if (agent && agent.agentId !== senderAgentId) {
-			log(
-				'orchestrator',
-				`routing to ${role} from ${senderAgentId ?? 'user'}`,
-				{
-					teamId: team.id,
-				},
-			)
-			if (contentBlocks) {
-				agent.queue.pushContent(contentBlocks)
-			} else {
-				agent.queue.push(text)
-			}
-		}
+	let agent = closeStaleAgent(team.id, targetRole)
+	if (!agent) {
+		await spawnSpecialist(team, targetRole as AgentRole)
+		agent = getAgent(team.id, targetRole)
 	}
+	if (agent && agent.agentId !== senderAgentId) {
+		log(
+			'orchestrator',
+			`routing to ${targetRole} from ${senderAgentId ?? 'user'}`,
+			{ teamId: team.id },
+		)
+		if (contentBlocks) {
+			agent.queue.pushContent(contentBlocks)
+		} else {
+			agent.queue.push(text)
+		}
+		return { dispatched: true }
+	}
+	return {
+		dispatched: false,
+		error: `Failed to spawn or find agent for role: ${targetRole}`,
+	}
+}
+
+function makePmCallbacks(
+	team: Team,
+	contentBlocks?: SDKUserMessage['message']['content'],
+) {
+	const ref = { agentId: '' }
+	const callbacks = {
+		onDone: () => {
+			log('orchestrator', 'pm process exited', { teamId: team.id })
+			closeAgent(team.id, 'pm', ref.agentId)
+		},
+		onError: () => {
+			dbUpdateTeamStatus(team.id, 'blocked')
+			closeAgent(team.id, 'pm', ref.agentId)
+		},
+		contentBlocks,
+	}
+	return { ref, callbacks }
+}
+
+/**
+ * Route a message to the appropriate agent.
+ * If targetRole is specified, dispatch directly to that role.
+ * Otherwise, route to PM (default coordinator).
+ */
+export async function routeMessageToAgents(
+	team: Team,
+	text: string,
+	senderAgentId?: string,
+	contentBlocks?: SDKUserMessage['message']['content'],
+	targetRole?: string,
+) {
+	if (!senderAgentId && resolveUserReply(team.id, text)) return
+
+	const role = targetRole ?? 'pm'
+	await dispatchToAgent(team, role, text, senderAgentId, contentBlocks)
 }
 
 export async function closeTeam(teamId: string) {
@@ -455,8 +471,13 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 				watchTeamForCompletion(dep.dependsOnTeamId, team.id)
 			}
 			dbInsertActivity(team.id, null, 'agent:message', {
-				text: '@pm Dev work is waiting for dependent teams to complete.',
+				text: 'Dev work is waiting for dependent teams to complete.',
 			})
+			await dispatchToAgent(
+				team,
+				'pm',
+				'Dev work is waiting for dependent teams to complete.',
+			)
 			return
 		}
 		if (deps.length > 0) await mergeDependencyBranches(team)

@@ -31,6 +31,7 @@ import {
 	archiveTeam,
 	cancelSetup,
 	closeTeam,
+	generateTeamPrDescription,
 	getBuildLogs,
 	getDevServerLogs,
 	getSetupLogs,
@@ -199,6 +200,11 @@ register('teams:dev-server:stdin', p =>
 	sendDevServerInput({ id: p.id as string, input: p.input as string }),
 )
 register('teams:dev-server:logs', p => getDevServerLogs({ id: p.id as string }))
+
+// Teams - PR description
+register('teams:pr-description', p =>
+	generateTeamPrDescription({ id: p.id as string }),
+)
 
 // Dashboard & usage
 register('dashboard', () => getDashboard())

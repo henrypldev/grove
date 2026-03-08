@@ -338,6 +338,13 @@ export function getDevServerLogs(params: { id: string }) {
 	return { status, output }
 }
 
+export async function generateTeamPrDescription(params: { id: string }) {
+	const team = dbGetTeam(params.id)
+	if (!team) return { error: 'Team not found' }
+	const { generatePrDescription } = await import('../../api/pr-description')
+	return generatePrDescription(team.worktreePath)
+}
+
 // --- HTTP handler ---
 
 export async function handleV2Teams(
@@ -857,6 +864,16 @@ export async function handleV2Teams(
 		const result = await getDevServerLogs({ id: devServerLogsMatch.id })
 		if ('error' in result)
 			return Response.json(result, { status: 404, headers })
+		return Response.json(result, { headers })
+	}
+
+	const prDescMatch = matchRoute(path, '/v2/teams/:id/pr-description')
+	if (prDescMatch && method === 'POST') {
+		const result = await generateTeamPrDescription({ id: prDescMatch.id })
+		if ('error' in result) {
+			const status = result.error === 'Team not found' ? 404 : 500
+			return Response.json(result, { status, headers })
+		}
 		return Response.json(result, { headers })
 	}
 

@@ -58,7 +58,7 @@ Classify the task, then:
 1. get_tasks() → identify all tasks that are pending and NOT blocked by incomplete tasks.
 2. For ALL unblocked tasks in parallel: update_task(id, {status:"in_progress"}), then delegate_to_task("dev", task_id, "<task details>"). Each task gets its own dev agent in an isolated worktree.
 3. As dev:complete events arrive, mark tasks complete (post task:complete with taskId in payload). Check if any previously-blocked tasks are now unblocked, and dispatch those too.
-4. Once ALL tasks are done → delegate_to("qa", "test the implementation") → wait for qa:result → delegate_to("reviewer", "review the changes") → wait for approval → delegate_to("dev", "open a PR").
+4. Once ALL tasks are done → delegate_to("qa", "test the implementation") → wait for qa:result → delegate_to("reviewer", "review the changes") → wait for approval → post pm:summary and celebrate.
 
 IMPORTANT: Use delegate_to_task (not delegate_to) when dispatching dev work for specific tasks. This spawns each dev in its own worktree so they can work in parallel without conflicts.
 
@@ -66,8 +66,7 @@ IMPORTANT: Use delegate_to_task (not delegate_to) when dispatching dev work for 
 - QA failed → delegate_to("dev", "<feedback>") (track retries, max 3).
 - QA passed → delegate_to("reviewer", "review the changes").
 - Reviewer feedback → delegate_to("dev", "<feedback>") (max 3 retries).
-- Reviewer approved → delegate_to("dev", "open a PR").
-- PR created → get_events(0), post pm:summary, celebrate.
+- Reviewer approved → get_events(0), post pm:summary, celebrate. The user will create the PR from the UI.
 - 3 failures → post pm:blocked and pm:summary.
 `
 
@@ -86,8 +85,7 @@ Start with get_events(0) to read full history. Do NOT re-create existing PRDs or
 
 ## Message handling
 - QA failed → delegate_to("dev", "<feedback>") (max 3 retries). QA passed → delegate_to("reviewer", "review the changes").
-- Reviewer feedback → delegate_to("dev", "<feedback>") (max 3). Reviewer approved → delegate_to("dev", "open a PR").
-- PR created → get_events(0), post pm:summary, celebrate.
+- Reviewer feedback → delegate_to("dev", "<feedback>") (max 3). Reviewer approved → get_events(0), post pm:summary, celebrate. The user will create the PR from the UI.
 - 3 failures → post pm:blocked and pm:summary.
 
 ## User message

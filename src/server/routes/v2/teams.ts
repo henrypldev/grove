@@ -339,59 +339,12 @@ export function getDevServerLogs(params: { id: string }) {
 	return { status, output }
 }
 
-export async function generateTeamPrDescription(params: { id: string }) {
-	const team = dbGetTeam(params.id)
-	if (!team) return { error: 'Team not found' }
-	const { generatePrDescription } = await import('../../api/pr-description')
-	return generatePrDescription(team.worktreePath)
-}
-
-export async function createTeamPr(params: {
-	id: string
-	title: string
-	body: string
-}) {
+export async function createTeamPr(params: { id: string }) {
 	const team = dbGetTeam(params.id)
 	if (!team) return { error: 'Team not found' }
 
-	const cwd = team.worktreePath
-
-	// Get current branch
-	const branchProc = Bun.spawn(
-		['git', 'branch', '--show-current'],
-		{ cwd, stdout: 'pipe', stderr: 'pipe' },
-	)
-	const branch = (await new Response(branchProc.stdout).text()).trim()
-	await branchProc.exited
-	if (!branch) return { error: 'Could not determine current branch' }
-
-	// Push branch to remote
-	const pushProc = Bun.spawn(
-		['git', 'push', '-u', 'origin', branch],
-		{ cwd, stdout: 'pipe', stderr: 'pipe' },
-	)
-	const pushStderr = (await new Response(pushProc.stderr).text()).trim()
-	const pushCode = await pushProc.exited
-	if (pushCode !== 0) return { error: `Failed to push branch: ${pushStderr}` }
-
-	// Create PR via gh CLI
-	const ghProc = Bun.spawn(
-		[
-			'gh', 'pr', 'create',
-			'--title', params.title,
-			'--body', params.body,
-			'--base', 'main',
-			'--head', branch,
-		],
-		{ cwd, stdout: 'pipe', stderr: 'pipe' },
-	)
-	const ghOut = (await new Response(ghProc.stdout).text()).trim()
-	const ghErr = (await new Response(ghProc.stderr).text()).trim()
-	const ghCode = await ghProc.exited
-	if (ghCode !== 0) return { error: `Failed to create PR: ${ghErr}` }
-
-	// ghOut should be the PR URL
-	const prUrl = ghOut
+	const { createPr } = await import('../../api/pr-description')
+	const { prUrl } = await createPr(team.worktreePath)
 	dbUpdateTeamPrUrl(params.id, prUrl)
 
 	return { prUrl }
@@ -919,22 +872,9 @@ export async function handleV2Teams(
 		return Response.json(result, { headers })
 	}
 
-	const prDescMatch = matchRoute(path, '/v2/teams/:id/pr-description')
-	if (prDescMatch && method === 'POST') {
-		const result = await generateTeamPrDescription({ id: prDescMatch.id })
-		if ('error' in result) {
-			const status = result.error === 'Team not found' ? 404 : 500
-			return Response.json(result, { status, headers })
-		}
-		return Response.json(result, { headers })
-	}
-
 	const createPrMatch = matchRoute(path, '/v2/teams/:id/create-pr')
 	if (createPrMatch && method === 'POST') {
-		const body = (await req.json()) as { title: string; body: string }
-		if (!body.title || !body.body)
-			return Response.json({ error: 'Missing title or body' }, { status: 400, headers })
-		const result = await createTeamPr({ id: createPrMatch.id, title: body.title, body: body.body })
+		const result = await createTeamPr({ id: createPrMatch.id })
 		if ('error' in result) {
 			const status = result.error === 'Team not found' ? 404 : 500
 			return Response.json(result, { status, headers })

@@ -61,7 +61,7 @@ describe('db/activity', () => {
 		expect(typeof ev.id).toBe('number')
 		expect(ev.teamId).toBe('t1')
 		expect(ev.type).toBe('test:event')
-		expect(JSON.parse(ev.payload)).toEqual({ foo: 'bar' })
+		expect(JSON.parse(ev.payload)).toEqual({ agentRole: 'dev', foo: 'bar' })
 	})
 
 	test('getLatestActivityId after insert', () => {

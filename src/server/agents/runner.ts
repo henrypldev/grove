@@ -292,6 +292,59 @@ async function processMessages(
 	}
 }
 
+function stripToolInput(
+	toolName: string,
+	toolInput: unknown,
+): Record<string, unknown> | undefined {
+	if (!toolInput || typeof toolInput !== 'object') return undefined
+	const raw = toolInput as Record<string, unknown>
+	switch (toolName) {
+		case 'Read':
+			return pick(raw, ['file_path', 'offset', 'limit'])
+		case 'Write':
+			return pick(raw, ['file_path'])
+		case 'Edit':
+			return pick(raw, ['file_path'])
+		case 'Bash':
+		case 'BashOutput':
+			return pick(raw, ['command', 'description', 'timeout'])
+		case 'Glob':
+			return pick(raw, ['pattern', 'path'])
+		case 'Grep':
+			return pick(raw, ['pattern', 'path', 'glob', 'type'])
+		case 'WebFetch':
+			return pick(raw, ['url'])
+		case 'WebSearch':
+			return pick(raw, ['query'])
+		case 'Task':
+		case 'Agent':
+			return pick(raw, ['description', 'prompt'])
+		case 'NotebookEdit':
+			return pick(raw, ['notebook_path', 'cell_id', 'type'])
+		default:
+			// For unknown tools, include only string/number/boolean values under 200 chars
+			return Object.fromEntries(
+				Object.entries(raw).filter(
+					([, v]) =>
+						(typeof v === 'string' && v.length < 200) ||
+						typeof v === 'number' ||
+						typeof v === 'boolean',
+				),
+			)
+	}
+}
+
+function pick(
+	obj: Record<string, unknown>,
+	keys: string[],
+): Record<string, unknown> {
+	const result: Record<string, unknown> = {}
+	for (const key of keys) {
+		if (key in obj) result[key] = obj[key]
+	}
+	return result
+}
+
 function buildHooks(
 	agent: Agent,
 	pending: Map<string, ToolCall>,
@@ -318,6 +371,11 @@ function buildHooks(
 								activity,
 							},
 						)
+						const strippedInput = stripToolInput(h.tool_name, h.tool_input)
+						dbInsertActivity(agent.teamId, agent.id, 'agent:tool_use', {
+							tool: h.tool_name,
+							...(strippedInput ? { input: strippedInput } : {}),
+						})
 						return {}
 					},
 				],

@@ -14,8 +14,8 @@ import {
 } from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertActivity, subscribeToTeamActivity } from '../db/activity'
-import { dbGetAgent } from '../db/agents'
 import { dbUpdateTask } from '../db/agent-tasks'
+import { dbGetAgent } from '../db/agents'
 import { dbGetRepo } from '../db/repos'
 import { dbGetTeamDependencies } from '../db/team-dependencies'
 import { dbGetTeam, dbUpdateTeamPrUrl, dbUpdateTeamStatus } from '../db/teams'
@@ -32,7 +32,7 @@ import { resolveUserReply } from './grove-tools'
 import { respawnPm, spawnPm } from './pm'
 import {
 	spawnDeveloper,
-	spawnExpoAgent,
+	// spawnExpoAgent,
 	spawnQaAgent,
 	spawnReviewerAgent,
 	spawnTaskDeveloper,
@@ -156,9 +156,13 @@ export async function onNewTeam(
 				payload = {}
 			}
 			if (payload.taskId) {
-				log('orchestrator', `task ${payload.taskId} complete, closing task dev`, {
-					teamId: team.id,
-				})
+				log(
+					'orchestrator',
+					`task ${payload.taskId} complete, closing task dev`,
+					{
+						teamId: team.id,
+					},
+				)
 				closeTaskAgent(team.id, payload.taskId)
 			} else {
 				log('orchestrator', 'task complete, cycling dev agent', {
@@ -239,12 +243,7 @@ export async function onNewTeam(
 				text: summaryText,
 				diff: diff ?? undefined,
 			})
-			await dispatchToAgent(
-				team,
-				'pm',
-				summaryText,
-				event.agentId ?? undefined,
-			)
+			await dispatchToAgent(team, 'pm', summaryText, event.agentId ?? undefined)
 		}
 		if (event.type === 'dev:pr-created') {
 			let payload: { url?: string }
@@ -289,15 +288,15 @@ export async function onNewTeam(
 
 	subscribeToTeamActivity(team.id, async event => {
 		if (event.type !== 'deps:installed') return
-		const repo = dbGetRepo(team.repoId)
-		if (repo?.framework === 'expo' || repo?.needsNativeBuild) {
-			spawnExpoAgent(team, repo.id).catch(err => {
-				log('orchestrator', 'expo agent spawn failed', {
-					teamId: team.id,
-					err,
-				})
-			})
-		}
+		// const repo = dbGetRepo(team.repoId)
+		// if (repo?.framework === 'expo' || repo?.needsNativeBuild) {
+		// 	spawnExpoAgent(team, repo.id).catch(err => {
+		// 		log('orchestrator', 'expo agent spawn failed', {
+		// 			teamId: team.id,
+		// 			err,
+		// 		})
+		// 	})
+		// }
 	})
 }
 
@@ -597,8 +596,8 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 		await spawnDeveloper(team, { onPostBash: makeOnPostBash(team) })
 	} else if (role === 'qa') await spawnQaAgent(team)
 	else if (role === 'reviewer') await spawnReviewerAgent(team)
-	else if (role === 'expo') {
-		const repo = dbGetRepo(team.repoId)
-		if (repo) await spawnExpoAgent(team, repo.id)
-	}
+	// else if (role === 'expo') {
+	// 	const repo = dbGetRepo(team.repoId)
+	// 	if (repo) await spawnExpoAgent(team, repo.id)
+	// }
 }

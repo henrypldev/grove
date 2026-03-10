@@ -66,6 +66,7 @@ export async function generatePrDescription(
 	const result = await unstable_v2_prompt(
 		`${PROMPT}\n\n${context}`,
 		{
+			model: 'claude-haiku-4-5-20251001',
 			maxTurns: 1,
 			allowedTools: [],
 			...(claudePath ? { pathToClaudeCodeExecutable: claudePath } : {}),

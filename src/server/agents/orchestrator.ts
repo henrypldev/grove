@@ -445,6 +445,11 @@ export async function routeMessageToAgents(
 ) {
 	if (!senderAgentId && resolveUserReply(team.id, text)) return
 
+	// Re-activate team when user sends a new message
+	if (!senderAgentId && (team.status === 'done' || team.status === 'idle')) {
+		dbUpdateTeamStatus(team.id, 'active')
+	}
+
 	const role = targetRole ?? 'pm'
 	await dispatchToAgent(team, role, text, senderAgentId, contentBlocks)
 }
@@ -462,7 +467,7 @@ export async function closeTeam(teamId: string) {
 		await killPort(port)
 		clearTeamPort(teamId)
 	}
-	dbUpdateTeamStatus(teamId, 'done')
+	dbUpdateTeamStatus(teamId, 'archived')
 	if (team) {
 		const branch = `grove-team-${teamId}`
 		await deleteWorktree(team.repoId, branch, true)

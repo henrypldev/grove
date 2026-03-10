@@ -216,6 +216,17 @@ export async function createTaskWorktree(
 		worktreePath,
 	})
 
+	// If the worktree path already exists, reuse it
+	const pathExists = await Bun.file(join(worktreePath, '.git')).exists()
+	if (pathExists) {
+		log('worktrees', 'task worktree already exists, reusing', {
+			teamId,
+			taskId,
+			worktreePath,
+		})
+		return { path: worktreePath, branch }
+	}
+
 	// Create a new branch off the team's current HEAD
 	const result =
 		await Bun.$`git -C ${teamWorktreePath} worktree add -b ${branch} ${worktreePath} HEAD`
@@ -269,6 +280,15 @@ export async function mergeTaskWorktree(
 
 	log('worktrees', 'merging task worktree', { teamId, taskId, branch })
 
+	// Stash any uncommitted changes before merging
+	const stashResult =
+		await Bun.$`git -C ${teamWorktreePath} stash --include-untracked`
+			.quiet()
+			.nothrow()
+	const didStash =
+		stashResult.exitCode === 0 &&
+		!stashResult.stdout.toString().includes('No local changes')
+
 	// Merge the task branch into the team branch
 	const mergeResult =
 		await Bun.$`git -C ${teamWorktreePath} merge ${branch} --no-edit`
@@ -280,7 +300,16 @@ export async function mergeTaskWorktree(
 		log('worktrees', 'task merge failed', { teamId, taskId, stderr })
 		// Abort the failed merge to leave team worktree clean
 		await Bun.$`git -C ${teamWorktreePath} merge --abort`.quiet().nothrow()
+		// Restore stashed changes
+		if (didStash) {
+			await Bun.$`git -C ${teamWorktreePath} stash pop`.quiet().nothrow()
+		}
 		return `Merge conflict for task ${taskId}: ${stderr}`
+	}
+
+	// Restore stashed changes after successful merge
+	if (didStash) {
+		await Bun.$`git -C ${teamWorktreePath} stash pop`.quiet().nothrow()
 	}
 
 	// Clean up the worktree and branch

@@ -45,7 +45,6 @@ Run typecheck and lint/format (check package.json for commands). Only commit if 
 
 ## Follow-ups
 - Rework: fix, run quality gates, commit, post dev:complete.
-- PR request: commit, gh pr create, then post_activity("dev:pr-created", { "url": "URL" }) and delegate_to("pm", "PR created: <URL>").
 
 ## Extra
 

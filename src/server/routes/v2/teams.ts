@@ -41,7 +41,6 @@ import { dbGetRepo } from '../../db/repos'
 import { dbGetScript } from '../../db/scripts'
 import { dbInsertTeamDependency } from '../../db/team-dependencies'
 import {
-	dbArchiveTeam,
 	dbGetTeam,
 	dbInsertTeam,
 	dbListTeams,
@@ -126,10 +125,11 @@ export async function getTeam(params: {
 	}
 }
 
-export function archiveTeam(params: { id: string }) {
+export async function archiveTeam(params: { id: string }) {
 	const team = dbGetTeam(params.id)
 	if (!team) return { error: 'Team not found' }
-	dbArchiveTeam(params.id)
+	const { closeTeam: doClose } = await import('../../agents/orchestrator')
+	await doClose(team.id)
 	return { success: true }
 }
 

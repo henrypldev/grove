@@ -19,7 +19,11 @@ async function getClaudeCodePath(): Promise<string | undefined> {
 	return cachedClaudePath
 }
 
-import { dbInsertActivity, emitEphemeralActivity } from '../db/activity'
+import {
+	dbInsertActivityBuffered,
+	emitEphemeralActivity,
+	flushActivityBuffer,
+} from '../db/activity'
 import {
 	dbGetAgent,
 	dbIncrementAgentRetry,
@@ -140,7 +144,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 			},
 		})) {
 			if (message.type !== 'user') {
-				dbInsertActivity(
+				dbInsertActivityBuffered(
 					agent.teamId,
 					agent.id,
 					`sdk:${message.type}`,
@@ -153,6 +157,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 			}
 
 			if (message.type === 'result') {
+				flushActivityBuffer()
 				recordUsage(agent, message as unknown as Record<string, unknown>)
 				agentToolAccumulator.delete(agent.id)
 				if (message.subtype === 'success') {
@@ -175,6 +180,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 			}
 		}
 	} catch (err) {
+		flushActivityBuffer()
 		const sessionErr = new AgentSessionError({
 			agentId: agent.id,
 			teamId: agent.teamId,
@@ -279,7 +285,7 @@ async function processMessages(
 	try {
 		for await (const message of q) {
 			if (message.type !== 'user') {
-				dbInsertActivity(
+				dbInsertActivityBuffered(
 					agent.teamId,
 					agent.id,
 					`sdk:${message.type}`,
@@ -295,6 +301,7 @@ async function processMessages(
 			}
 
 			if (message.type === 'result') {
+				flushActivityBuffer()
 				recordUsage(agent, message as unknown as Record<string, unknown>)
 				agentToolAccumulator.delete(agent.id)
 				if (messageQueue) {
@@ -343,6 +350,7 @@ async function processMessages(
 		}
 		agentToolAccumulator.delete(agent.id)
 	} catch (err) {
+		flushActivityBuffer()
 		const sessionErr = new AgentSessionError({
 			agentId: agent.id,
 			teamId: agent.teamId,
@@ -440,7 +448,7 @@ function buildHooks(
 							},
 						)
 						const strippedInput = stripToolInput(h.tool_name, h.tool_input)
-						dbInsertActivity(agent.teamId, agent.id, 'agent:tool_use', {
+						dbInsertActivityBuffered(agent.teamId, agent.id, 'agent:tool_use', {
 							tool: h.tool_name,
 							...(strippedInput ? { input: strippedInput } : {}),
 						})

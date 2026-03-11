@@ -1,5 +1,8 @@
 import { log } from '../config'
-import { subscribeToTeamActivity } from '../db/activity'
+import {
+	clearEphemeralThrottles,
+	subscribeToTeamActivity,
+} from '../db/activity'
 import type { Handler } from './types'
 
 const handlers: Handler[] = []
@@ -17,7 +20,13 @@ export async function initHandlersForTeam(teamId: string) {
 			await handler.onTeamCreated(teamId)
 		}
 
+		const processedIds = new Set<number>()
 		const unsub = subscribeToTeamActivity(teamId, async event => {
+			// Skip ephemeral events and already-processed IDs
+			if (event.id < 0) return
+			if (processedIds.has(event.id)) return
+			processedIds.add(event.id)
+
 			if (handler.handles.includes(event.type)) {
 				try {
 					await handler.onActivity(teamId, event)
@@ -36,6 +45,9 @@ export async function initHandlersForTeam(teamId: string) {
 }
 
 export async function teardownHandlersForTeam(teamId: string) {
+	// Clean up ephemeral throttles for this team
+	clearEphemeralThrottles(teamId)
+
 	// Unsubscribe all activity listeners
 	const unsubs = teamUnsubscribers.get(teamId)
 	if (unsubs) {

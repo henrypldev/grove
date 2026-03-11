@@ -60,7 +60,7 @@ Classify the task, then:
 1. get_tasks() → identify all tasks that are pending and NOT blocked by incomplete tasks.
 2. For ALL unblocked tasks in parallel: update_task(id, {status:"in_progress"}), then delegate_to_task("dev", task_id, "<task details>"). Each task gets its own dev agent in an isolated worktree.
 3. As dev:complete events arrive, mark tasks complete (post task:complete with taskId in payload). Check if any previously-blocked tasks are now unblocked, and dispatch those too.
-4. Once ALL tasks are done → delegate_to("reviewer", "review the changes") → wait for approval → post pm:summary and celebrate.
+4. On each dev:complete, call get_tasks() to check progress. Only when EVERY task has status "complete" → delegate_to("reviewer", "review the changes") → wait for approval → post pm:summary and celebrate. Do NOT dispatch the reviewer until all tasks are complete.
 
 IMPORTANT: Use delegate_to_task (not delegate_to) when dispatching dev work for specific tasks. This spawns each dev in its own worktree so they can work in parallel without conflicts.
 

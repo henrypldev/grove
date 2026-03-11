@@ -190,6 +190,7 @@ export async function startExpoBuild(
 			...process.env,
 			GROVE_HEADLESS: '1',
 			REACT_NATIVE_PACKAGER_HOSTNAME: 'localhost',
+			LANG: process.env.LANG || 'en_US.UTF-8',
 		},
 	})
 

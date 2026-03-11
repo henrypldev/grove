@@ -55,7 +55,6 @@ export type AgentRole =
 	| 'pm'
 	| 'team-lead'
 	| 'dev'
-	| 'qa'
 	| 'reviewer'
 	| 'env'
 	| 'expo'

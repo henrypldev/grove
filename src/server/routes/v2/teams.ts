@@ -142,7 +142,7 @@ export function listTeamAgents(params: { id: string }) {
 export async function spawnAgent(params: { id: string; role: SpawnableRole }) {
 	const team = dbGetTeam(params.id)
 	if (!team) return { error: 'Team not found' }
-	const { spawnTeamLead, spawnDeveloper, spawnQaAgent, spawnReviewerAgent } =
+	const { spawnTeamLead, spawnDeveloper, spawnReviewerAgent } =
 		await import('../../agents/specialists')
 	let agent: Awaited<ReturnType<typeof spawnDeveloper>> | undefined
 	switch (params.role) {
@@ -151,9 +151,6 @@ export async function spawnAgent(params: { id: string; role: SpawnableRole }) {
 			break
 		case 'dev':
 			agent = await spawnDeveloper(team)
-			break
-		case 'qa':
-			agent = await spawnQaAgent(team)
 			break
 		case 'reviewer':
 			agent = await spawnReviewerAgent(team)

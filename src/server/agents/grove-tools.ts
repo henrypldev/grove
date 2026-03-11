@@ -112,9 +112,7 @@ export function createGroveTools(
 							'pm',
 							'team-lead',
 							'dev',
-							'qa',
 							'reviewer',
-							'expo',
 						])
 						.describe('The target agent role'),
 					message: z

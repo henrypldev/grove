@@ -51,14 +51,6 @@ Run typecheck and lint/format (check package.json for commands). Only commit if 
 - Use the /simplify skill before submitting your work
 `
 
-const QA_PROMPT = (team: Team) => `${header('QA', team)}
-
-1. get_events(0) to understand what was implemented.
-2. Post post_activity("agent:message", { "text": "Starting QA — running tests and reviewing diff" }).
-3. Run tests, check git diff HEAD. Focus on whether the change works — don't re-investigate the original problem.
-4. Post progress updates via post_activity("agent:message", { "text": "<status>" }) as you work — e.g. test results, issues found.
-5. post_activity("qa:result", { "passed": true/false, "feedback": "SUMMARY" }) and delegate_to("pm", "<results summary>").
-`
 
 const REVIEWER_PROMPT = (team: Team) => `${header('Reviewer', team)}
 
@@ -173,18 +165,8 @@ export async function spawnTaskDeveloper(
 	return result
 }
 
-export async function spawnQaAgent(team: Team): Promise<PersistentAgentResult> {
-	log('agent', 'spawning QA', { teamId: team.id })
-	const agentId = generateId()
-	return spawnPersistentAgent({
-		agentId,
-		teamId: team.id,
-		role: 'qa',
-		prompt: QA_PROMPT(team),
-		cwd: team.worktreePath,
-		maxBudgetUsd: 15,
-		mcpTools: createGroveTools(team.id, agentId),
-	})
+export async function spawnQaAgent(_team: Team): Promise<PersistentAgentResult> {
+	throw new Error('QA agent has been disabled')
 }
 
 export async function spawnReviewerAgent(

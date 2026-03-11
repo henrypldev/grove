@@ -33,7 +33,6 @@ import { respawnPm, spawnPm } from './pm'
 import {
 	spawnDeveloper,
 	// spawnExpoAgent,
-	spawnQaAgent,
 	spawnReviewerAgent,
 	spawnTaskDeveloper,
 	spawnTeamLead,
@@ -44,9 +43,7 @@ const VALID_ROLES = new Set([
 	'pm',
 	'team-lead',
 	'dev',
-	'qa',
 	'reviewer',
-	'expo',
 ])
 
 const devBaseCommit = new Map<string, string>()
@@ -594,8 +591,7 @@ async function spawnSpecialist(team: Team, role: AgentRole) {
 		const sha = await getHeadSha(team.worktreePath)
 		if (sha) devBaseCommit.set(team.id, sha)
 		await spawnDeveloper(team, { onPostBash: makeOnPostBash(team) })
-	} else if (role === 'qa') await spawnQaAgent(team)
-	else if (role === 'reviewer') await spawnReviewerAgent(team)
+	} else if (role === 'reviewer') await spawnReviewerAgent(team)
 	// else if (role === 'expo') {
 	// 	const repo = dbGetRepo(team.repoId)
 	// 	if (repo) await spawnExpoAgent(team, repo.id)

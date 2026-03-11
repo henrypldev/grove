@@ -29,7 +29,7 @@ import {
 } from '../../api/setup-v2'
 import { rediscoverTeamDevice } from '../../api/simulator'
 import { createWorktree } from '../../api/worktrees'
-import { generateId, getTerminalHost } from '../../config'
+import { generateId, getTerminalHost, log } from '../../config'
 import { dbInsertActivity, dbListActivitySince } from '../../db/activity'
 import { dbGetNote } from '../../db/agent-notes'
 import { dbListTasks } from '../../db/agent-tasks'
@@ -337,14 +337,34 @@ export function getDevServerLogs(params: { id: string }) {
 }
 
 export async function createTeamPr(params: { id: string }) {
+	log('pr', 'createTeamPr called', { teamId: params.id })
 	const team = dbGetTeam(params.id)
-	if (!team) return { error: 'Team not found' }
+	if (!team) {
+		log('pr', 'team not found', { teamId: params.id })
+		return { error: 'Team not found' }
+	}
 
-	const { createPr } = await import('../../api/pr-description')
-	const { prUrl } = await createPr(team.worktreePath)
-	dbUpdateTeamPrUrl(params.id, prUrl)
+	log('pr', 'team found, calling createPr', {
+		teamId: params.id,
+		worktreePath: team.worktreePath,
+		task: team.task,
+		title: team.title,
+	})
 
-	return { prUrl }
+	try {
+		const { createPr } = await import('../../api/pr-description')
+		const { prUrl } = await createPr({
+			cwd: team.worktreePath,
+			task: team.task,
+			title: team.title,
+		})
+		log('pr', 'PR created successfully', { teamId: params.id, prUrl })
+		dbUpdateTeamPrUrl(params.id, prUrl)
+		return { prUrl }
+	} catch (err) {
+		log('pr', 'createPr failed', { teamId: params.id, error: String(err) })
+		return { error: String(err) }
+	}
 }
 
 // --- HTTP handler ---

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { stopExpoBuild } from '../api/expo-build'
 import { stopExpoDevServer } from '../api/expo-dev-server'
-import { clearTeamPort, getTeamPort } from '../api/ports'
+import { clearTeamPort, getTeamPort, killProcessOnPort } from '../api/ports'
 import { createTeamDevice, deleteTeamDevice } from '../api/simulator'
 import { unregisterTeamServe } from '../api/tailscale-serve'
 import { deleteWorktree } from '../api/worktrees'
@@ -47,20 +47,6 @@ function runInstallInBackground(teamId: string, worktreePath: string) {
 	})
 }
 
-async function killPort(port: number) {
-	try {
-		const proc = Bun.spawn(['lsof', '-ti', `:${port}`], {
-			stdout: 'pipe',
-			stderr: 'ignore',
-		})
-		const text = await new Response(proc.stdout).text()
-		const pids = text.trim().split('\n').filter(Boolean)
-		for (const pid of pids) {
-			process.kill(Number(pid), 'SIGTERM')
-		}
-	} catch {}
-}
-
 export const infrastructureHandler: Handler = {
 	name: 'infrastructure',
 	handles: ['deps:installed'],
@@ -93,7 +79,7 @@ export const infrastructureHandler: Handler = {
 		const port = getTeamPort(teamId)
 		if (port) {
 			unregisterTeamServe(teamId, port)
-			await killPort(port)
+			await killProcessOnPort(port)
 			clearTeamPort(teamId)
 		}
 

@@ -8,7 +8,7 @@ import { dbUpdateTask } from '../db/agent-tasks'
 import { dbUpdateAgentBaseCommit } from '../db/agents'
 import { dbGetTeam, dbUpdateTeamPrUrl } from '../db/teams'
 import type { TeamActivity } from '../types'
-import type { Handler } from './types'
+import { type Handler, parsePayload } from './types'
 
 /** Track base commit SHA for diff computation: Map<teamId or teamId:taskId, sha> */
 const devBaseCommit = new Map<string, string>()
@@ -58,15 +58,9 @@ export const devCompleteHandler: Handler = {
 
 	async onActivity(teamId: string, event: TeamActivity) {
 		if (event.type === 'dev:complete') {
-			let payload: { summary?: string; taskId?: string }
-			try {
-				payload =
-					typeof event.payload === 'string'
-						? JSON.parse(event.payload)
-						: event.payload
-			} catch {
-				payload = {}
-			}
+			const payload = parsePayload<{ summary?: string; taskId?: string }>(
+				event.payload,
+			)
 
 			const team = dbGetTeam(teamId)
 			if (!team) return
@@ -78,37 +72,38 @@ export const devCompleteHandler: Handler = {
 				const wtKey = `${teamId}:${taskId}`
 				const taskWtPath = taskWorktrees.get(wtKey)
 				if (taskWtPath) {
-					const base = devBaseCommit.get(wtKey)
-					diff = await computeDiff(taskWtPath, base)
-					devBaseCommit.delete(wtKey)
+					try {
+						const base = devBaseCommit.get(wtKey)
+						diff = await computeDiff(taskWtPath, base)
 
-					const mergeResult = await mergeTaskWorktree(
-						team.worktreePath,
-						teamId,
-						taskId,
-					)
-					if (mergeResult !== true) {
-						log('handler', 'task merge conflict', {
+						const mergeResult = await mergeTaskWorktree(
+							team.worktreePath,
 							teamId,
 							taskId,
-							error: mergeResult,
-						})
-						dbInsertActivity(teamId, event.agentId, 'agent:message', {
-							text: `Merge conflict for task ${taskId}: ${mergeResult}`,
-						})
-						await dispatchToAgent(
-							team,
-							'pm',
-							`Task ${taskId} dev complete but merge conflict: ${mergeResult}. The dev's changes could not be merged automatically.`,
-							event.agentId ?? undefined,
 						)
+						if (mergeResult !== true) {
+							log('handler', 'task merge conflict', {
+								teamId,
+								taskId,
+								error: mergeResult,
+							})
+							dbInsertActivity(teamId, event.agentId, 'agent:message', {
+								text: `Merge conflict for task ${taskId}: ${mergeResult}`,
+							})
+							await dispatchToAgent(
+								team,
+								'pm',
+								`Task ${taskId} dev complete but merge conflict: ${mergeResult}. The dev's changes could not be merged automatically.`,
+								event.agentId ?? undefined,
+							)
+							return
+						}
+						log('handler', `task ${taskId} merged successfully`, { teamId })
+					} finally {
+						devBaseCommit.delete(wtKey)
 						taskWorktrees.delete(wtKey)
 						closeTaskAgent(teamId, taskId)
-						return
 					}
-					taskWorktrees.delete(wtKey)
-					closeTaskAgent(teamId, taskId)
-					log('handler', `task ${taskId} merged successfully`, { teamId })
 				}
 			} else {
 				const base = devBaseCommit.get(teamId)
@@ -128,15 +123,7 @@ export const devCompleteHandler: Handler = {
 		}
 
 		if (event.type === 'dev:pr-created') {
-			let payload: { url?: string }
-			try {
-				payload =
-					typeof event.payload === 'string'
-						? JSON.parse(event.payload)
-						: event.payload
-			} catch {
-				payload = {}
-			}
+			const payload = parsePayload<{ url?: string }>(event.payload)
 			if (payload.url) {
 				dbUpdateTeamPrUrl(teamId, payload.url)
 			}

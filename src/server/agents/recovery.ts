@@ -1,10 +1,9 @@
-import { checkFingerprintAndRebuild } from '../api/expo-build'
 import { log } from '../config'
 import { dbListAgentsByTeam, dbUpdateAgentStatus } from '../db/agents'
-import { dbGetRepo } from '../db/repos'
 import { getTaskWorktreePath } from '../handlers/dev-complete'
 import type { Agent, Team } from '../types'
 import { closeAgent } from './agent-registry'
+import { makeOnPostBash } from './helpers'
 import { respawnPm } from './pm'
 import {
 	spawnDeveloper,
@@ -98,19 +97,6 @@ async function recoverPm(team: Team, agent: Agent): Promise<void> {
 		oldAgentId: agent.id,
 		newAgentId: newPm.id,
 	})
-}
-
-function makeOnPostBash(team: Team): ((command: string) => void) | undefined {
-	const repo = dbGetRepo(team.repoId)
-	if (!repo?.needsNativeBuild) return undefined
-
-	const installPattern =
-		/\b(npm install|yarn add|pnpm add|bun add|bun install|expo install)\b/
-	return (command: string) => {
-		if (installPattern.test(command)) {
-			checkFingerprintAndRebuild(team.id, team.worktreePath, team.repoId)
-		}
-	}
 }
 
 async function recoverDev(team: Team, agent: Agent): Promise<void> {

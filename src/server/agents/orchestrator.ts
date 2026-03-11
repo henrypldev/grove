@@ -1,12 +1,10 @@
 import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import { getHeadSha } from '../api/diff'
-import { checkFingerprintAndRebuild } from '../api/expo-build'
 import { createTaskWorktree } from '../api/worktrees'
 import { log } from '../config'
 import { dbInsertActivity, subscribeToTeamActivity } from '../db/activity'
 import { dbUpdateTask } from '../db/agent-tasks'
 import { dbGetAgent } from '../db/agents'
-import { dbGetRepo } from '../db/repos'
 import { dbGetTeamDependencies } from '../db/team-dependencies'
 import { dbGetTeam, dbUpdateTeamStatus } from '../db/teams'
 import { GitOperationError, TaskDevLimitError } from '../errors'
@@ -32,6 +30,7 @@ import {
 	type RegisteredAgent,
 } from './agent-registry'
 import { resolveUserReply } from './grove-tools'
+import { makeOnPostBash } from './helpers'
 import { respawnPm, spawnPm } from './pm'
 import {
 	spawnDeveloper,
@@ -284,6 +283,11 @@ export async function routeMessageToAgents(
 export async function closeTeam(teamId: string) {
 	log('orchestrator', 'closing team', { teamId })
 	closeAllAgents(teamId)
+	pendingDevSpawns.delete(teamId)
+	for (const [depTeamId, blocked] of depWatchers) {
+		blocked.delete(teamId)
+		if (blocked.size === 0) depWatchers.delete(depTeamId)
+	}
 	await teardownHandlersForTeam(teamId)
 	dbUpdateTeamStatus(teamId, 'archived')
 }
@@ -348,22 +352,6 @@ async function mergeDependencyBranches(team: Team) {
 				depBranch,
 				error: mergeErr,
 			})
-		}
-	}
-}
-
-function makeOnPostBash(team: Team): ((command: string) => void) | undefined {
-	const repo = dbGetRepo(team.repoId)
-	if (!repo?.needsNativeBuild) return undefined
-
-	const installPattern =
-		/\b(npm install|yarn add|pnpm add|bun add|bun install|expo install)\b/
-	return (command: string) => {
-		if (installPattern.test(command)) {
-			log('orchestrator', 'detected package install, checking fingerprint', {
-				teamId: team.id,
-			})
-			checkFingerprintAndRebuild(team.id, team.worktreePath, team.repoId)
 		}
 	}
 }

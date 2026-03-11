@@ -2,7 +2,7 @@ import { closeAgent, closeTaskAgent } from '../agents/agent-registry'
 import { log } from '../config'
 import { dbUpdateTeamStatus } from '../db/teams'
 import type { TeamActivity } from '../types'
-import type { Handler } from './types'
+import { type Handler, parsePayload } from './types'
 
 export const agentLifecycleHandler: Handler = {
 	name: 'agent-lifecycle',
@@ -10,15 +10,7 @@ export const agentLifecycleHandler: Handler = {
 
 	async onActivity(teamId: string, event: TeamActivity) {
 		if (event.type === 'task:complete') {
-			let payload: { taskId?: string }
-			try {
-				payload =
-					typeof event.payload === 'string'
-						? JSON.parse(event.payload)
-						: event.payload
-			} catch {
-				payload = {}
-			}
+			const payload = parsePayload<{ taskId?: string }>(event.payload)
 			if (payload.taskId) {
 				log('handler', `task ${payload.taskId} complete, closing task dev`, {
 					teamId,
@@ -31,19 +23,9 @@ export const agentLifecycleHandler: Handler = {
 		}
 
 		if (event.type === 'pm:summary') {
-			const summary = (() => {
-				try {
-					const p =
-						typeof event.payload === 'string'
-							? JSON.parse(event.payload)
-							: event.payload
-					return p.summary ?? null
-				} catch {
-					return null
-				}
-			})()
+			const payload = parsePayload<{ summary?: string }>(event.payload)
 			log('handler', 'pm:summary received, team done', { teamId })
-			dbUpdateTeamStatus(teamId, 'done', summary ?? undefined)
+			dbUpdateTeamStatus(teamId, 'done', payload.summary ?? undefined)
 		}
 	},
 }

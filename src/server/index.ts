@@ -15,6 +15,16 @@ import { initWebSocketBridge, wsHandlers } from './websocket'
 
 export { setLogsEnabled }
 
+function getMemoryStats() {
+	const mem = process.memoryUsage()
+	return {
+		heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
+		heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
+		rssMB: Math.round(mem.rss / 1024 / 1024),
+		externalMB: Math.round(mem.external / 1024 / 1024),
+	}
+}
+
 export async function startServer(port: number): Promise<number> {
 	getDb()
 	await getTerminalHost()
@@ -33,13 +43,7 @@ export async function startServer(port: number): Promise<number> {
 
 	// Log memory usage every 60 seconds
 	setInterval(() => {
-		const mem = process.memoryUsage()
-		log('memory', 'usage', {
-			heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-			heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
-			rssMB: Math.round(mem.rss / 1024 / 1024),
-			externalMB: Math.round(mem.external / 1024 / 1024),
-		})
+		log('memory', 'usage', getMemoryStats())
 	}, 60000)
 
 	const server = Bun.serve({
@@ -78,17 +82,9 @@ export async function startServer(port: number): Promise<number> {
 			}
 
 			if (path === '/health' && method === 'GET') {
-				const mem = process.memoryUsage()
 				return logResponse(
 					Response.json(
-						{
-							status: 'ok',
-							memory: {
-								heapUsedMB: Math.round(mem.heapUsed / 1024 / 1024),
-								heapTotalMB: Math.round(mem.heapTotal / 1024 / 1024),
-								rssMB: Math.round(mem.rss / 1024 / 1024),
-							},
-						},
+						{ status: 'ok', memory: getMemoryStats() },
 						{ headers },
 					),
 				)

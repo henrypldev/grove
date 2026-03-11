@@ -42,11 +42,6 @@ export function popAgentTools(agentId: string): ToolCall[] {
 	return tools
 }
 
-/** Clean up in-memory state for a closed agent session. */
-export function cleanupAgentSession(agentId: string) {
-	agentToolAccumulator.delete(agentId)
-}
-
 export interface AgentRunOptions {
 	agentId?: string
 	teamId: string
@@ -142,6 +137,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 
 			if (message.type === 'result') {
 				recordUsage(agent, message as unknown as Record<string, unknown>)
+				agentToolAccumulator.delete(agent.id)
 				if (message.subtype === 'success') {
 					dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 					opts.onDone?.(agent.id)
@@ -158,6 +154,7 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 	} catch (err) {
 		log('agent', `${opts.role} threw error`, { agentId: agent.id, err })
 		dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
+		agentToolAccumulator.delete(agent.id)
 		opts.onError?.(agent.id, err)
 		throw err
 	}
@@ -257,6 +254,7 @@ async function processMessages(
 
 			if (message.type === 'result') {
 				recordUsage(agent, message as unknown as Record<string, unknown>)
+				agentToolAccumulator.delete(agent.id)
 				if (messageQueue) {
 					if (message.subtype === 'success') {
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'idle')
@@ -289,6 +287,7 @@ async function processMessages(
 			dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 			opts.onDone?.(agent.id)
 		}
+		agentToolAccumulator.delete(agent.id)
 	} catch (err) {
 		log('agent', `${opts.role} threw error`, { agentId: agent.id, err })
 		dbUpdateAgentStatus(agent.id, agent.teamId, 'error')

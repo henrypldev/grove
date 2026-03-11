@@ -42,6 +42,11 @@ export function popAgentTools(agentId: string): ToolCall[] {
 	return tools
 }
 
+/** Clean up in-memory state for a closed agent session. */
+export function cleanupAgentSession(agentId: string) {
+	agentToolAccumulator.delete(agentId)
+}
+
 export interface AgentRunOptions {
 	agentId?: string
 	teamId: string

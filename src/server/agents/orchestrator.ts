@@ -25,6 +25,7 @@ import {
 	closeAllAgents,
 	closeTaskAgent,
 	getAgent,
+	getAllTaskAgents,
 	getTaskAgent,
 	type RegisteredAgent,
 } from './agent-registry'
@@ -39,12 +40,10 @@ import {
 } from './specialists'
 
 /** Valid roles that can be dispatched to. */
-const VALID_ROLES = new Set([
-	'pm',
-	'team-lead',
-	'dev',
-	'reviewer',
-])
+const VALID_ROLES = new Set(['pm', 'team-lead', 'dev', 'reviewer'])
+
+/** Maximum number of concurrent task dev agents per team. */
+const MAX_TASK_DEVS = 4
 
 const devBaseCommit = new Map<string, string>()
 
@@ -316,6 +315,26 @@ export async function dispatchToTaskDev(
 		})
 		existing.queue.push(message)
 		return { dispatched: true }
+	}
+
+	// Enforce max concurrent task devs
+	const activeTaskDevs = getAllTaskAgents(team.id)
+	const activeCount = [...activeTaskDevs.values()].filter(
+		a => !a.queue.closed,
+	).length
+	if (activeCount >= MAX_TASK_DEVS) {
+		log(
+			'orchestrator',
+			`task dev limit reached (${activeCount}/${MAX_TASK_DEVS})`,
+			{
+				teamId: team.id,
+				taskId,
+			},
+		)
+		return {
+			dispatched: false,
+			error: `Maximum concurrent task devs (${MAX_TASK_DEVS}) reached. Wait for a task to complete before starting another.`,
+		}
 	}
 
 	// Create a sub-worktree for this task

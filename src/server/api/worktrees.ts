@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { type EnvVar, log, WORKTREES_DIR } from '../config'
 import { dbGetRepo } from '../db/repos'
+import { MergeConflictError, WorktreeCreateError } from '../errors'
 
 export interface Worktree {
 	path: string
@@ -241,10 +242,14 @@ export async function createTaskWorktree(
 				.nothrow()
 		if (retry.exitCode !== 0) {
 			const stderr = retry.stderr.toString().trim()
-			log('worktrees', 'failed to create task worktree', {
+			const wtErr = new WorktreeCreateError({
 				teamId,
-				taskId,
+				branch,
 				stderr,
+			})
+			log('worktrees', 'failed to create task worktree', {
+				taskId,
+				error: wtErr,
 			})
 			return `Failed to create task worktree: ${stderr}`
 		}
@@ -297,7 +302,8 @@ export async function mergeTaskWorktree(
 
 	if (mergeResult.exitCode !== 0) {
 		const stderr = mergeResult.stderr.toString().trim()
-		log('worktrees', 'task merge failed', { teamId, taskId, stderr })
+		const conflictErr = new MergeConflictError({ teamId, taskId, stderr })
+		log('worktrees', 'task merge failed', { error: conflictErr })
 		// Abort the failed merge to leave team worktree clean
 		await Bun.$`git -C ${teamWorktreePath} merge --abort`.quiet().nothrow()
 		// Restore stashed changes
@@ -316,9 +322,7 @@ export async function mergeTaskWorktree(
 	await Bun.$`git -C ${teamWorktreePath} worktree remove --force ${worktreePath}`
 		.quiet()
 		.nothrow()
-	await Bun.$`git -C ${teamWorktreePath} branch -d ${branch}`
-		.quiet()
-		.nothrow()
+	await Bun.$`git -C ${teamWorktreePath} branch -d ${branch}`.quiet().nothrow()
 
 	log('worktrees', 'task worktree merged and cleaned up', {
 		teamId,

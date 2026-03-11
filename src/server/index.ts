@@ -1,10 +1,15 @@
 import pkg from '../../package.json'
+import { getAllAgents } from './agents/agent-registry'
 import { onNewTeam, startOrchestrator } from './agents/orchestrator'
+import { cleanupOrphanedProcesses } from './agents/process-cleanup'
 import { killAllExpoBuilds } from './api/expo-build'
 import { killAllExpoDevServers } from './api/expo-dev-server'
 import { startPortPoller } from './api/ports'
 import { getTailscaleId, getTerminalHost, log, setLogsEnabled } from './config'
 import { getDb } from './db'
+import { dbListAgentsByTeam, dbUpdateAgentStatus } from './db/agents'
+import { dbListTeams } from './db/teams'
+import { recoverActiveTeams } from './recovery'
 import { handleV2Activity } from './routes/v2/activity'
 import { handleV2Dashboard } from './routes/v2/dashboard'
 import { handleV2Repos } from './routes/v2/repos'
@@ -29,6 +34,8 @@ export async function startServer(port: number): Promise<number> {
 	getDb()
 	await getTerminalHost()
 	await startOrchestrator()
+	await cleanupOrphanedProcesses()
+	await recoverActiveTeams()
 	setTeamCreatedHook(onNewTeam)
 	log('server', 'starting up')
 	await cleanupStaleSessions()
@@ -162,7 +169,28 @@ export async function startServer(port: number): Promise<number> {
 	log('server', `listening on http://localhost:${actualPort}`)
 
 	function shutdown() {
-		log('server', 'shutting down, killing child processes')
+		log('server', 'shutting down gracefully')
+
+		// Suspend all active agents so they can be recovered on restart
+		const teams = dbListTeams()
+		for (const team of teams) {
+			const registeredAgents = getAllAgents(team.id)
+			for (const entry of registeredAgents) {
+				entry.queue.close()
+				entry.query.close()
+			}
+			const dbAgents = dbListAgentsByTeam(team.id)
+			for (const agent of dbAgents) {
+				if (
+					agent.status === 'working' ||
+					agent.status === 'idle' ||
+					agent.status === 'waiting'
+				) {
+					dbUpdateAgentStatus(agent.id, agent.teamId, 'suspended')
+				}
+			}
+		}
+
 		killAllExpoBuilds()
 		killAllExpoDevServers()
 		process.exit(0)

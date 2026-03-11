@@ -49,7 +49,13 @@ export interface PushToken {
 	registeredAt: string
 }
 
-export type TeamStatus = 'working' | 'blocked' | 'done' | 'archived'
+export type TeamStatus =
+	| 'working'
+	| 'blocked'
+	| 'done'
+	| 'archived'
+	| 'active'
+	| 'idle'
 export type AgentRole =
 	| 'orchestrator'
 	| 'pm'
@@ -67,6 +73,7 @@ export type AgentStatus =
 	| 'blocked'
 	| 'done'
 	| 'error'
+	| 'suspended'
 
 export interface Team {
 	id: string
@@ -90,6 +97,7 @@ export interface Agent {
 	currentTask: string | null
 	sessionId: string | null
 	taskId: string | null
+	baseCommitSha: string | null
 	retryCount: number
 	spawnedAt: number
 	updatedAt: number

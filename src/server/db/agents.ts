@@ -54,6 +54,7 @@ export function dbInsertAgent(agent: Agent): void {
 			currentTask: agent.currentTask,
 			sessionId: agent.sessionId,
 			taskId: agent.taskId,
+			baseCommitSha: agent.baseCommitSha,
 			retryCount: agent.retryCount,
 			spawnedAt: agent.spawnedAt,
 			updatedAt: agent.updatedAt,
@@ -109,6 +110,26 @@ export function dbUpdateAgentSessionId(id: string, sessionId: string): void {
 		.run()
 }
 
+export function dbUpdateAgentBaseCommit(
+	id: string,
+	baseCommitSha: string,
+): void {
+	getDb()
+		.update(agents)
+		.set({ baseCommitSha, updatedAt: Date.now() })
+		.where(eq(agents.id, id))
+		.run()
+}
+
+export function dbGetRecoverableAgents(): Agent[] {
+	const rows = getDb()
+		.select()
+		.from(agents)
+		.where(sql`${agents.status} IN ('working', 'idle', 'suspended', 'waiting')`)
+		.all()
+	return rows.map(toAgent)
+}
+
 export function dbIncrementAgentRetry(id: string): number {
 	getDb()
 		.update(agents)
@@ -136,6 +157,7 @@ function toAgent(row: typeof agents.$inferSelect): Agent {
 		currentTask: row.currentTask,
 		sessionId: row.sessionId,
 		taskId: row.taskId ?? null,
+		baseCommitSha: row.baseCommitSha ?? null,
 		retryCount: row.retryCount ?? 0,
 		spawnedAt: row.spawnedAt,
 		updatedAt: row.updatedAt,

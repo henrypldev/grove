@@ -34,12 +34,18 @@ export function dbListTasks(teamId: string) {
 export function dbUpdateTask(
 	teamId: string,
 	idString: string,
-	updates: { status?: string; agentId?: string; blockedBy?: string[] },
+	updates: {
+		status?: string
+		agentId?: string
+		blockedBy?: string[]
+		worktreePath?: string
+	},
 ): void {
 	const set: Record<string, unknown> = {}
 	if (updates.status) set.status = updates.status
 	if (updates.agentId) set.agentId = updates.agentId
 	if (updates.blockedBy) set.blockedBy = JSON.stringify(updates.blockedBy)
+	if (updates.worktreePath) set.worktreePath = updates.worktreePath
 	if (Object.keys(set).length === 0) return
 	getDb()
 		.update(agentTasks)

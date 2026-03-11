@@ -29,6 +29,11 @@ import {
 	dbUpdateAgentStatus,
 } from '../db/agents'
 import { dbInsertUsage } from '../db/usage'
+import {
+	AgentRetryExhausted,
+	AgentSessionError,
+	AgentSpawnError,
+} from '../errors'
 import type { Agent, AgentRole, ToolCall } from '../types'
 import { registerAgent } from './agent-registry'
 import type { createGroveTools } from './grove-tools'
@@ -56,7 +61,10 @@ export interface AgentRunOptions {
 	onPostBash?: (command: string) => void
 	settingSources?: SettingSource[]
 	onDone?: (agentId: string) => void
-	onError?: (agentId: string, error: unknown) => void
+	onError?: (
+		agentId: string,
+		error: AgentSessionError | AgentSpawnError | unknown,
+	) => void
 	/** Skip role-based registry registration (used for task-scoped agents that register separately). */
 	skipRoleRegistry?: boolean
 	/** Task ID for task-scoped dev agents (stored in DB for frontend display). */
@@ -87,6 +95,7 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 		currentTask: opts.prompt.slice(0, 200),
 		sessionId: null,
 		taskId: opts.taskId ?? null,
+		baseCommitSha: null,
 		retryCount: 0,
 		spawnedAt: now,
 		updatedAt: now,
@@ -94,9 +103,17 @@ export async function spawnAgent(opts: AgentRunOptions): Promise<Agent> {
 	dbInsertAgent(agent)
 
 	runAgentSession(agent, opts).catch(err => {
-		log('agent', `unhandled error in ${opts.role}`, { agentId, err })
+		const spawnErr = new AgentSpawnError({
+			teamId: opts.teamId,
+			role: opts.role,
+			cause: err,
+		})
+		log('agent', `unhandled error in ${opts.role}`, {
+			agentId,
+			error: spawnErr,
+		})
 		dbUpdateAgentStatus(agentId, opts.teamId, 'error')
-		opts.onError?.(agentId, err)
+		opts.onError?.(agentId, spawnErr)
 	})
 
 	return agent
@@ -142,20 +159,36 @@ async function runAgentSession(agent: Agent, opts: AgentRunOptions) {
 					dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 					opts.onDone?.(agent.id)
 				} else {
+					const sessionErr = new AgentSessionError({
+						agentId: agent.id,
+						teamId: agent.teamId,
+						role: opts.role,
+						subtype: message.subtype,
+					})
 					log('agent', `${opts.role} finished with error: ${message.subtype}`, {
 						agentId: agent.id,
-						message,
+						error: sessionErr,
 					})
 					dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
-					opts.onError?.(agent.id, new Error(message.subtype))
+					opts.onError?.(agent.id, sessionErr)
 				}
 			}
 		}
 	} catch (err) {
-		log('agent', `${opts.role} threw error`, { agentId: agent.id, err })
+		const sessionErr = new AgentSessionError({
+			agentId: agent.id,
+			teamId: agent.teamId,
+			role: opts.role,
+			subtype: 'exception',
+		})
+		log('agent', `${opts.role} threw error`, {
+			agentId: agent.id,
+			error: sessionErr,
+			cause: err,
+		})
 		dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
 		agentToolAccumulator.delete(agent.id)
-		opts.onError?.(agent.id, err)
+		opts.onError?.(agent.id, sessionErr)
 		throw err
 	}
 }
@@ -180,6 +213,7 @@ export async function spawnPersistentAgent(
 		currentTask: opts.prompt.slice(0, 200),
 		sessionId: null,
 		taskId: opts.taskId ?? null,
+		baseCommitSha: null,
 		retryCount: 0,
 		spawnedAt: now,
 		updatedAt: now,
@@ -220,9 +254,17 @@ export async function spawnPersistentAgent(
 	}
 
 	processMessages(q, agent, opts, messageQueue).catch(err => {
-		log('agent', `unhandled error in persistent ${opts.role}`, { agentId, err })
+		const spawnErr = new AgentSpawnError({
+			teamId: opts.teamId,
+			role: opts.role,
+			cause: err,
+		})
+		log('agent', `unhandled error in persistent ${opts.role}`, {
+			agentId,
+			error: spawnErr,
+		})
 		dbUpdateAgentStatus(agentId, opts.teamId, 'error')
-		opts.onError?.(agentId, err)
+		opts.onError?.(agentId, spawnErr)
 	})
 
 	return { agent, queue: messageQueue, query: q }
@@ -259,26 +301,38 @@ async function processMessages(
 					if (message.subtype === 'success') {
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'idle')
 					} else {
+						const sessionErr = new AgentSessionError({
+							agentId: agent.id,
+							teamId: agent.teamId,
+							role: opts.role,
+							subtype: message.subtype,
+						})
 						log(
 							'agent',
 							`persistent ${opts.role} finished with error: ${message.subtype}`,
-							{ agentId: agent.id, message },
+							{ agentId: agent.id, error: sessionErr },
 						)
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
-						opts.onError?.(agent.id, new Error(message.subtype))
+						opts.onError?.(agent.id, sessionErr)
 					}
 				} else {
 					if (message.subtype === 'success') {
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'done')
 						opts.onDone?.(agent.id)
 					} else {
+						const sessionErr = new AgentSessionError({
+							agentId: agent.id,
+							teamId: agent.teamId,
+							role: opts.role,
+							subtype: message.subtype,
+						})
 						log(
 							'agent',
 							`${opts.role} finished with error: ${message.subtype}`,
-							{ agentId: agent.id, message },
+							{ agentId: agent.id, error: sessionErr },
 						)
 						dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
-						opts.onError?.(agent.id, new Error(message.subtype))
+						opts.onError?.(agent.id, sessionErr)
 					}
 				}
 			}
@@ -289,9 +343,19 @@ async function processMessages(
 		}
 		agentToolAccumulator.delete(agent.id)
 	} catch (err) {
-		log('agent', `${opts.role} threw error`, { agentId: agent.id, err })
+		const sessionErr = new AgentSessionError({
+			agentId: agent.id,
+			teamId: agent.teamId,
+			role: opts.role,
+			subtype: 'exception',
+		})
+		log('agent', `${opts.role} threw error`, {
+			agentId: agent.id,
+			error: sessionErr,
+			cause: err,
+		})
 		dbUpdateAgentStatus(agent.id, agent.teamId, 'error')
-		opts.onError?.(agent.id, err)
+		opts.onError?.(agent.id, sessionErr)
 		throw err
 	}
 }
@@ -488,7 +552,14 @@ export async function respawnAgent(
 	if (!agent) return false
 	const retries = dbIncrementAgentRetry(agentId)
 	if (retries > 3) {
+		const retryErr = new AgentRetryExhausted({
+			agentId,
+			teamId: agent.teamId,
+			retryCount: retries,
+		})
+		log('agent', 'retry exhausted', { error: retryErr })
 		dbUpdateAgentStatus(agentId, agent.teamId, 'error')
+		onError?.(agentId, retryErr)
 		return false
 	}
 	dbUpdateAgentStatus(agentId, agent.teamId, 'planning')

@@ -120,10 +120,19 @@ export const migrations: MigrationMeta[] = [
 	},
 	{
 		sql: [
-			"ALTER TABLE `agents` ADD COLUMN `task_id` text;",
+			"ALTER TABLE `agents` ADD `task_id` text;",
 		],
-		folderMillis: 1772750000000,
-		hash: '6218d8be51ec6d143f437e26308f8bad75b3e1cac97c73379db0ad5ad8b67f21',
+		folderMillis: 1772920785141,
+		hash: '01457448c3d52ad3a6c69f00b25b1887de096d196ec6a9c1e1f78b0e730e668a',
+		bps: true,
+	},
+	{
+		sql: [
+			"ALTER TABLE agents ADD COLUMN base_commit_sha TEXT;",
+			"\nALTER TABLE agent_tasks ADD COLUMN worktree_path TEXT;\n",
+		],
+		folderMillis: 1773300000000,
+		hash: 'addb55d09427a2c4f635b165d293403de486ecde206d7ed1aab280da00b61766',
 		bps: true,
 	},
 ]

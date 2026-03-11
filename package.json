@@ -28,6 +28,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.68",
     "drizzle-orm": "^0.45.1",
+    "effect": "^3.19.19",
     "ink": "^6.6.0",
     "ink-select-input": "^6.2.0",
     "ink-spinner": "^5.0.0",
